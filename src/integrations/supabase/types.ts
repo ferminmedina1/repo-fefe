@@ -56,6 +56,79 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_conversations: {
+        Row: {
+          id: string
+          user_id: string
+          company_id: string
+          title: string
+          analysis_type: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          company_id: string
+          title?: string
+          analysis_type?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          company_id?: string
+          title?: string
+          analysis_type?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_conversation_messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          role: string
+          content: string
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          role: string
+          content: string
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          role?: string
+          content?: string
+          metadata?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_conversation_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "ai_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -217,6 +290,142 @@ export type Database = {
             columns: ["destination_account_id"]
             isOneToOne: false
             referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bot_implementation_requests: {
+        Row: {
+          id: string
+          company_id: string
+          requested_by: string
+          bot_name: string
+          bot_description: string
+          use_case: string | null
+          target_audience: string | null
+          desired_features: string[] | null
+          integration_requirements: string | null
+          priority: string
+          status: Database["public"]["Enums"]["bot_request_status"]
+          assigned_to: string | null
+          admin_notes: string | null
+          estimated_budget: number | null
+          actual_budget: number | null
+          estimated_delivery_date: string | null
+          qa_approved: boolean | null
+          qa_notes: string | null
+          rejection_reason: string | null
+          created_at: string
+          updated_at: string
+          reviewed_at: string | null
+          approved_at: string | null
+          completed_at: string | null
+          activated_at: string | null
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          requested_by: string
+          bot_name: string
+          bot_description: string
+          use_case?: string | null
+          target_audience?: string | null
+          desired_features?: string[] | null
+          integration_requirements?: string | null
+          priority?: string
+          status?: Database["public"]["Enums"]["bot_request_status"]
+          assigned_to?: string | null
+          admin_notes?: string | null
+          estimated_budget?: number | null
+          actual_budget?: number | null
+          estimated_delivery_date?: string | null
+          qa_approved?: boolean | null
+          qa_notes?: string | null
+          rejection_reason?: string | null
+          created_at?: string
+          updated_at?: string
+          reviewed_at?: string | null
+          approved_at?: string | null
+          completed_at?: string | null
+          activated_at?: string | null
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          requested_by?: string
+          bot_name?: string
+          bot_description?: string
+          use_case?: string | null
+          target_audience?: string | null
+          desired_features?: string[] | null
+          integration_requirements?: string | null
+          priority?: string
+          status?: Database["public"]["Enums"]["bot_request_status"]
+          assigned_to?: string | null
+          admin_notes?: string | null
+          estimated_budget?: number | null
+          actual_budget?: number | null
+          estimated_delivery_date?: string | null
+          qa_approved?: boolean | null
+          qa_notes?: string | null
+          rejection_reason?: string | null
+          created_at?: string
+          updated_at?: string
+          reviewed_at?: string | null
+          approved_at?: string | null
+          completed_at?: string | null
+          activated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_implementation_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bot_request_activity_log: {
+        Row: {
+          id: string
+          request_id: string
+          user_id: string
+          action: string
+          old_status: Database["public"]["Enums"]["bot_request_status"] | null
+          new_status: Database["public"]["Enums"]["bot_request_status"] | null
+          details: string | null
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          request_id: string
+          user_id: string
+          action: string
+          old_status?: Database["public"]["Enums"]["bot_request_status"] | null
+          new_status?: Database["public"]["Enums"]["bot_request_status"] | null
+          details?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          request_id?: string
+          user_id?: string
+          action?: string
+          old_status?: Database["public"]["Enums"]["bot_request_status"] | null
+          new_status?: Database["public"]["Enums"]["bot_request_status"] | null
+          details?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_request_activity_log_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "bot_implementation_requests"
             referencedColumns: ["id"]
           },
         ]
@@ -7665,6 +7874,17 @@ export type Database = {
         | "technician"
         | "auditor"
         | "platform_admin"
+      bot_request_status:
+        | "pending"
+        | "reviewing"
+        | "quoted"
+        | "approved"
+        | "in_development"
+        | "qa_testing"
+        | "ready_for_activation"
+        | "active"
+        | "rejected"
+        | "cancelled"
       delivery_status: "pending" | "in_transit" | "delivered" | "cancelled"
       quotation_status:
         | "draft"

@@ -94,6 +94,7 @@ export const useSSEStream = (options: UseSSEStreamOptions = {}) => {
 
         const decoder = new TextDecoder();
         let accumulatedText = "";
+        let lineBuffer = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -102,13 +103,17 @@ export const useSSEStream = (options: UseSSEStreamOptions = {}) => {
             break;
           }
 
-          // Decode chunk
+          // Decode chunk and buffer partial lines
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
+          lineBuffer += chunk;
+          const lines = lineBuffer.split("\n");
+          // Keep the last element as it may be an incomplete line
+          lineBuffer = lines.pop() || "";
 
           for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6);
+            const trimmed = line.trim();
+            if (trimmed.startsWith("data: ")) {
+              const data = trimmed.slice(6);
 
               // Check for completion signal
               if (data === "[DONE]") {
