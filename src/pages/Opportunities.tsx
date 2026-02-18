@@ -19,7 +19,9 @@ import {
 import { useCompany } from "@/contexts/CompanyContext";
 import { OpportunitiesList } from "@/components/crm/OpportunitiesList";
 import { OpportunityDrawer } from "@/components/crm/OpportunityDrawer";
-import { LucidePlus, LucideFilter, LucideDownload } from "lucide-react";
+import { OpportunitiesCalendarView } from "@/components/crm/OpportunitiesCalendarView";
+import { OpportunitiesKanbanView } from "@/components/crm/OpportunitiesKanbanView";
+import { LucidePlus, LucideFilter, LucideDownload, List, CalendarDays, Kanban } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -152,6 +154,7 @@ export default function OpportunitiesPage() {
 
   const [savedViewId, setSavedViewId] = useState<string>("default");
   const [newViewName, setNewViewName] = useState("");
+  const [view, setView] = useState<"list" | "calendar" | "kanban">("list");
 
   const { data: savedViews = [] } = useQuery({
     queryKey: ["crm-saved-views", currentCompany?.id],
@@ -383,15 +386,14 @@ export default function OpportunitiesPage() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-2">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">Oportunidades</h1>
-            <select
-              className="ml-2 border rounded px-2 py-1 text-sm"
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-bold">Oportunidades</h1>
+              <Select
               value={savedViewId}
-              onChange={(e) => {
-                const nextId = e.target.value;
+              onValueChange={(nextId) => {
                 setSavedViewId(nextId);
                 if (nextId === "default") return;
                 const view = savedViews.find((v) => v.id === nextId);
@@ -411,17 +413,23 @@ export default function OpportunitiesPage() {
                   }
                 }
               }}
-              aria-label="Vista guardada"
             >
-              <option value="default">Vista por defecto</option>
-              {savedViews.map((view) => (
-                <option key={view.id} value={view.id}>
-                  {view.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-44" aria-label="Vista guardada">
+                <SelectValue placeholder="Vista por defecto" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Vista por defecto</SelectItem>
+                {savedViews.map((view) => (
+                  <SelectItem key={view.id} value={view.id}>
+                    {view.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            </div>
+            <p className="text-sm text-muted-foreground">Gestioná y filtrá tus oportunidades de venta.</p>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             <Input
               placeholder="Buscar oportunidad o cliente..."
               value={search}
@@ -447,195 +455,254 @@ export default function OpportunitiesPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button onClick={() => setShowDrawer(true)} variant="default" className="ml-2">
+            <div className="flex rounded-md border overflow-hidden">
+              <Button
+                variant={view === "list" ? "default" : "ghost"}
+                size="icon"
+                className="rounded-none"
+                aria-label="Vista lista"
+                onClick={() => setView("list")}
+              >
+                <List className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={view === "calendar" ? "default" : "ghost"}
+                size="icon"
+                className="rounded-none border-l"
+                aria-label="Vista calendario"
+                onClick={() => setView("calendar")}
+              >
+                <CalendarDays className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={view === "kanban" ? "default" : "ghost"}
+                size="icon"
+                className="rounded-none border-l"
+                aria-label="Vista kanban"
+                onClick={() => setView("kanban")}
+              >
+                <Kanban className="w-4 h-4" />
+              </Button>
+            </div>
+            <Button onClick={() => setShowDrawer(true)} variant="default">
               <LucidePlus className="w-4 h-4 mr-1" /> Nueva oportunidad
             </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Input
-            value={newViewName}
-            onChange={(e) => setNewViewName(e.target.value)}
-            placeholder="Nombre de vista"
-            className="w-56"
-          />
-          <Button
-            variant="outline"
-            onClick={() => createSavedViewMutation.mutate()}
-            disabled={!newViewName.trim() || createSavedViewMutation.isPending}
-          >
-            Guardar vista
-          </Button>
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-medium text-muted-foreground">Filtros</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={newViewName}
+                onChange={(e) => setNewViewName(e.target.value)}
+                placeholder="Nombre de vista"
+                className="w-44 h-8 text-sm"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => createSavedViewMutation.mutate()}
+                disabled={!newViewName.trim() || createSavedViewMutation.isPending}
+              >
+                Guardar vista
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  setFilters({
+                    pipelineId: undefined,
+                    stageId: undefined,
+                    ownerId: undefined,
+                    status: undefined,
+                    dateRange: undefined,
+                    value: undefined,
+                  })
+                }
+              >
+                Limpiar
+              </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+            <Select
+              value={filters.pipelineId || "all"}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  pipelineId: value === "all" ? undefined : value,
+                  stageId: undefined,
+                }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Pipeline" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los pipelines</SelectItem>
+                {pipelines.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.stageId || "all"}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  stageId: value === "all" ? undefined : value,
+                }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Etapa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las etapas</SelectItem>
+                {stageOptions.map((stage) => (
+                  <SelectItem key={stage} value={stage}>
+                    {stage}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.ownerId || "all"}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  ownerId: value === "all" ? undefined : value,
+                }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Responsable" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {owners.map((o: any) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    {`${o.first_name} ${o.last_name}`.trim()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.status || "all"}
+              onValueChange={(value) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  status: value === "all" ? undefined : value,
+                }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="abierta">Abierta</SelectItem>
+                <SelectItem value="ganado">Ganado</SelectItem>
+                <SelectItem value="perdido">Perdido</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Input
+              type="date"
+              value={filters.dateRange?.from || ""}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  dateRange: {
+                    from: e.target.value,
+                    to: prev.dateRange?.to || e.target.value,
+                  },
+                }))
+              }
+              placeholder="Desde"
+            />
+            <Input
+              type="date"
+              value={filters.dateRange?.to || ""}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  dateRange: {
+                    from: prev.dateRange?.from || e.target.value,
+                    to: e.target.value,
+                  },
+                }))
+              }
+              placeholder="Hasta"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 max-w-sm">
+            <Input
+              type="number"
+              value={filters.value?.min ?? ""}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  value: {
+                    min: e.target.value ? Number(e.target.value) : 0,
+                    max: prev.value?.max ?? 0,
+                  },
+                }))
+              }
+              placeholder="Monto mínimo"
+            />
+            <Input
+              type="number"
+              value={filters.value?.max ?? ""}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  value: {
+                    min: prev.value?.min ?? 0,
+                    max: e.target.value ? Number(e.target.value) : 0,
+                  },
+                }))
+              }
+              placeholder="Monto máximo"
+            />
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
-          <Select
-            value={filters.pipelineId || "all"}
-            onValueChange={(value) =>
-              setFilters((prev) => ({
-                ...prev,
-                pipelineId: value === "all" ? undefined : value,
-                stageId: undefined,
-              }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Pipeline" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los pipelines</SelectItem>
-              {pipelines.map((p: any) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.stageId || "all"}
-            onValueChange={(value) =>
-              setFilters((prev) => ({
-                ...prev,
-                stageId: value === "all" ? undefined : value,
-              }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Etapa" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las etapas</SelectItem>
-              {stageOptions.map((stage) => (
-                <SelectItem key={stage} value={stage}>
-                  {stage}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.ownerId || "all"}
-            onValueChange={(value) =>
-              setFilters((prev) => ({
-                ...prev,
-                ownerId: value === "all" ? undefined : value,
-              }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Responsable" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {owners.map((o: any) => (
-                <SelectItem key={o.id} value={o.id}>
-                  {`${o.first_name} ${o.last_name}`.trim()}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.status || "all"}
-            onValueChange={(value) =>
-              setFilters((prev) => ({
-                ...prev,
-                status: value === "all" ? undefined : value,
-              }))
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="abierta">Abierta</SelectItem>
-              <SelectItem value="ganado">Ganado</SelectItem>
-              <SelectItem value="perdido">Perdido</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Input
-            type="date"
-            value={filters.dateRange?.from || ""}
-            onChange={(e) =>
-              setFilters((prev) => ({
-                ...prev,
-                dateRange: {
-                  from: e.target.value,
-                  to: prev.dateRange?.to || e.target.value,
-                },
-              }))
-            }
-            placeholder="Desde"
+        {view === "list" ? (
+          <OpportunitiesList
+            companyId={currentCompany.id}
+            search={search}
+            filters={filters}
+            onCreate={() => setShowDrawer(true)}
           />
-          <Input
-            type="date"
-            value={filters.dateRange?.to || ""}
-            onChange={(e) =>
-              setFilters((prev) => ({
-                ...prev,
-                dateRange: {
-                  from: prev.dateRange?.from || e.target.value,
-                  to: e.target.value,
-                },
-              }))
-            }
-            placeholder="Hasta"
+        ) : view === "kanban" ? (
+          <OpportunitiesKanbanView
+            companyId={currentCompany.id}
+            search={search}
+            filters={{
+              pipelineId: filters.pipelineId,
+              ownerId: filters.ownerId,
+              status: filters.status,
+              stageId: filters.stageId,
+            }}
           />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-          <Input
-            type="number"
-            value={filters.value?.min ?? ""}
-            onChange={(e) =>
-              setFilters((prev) => ({
-                ...prev,
-                value: {
-                  min: e.target.value ? Number(e.target.value) : 0,
-                  max: prev.value?.max ?? 0,
-                },
-              }))
-            }
-            placeholder="Monto mínimo"
+        ) : (
+          <OpportunitiesCalendarView
+            companyId={currentCompany.id}
+            search={search}
+            filters={{
+              pipelineId: filters.pipelineId,
+              ownerId: filters.ownerId,
+              status: filters.status,
+              stageId: filters.stageId,
+            }}
           />
-          <Input
-            type="number"
-            value={filters.value?.max ?? ""}
-            onChange={(e) =>
-              setFilters((prev) => ({
-                ...prev,
-                value: {
-                  min: prev.value?.min ?? 0,
-                  max: e.target.value ? Number(e.target.value) : 0,
-                },
-              }))
-            }
-            placeholder="Monto máximo"
-          />
-          <Button
-            variant="outline"
-            onClick={() =>
-              setFilters({
-                pipelineId: undefined,
-                stageId: undefined,
-                ownerId: undefined,
-                status: undefined,
-                dateRange: undefined,
-                value: undefined,
-              })
-            }
-          >
-            Limpiar filtros
-          </Button>
-        </div>
-        <OpportunitiesList
-          companyId={currentCompany.id}
-          search={search}
-          filters={filters}
-          onCreate={() => setShowDrawer(true)}
-        />
+        )}
         {/* Drawer/modal for create opportunity */}
         <OpportunityDrawer
           open={showDrawer}
