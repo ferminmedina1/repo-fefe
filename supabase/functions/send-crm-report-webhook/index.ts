@@ -213,6 +213,7 @@ Deno.serve(async (req) => {
       const payload = {
         meta: {
           company_id: schedule.company_id,
+          company_name: schedule.company_name,
           frequency,
           timezone,
           period: { start: start.toISO(), end: end.toISO() },
