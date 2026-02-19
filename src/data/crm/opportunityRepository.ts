@@ -71,8 +71,9 @@ export const opportunityRepository = {
       .update(values)
       .eq("id", id)
       .select("*")
-      .single();
+      .maybeSingle();
     if (error) throw error;
+    if (!data) return opportunityRepository.getById(id);
     return toOpportunityDTO(data);
   },
 
