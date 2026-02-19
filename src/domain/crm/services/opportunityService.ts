@@ -29,10 +29,12 @@ const applyScoringForOpportunity = async (opportunity: OpportunityDTO) => {
     return opportunity;
   }
 
-  return opportunityRepository.update(opportunity.id, {
+  const now = new Date().toISOString();
+  await opportunityRepository.updateSilently(opportunity.id, {
     score_total: total,
-    score_updated_at: new Date().toISOString(),
+    score_updated_at: now,
   });
+  return { ...opportunity, scoreTotal: total, scoreUpdatedAt: now };
 };
 
 export const opportunityService = {

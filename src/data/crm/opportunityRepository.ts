@@ -76,6 +76,14 @@ export const opportunityRepository = {
     return toOpportunityDTO(data);
   },
 
+  async updateSilently(id: string, values: OpportunityUpdate) {
+    const { error } = await supabase
+      .from("crm_opportunities")
+      .update(values)
+      .eq("id", id);
+    if (error) throw error;
+  },
+
   async remove(id: string) {
     const { error } = await supabase.from("crm_opportunities").delete().eq("id", id);
     if (error) throw error;
