@@ -144,9 +144,7 @@ export default function CrmReports() {
   }, [reportSchedule]);
   
   const [companyName, setCompanyName] = useState<string>("");
-  const saveSchedule = useMutation({
-    mutationFn: async () => {
-      if (!currentCompany?.id) throw new Error("Empresa inválida");
+  if (!currentCompany?.id) throw new Error("Empresa inválida");
       useEffect(() => {
         supabase
           .from("companies")
@@ -155,6 +153,8 @@ export default function CrmReports() {
           .maybeSingle()
           .then(({ data }) => setCompanyName(data?.name ?? ""));
       }, [currentCompany?.id]);
+  const saveSchedule = useMutation({
+    mutationFn: async () => {
       const recipients = scheduleRecipients
         .split(/[\n,;]+/)
         .map((email) => email.trim())
