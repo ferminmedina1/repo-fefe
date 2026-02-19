@@ -28,10 +28,13 @@ export const tagRepository = {
       .from("crm_tags")
       .update(values)
       .eq("id", id)
-      .select("*")
-      .single();
+      .select("*");
     if (error) throw error;
-    return toTagDTO(data);
+    const row = data?.[0];
+    if (!row) {
+      throw new Error("No se pudo actualizar el tag (sin permisos o no existe).");
+    }
+    return toTagDTO(row);
   },
 
   async remove(id: string) {

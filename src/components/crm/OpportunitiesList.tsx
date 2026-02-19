@@ -50,15 +50,15 @@ function getStageBadgeClass(stage: string) {
 
 function getStatusBadgeClass(status?: string | null) {
   const s = (status ?? "").toLowerCase();
-  if (s.includes("ganad") || s === "won") return "bg-green-100 text-green-800 border-green-200";
-  if (s.includes("perdid") || s === "lost") return "bg-red-100 text-red-800 border-red-200";
+  if (s.includes("ganado") || s === "won") return "bg-green-100 text-green-800 border-green-200";
+  if (s.includes("perdido") || s === "lost") return "bg-red-100 text-red-800 border-red-200";
   return "bg-blue-100 text-blue-800 border-blue-200";
 }
 
 function getStatusLabel(status?: string | null) {
   const s = (status ?? "").toLowerCase();
-  if (s.includes("ganad") || s === "won") return "Ganado";
-  if (s.includes("perdid") || s === "lost") return "Perdido";
+  if (s.includes("ganado") || s === "won") return "Ganado";
+  if (s.includes("perdido") || s === "lost") return "Perdido";
   return "Abierta";
 }
 
