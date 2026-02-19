@@ -17,7 +17,37 @@ export const opportunityRepository = {
       )
       .eq("company_id", params.companyId);
 
-    if (params.search) q = q.ilike("name", `%${params.search}%`);
+    if (params.search) {
+      const raw = params.search.trim();
+      const needle = raw.replace(/,/g, "\\,");
+      const ilike = `%${needle}%`;
+      const orFilters = [
+        `name.ilike.${ilike}`,
+        `email.ilike.${ilike}`,
+        `phone.ilike.${ilike}`,
+        `description.ilike.${ilike}`,
+        `stage.ilike.${ilike}`,
+        `status.ilike.${ilike}`,
+        `next_step.ilike.${ilike}`,
+        `source.ilike.${ilike}`,
+        `lost_reason.ilike.${ilike}`,
+        `won_reason.ilike.${ilike}`,
+        `currency.ilike.${ilike}`,
+        `tags.cs.{${needle}}`,
+      ];
+
+      if (/^\d+(\.\d+)?$/.test(raw)) {
+        orFilters.push(`value.eq.${raw}`);
+        orFilters.push(`probability.eq.${raw}`);
+      }
+
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        orFilters.push(`estimated_close_date.eq.${raw}`);
+        orFilters.push(`close_date.eq.${raw}`);
+      }
+
+      q = q.or(orFilters.join(","));
+    }
     if (params.filters?.pipelineId) q = q.eq("pipeline_id", params.filters.pipelineId);
     if (params.filters?.stageId) q = q.eq("stage", params.filters.stageId);
     if (params.filters?.ownerId) q = q.eq("owner_id", params.filters.ownerId);
