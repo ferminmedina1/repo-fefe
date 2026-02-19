@@ -12,7 +12,7 @@ export const opportunityRepository = {
     let q = supabase
       .from("crm_opportunities")
       .select(
-        "id, company_id, name, email, phone, customer_id, pipeline_id, stage, value, estimated_close_date, probability, next_step, last_activity_at, sla_due_at, score_total, score_updated_at, created_at, updated_at, owner_id, status",
+        "id, company_id, name, email, phone, customer_id, pipeline_id, stage, value, estimated_close_date, probability, next_step, last_activity_at, sla_due_at, score_total, score_updated_at, created_at, updated_at, owner_id, status, tags",
         { count: "estimated" }
       )
       .eq("company_id", params.companyId);
@@ -70,11 +70,13 @@ export const opportunityRepository = {
       .from("crm_opportunities")
       .update(values)
       .eq("id", id)
-      .select("*")
-      .maybeSingle();
+      .select("*");
     if (error) throw error;
-    if (!data) return opportunityRepository.getById(id);
-    return toOpportunityDTO(data);
+    const row = data?.[0];
+    if (!row) {
+      throw new Error("No se pudo actualizar la oportunidad (sin permisos o no existe)." );
+    }
+    return toOpportunityDTO(row);
   },
 
   async updateSilently(id: string, values: OpportunityUpdate) {
