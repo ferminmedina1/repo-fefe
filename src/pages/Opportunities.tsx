@@ -30,7 +30,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { LucidePlus, LucideDownload, List, CalendarDays, Kanban, SlidersHorizontal } from "lucide-react";
+import { LucidePlus, LucideDownload, List, CalendarDays, Kanban, SlidersHorizontal, Eye } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -164,6 +164,7 @@ export default function OpportunitiesPage() {
   const [savedViewId, setSavedViewId] = useState<string>("default");
   const [newViewName, setNewViewName] = useState("");
   const [view, setView] = useState<"list" | "calendar" | "kanban">("list");
+  const [showViewPanel, setShowViewPanel] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
   const activeFilterCount = useMemo(() => {
@@ -460,9 +461,17 @@ export default function OpportunitiesPage() {
             />
             <Button
               variant="outline"
+              onClick={() => setShowViewPanel(true)}
+              aria-label="Vistas"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Vistas
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => setShowFilterPanel(true)}
               className="relative"
-              aria-label="Filtros y vista"
+              aria-label="Filtros"
             >
               <SlidersHorizontal className="w-4 h-4 mr-2" />
               Filtros
@@ -492,15 +501,14 @@ export default function OpportunitiesPage() {
             </Button>
           </div>
         </div>
-        {/* Filter & View side panel */}
-        <Sheet open={showFilterPanel} onOpenChange={setShowFilterPanel}>
+        {/* Views side panel */}
+        <Sheet open={showViewPanel} onOpenChange={setShowViewPanel}>
           <SheetContent side="right" className="w-80 sm:w-96 overflow-y-auto">
             <SheetHeader className="mb-4">
-              <SheetTitle>Filtros y vista</SheetTitle>
+              <SheetTitle>Vistas</SheetTitle>
             </SheetHeader>
 
-            {/* Vista */}
-            <div className="space-y-2 mb-5">
+            <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista</Label>
               <div className="flex rounded-md border overflow-hidden">
                 <Button
@@ -526,8 +534,15 @@ export default function OpportunitiesPage() {
                 </Button>
               </div>
             </div>
+          </SheetContent>
+        </Sheet>
 
-            <Separator className="mb-5" />
+        {/* Filter side panel */}
+        <Sheet open={showFilterPanel} onOpenChange={setShowFilterPanel}>
+          <SheetContent side="right" className="w-80 sm:w-96 overflow-y-auto">
+            <SheetHeader className="mb-4">
+              <SheetTitle>Filtros</SheetTitle>
+            </SheetHeader>
 
             {/* Filtros */}
             <div className="space-y-4">
