@@ -35,7 +35,6 @@ export const opportunityRepository = {
         `won_reason.ilike.${ilike}`,
         `currency.ilike.${ilike}`,
         `tags.cs.{"${tagValue}"}`,
-        `tags::text.ilike.${ilike}`,
       ];
 
       if (/^\d+(\.\d+)?$/.test(raw)) {
