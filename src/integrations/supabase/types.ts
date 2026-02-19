@@ -3321,6 +3321,81 @@ export type Database = {
           },
         ]
       }
+      inventory_alert_rules: {
+        Row: {
+          id: string
+          company_id: string
+          created_by: string | null
+          condition_type: string
+          scope: string
+          scope_category: string | null
+          scope_product_id: string | null
+          threshold: number
+          notify_system: boolean
+          notify_email: boolean
+          notify_whatsapp: boolean
+          active: boolean
+          name: string | null
+          last_triggered_at: string | null
+          triggered_count: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_id: string
+          created_by?: string | null
+          condition_type: string
+          scope?: string
+          scope_category?: string | null
+          scope_product_id?: string | null
+          threshold: number
+          notify_system?: boolean
+          notify_email?: boolean
+          notify_whatsapp?: boolean
+          active?: boolean
+          name?: string | null
+          last_triggered_at?: string | null
+          triggered_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_id?: string
+          created_by?: string | null
+          condition_type?: string
+          scope?: string
+          scope_category?: string | null
+          scope_product_id?: string | null
+          threshold?: number
+          notify_system?: boolean
+          notify_email?: boolean
+          notify_whatsapp?: boolean
+          active?: boolean
+          name?: string | null
+          last_triggered_at?: string | null
+          triggered_count?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_alert_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_alert_rules_scope_product_id_fkey"
+            columns: ["scope_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invite_tokens: {
         Row: {
           company_id: string
