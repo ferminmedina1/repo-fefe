@@ -213,7 +213,7 @@ export default function Auth() {
             <Button type="submit" className="w-full mt-2 h-11 bg-primary hover:bg-primary/90 text-white font-semibold shadow-lg" disabled={isLoading}>
               {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0 mt-4 pt-2 border-t border-primary/30">
+            <div className="flex flex-col items-center gap-2 mt-4 pt-2 border-t border-primary/30">
               <Button
                 type="button"
                 variant="link"
