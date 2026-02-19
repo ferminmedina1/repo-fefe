@@ -48,10 +48,27 @@ interface Opportunity {
   name: string;
   value: number | null;
   stage: string;
+  status: string | null;
   customer_id: string | null;
   probability: number | null;
   updated_at: string;
   customers?: { name: string } | null;
+}
+
+const formatCurrency = (value: number | null) => {
+  if (value == null) return null;
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    maximumFractionDigits: 0,
+  }).format(value);
+};
+
+function getPillClass(status?: string | null, stage?: string | null) {
+  const s = ((status ?? stage) ?? "").toLowerCase();
+  if (s.includes("ganad") || s === "won") return "bg-green-100 text-green-800";
+  if (s.includes("perdid") || s === "lost") return "bg-red-100 text-red-800";
+  return "bg-primary/10 text-primary";
 }
 
 export function Pipelines({ companyId }: { companyId: string }) {
@@ -110,7 +127,7 @@ export function Pipelines({ companyId }: { companyId: string }) {
       if (!selectedPipeline) return [];
       const { data, error } = await supabase
         .from("crm_opportunities")
-        .select("id, name, value, stage, customer_id, probability, updated_at, customers(name)")
+        .select("id, name, value, stage, status, customer_id, probability, updated_at, customers(name)")
         .eq("company_id", companyId)
         .eq("pipeline_id", selectedPipeline.id)
         .order("updated_at", { ascending: false });
@@ -549,18 +566,18 @@ export function Pipelines({ companyId }: { companyId: string }) {
       {selectedPipeline && (
         <div className="overflow-x-auto">
           <div className="flex gap-4 min-w-max pb-4">
-            {selectedPipeline.stages.map((stage) => (
+            {selectedPipeline.stages.map((stage) => {
+              const stageValue = opportunitiesByStage[stage]?.reduce((s, o) => s + (o.value ?? 0), 0) ?? 0;
+              return (
               <div
                 key={stage}
-                className="flex-shrink-0 w-80"
+                className="flex-shrink-0 w-72 flex flex-col rounded-lg border bg-muted/30 transition-all"
                 onDragOver={handleDragOver}
                 onDrop={() => handleDrop(stage)}
               >
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium flex items-center justify-between">
-                      <span>{stage}</span>
-                      <div className="flex items-center gap-2">
+                <div className="p-3 flex items-center justify-between border-b bg-muted/50 rounded-t-lg">
+                  <span className="font-medium text-sm truncate mr-2">{stage}</span>
+                  <div className="flex items-center gap-1.5">
                         <Dialog
                           open={ruleDialogStage === stage}
                           onOpenChange={(open) => {
@@ -650,13 +667,17 @@ export function Pipelines({ companyId }: { companyId: string }) {
                             </div>
                           </DialogContent>
                         </Dialog>
-                        <Badge variant="secondary">{opportunitiesByStage[stage]?.length || 0}</Badge>
+                        <Badge variant="secondary" className="text-xs shrink-0">{opportunitiesByStage[stage]?.length || 0}</Badge>
                       </div>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="min-h-[200px] flex flex-col gap-2">
+                    </div>
+                    {stageValue > 0 && (
+                      <p className="px-3 pt-1.5 pb-1 text-xs text-muted-foreground font-medium">
+                        {formatCurrency(stageValue)}
+                      </p>
+                    )}
+                  <div className="flex flex-col gap-2 p-2 flex-1">
                     <div
-                      className="space-y-2 max-h-[520px] overflow-y-auto pr-1"
+                      className="flex flex-col gap-2 max-h-[520px] overflow-y-auto"
                       onScroll={(e) => handleColumnScroll(stage, e)}
                     >
                       {opportunitiesByStage[stage]
@@ -667,17 +688,14 @@ export function Pipelines({ companyId }: { companyId: string }) {
                             draggable
                             onDragStart={() => handleDragStart(opp)}
                             onClick={() => handleEditOpportunity(opp.id)}
-                            className="p-3 bg-card border rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+                            className="p-3 bg-card border rounded-lg cursor-pointer hover:shadow-md transition-shadow select-none"
                           >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-start gap-2 flex-1">
-                                <GripVertical className="w-4 h-4 text-muted-foreground mt-0.5" />
-                                <div className="flex-1">
-                                  <p className="font-medium text-sm">{opp.name}</p>
-                                  {opp.customers?.name && (
-                                    <p className="text-xs text-muted-foreground">{opp.customers.name}</p>
-                                  )}
-                                </div>
+                            <div className="flex items-start justify-between mb-1">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm leading-tight truncate">{opp.name}</p>
+                                {opp.customers?.name && (
+                                  <p className="text-xs text-muted-foreground truncate mt-0.5">{opp.customers.name}</p>
+                                )}
                               </div>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -708,13 +726,20 @@ export function Pipelines({ companyId }: { companyId: string }) {
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
-                            <div className="flex items-center justify-between text-xs">
-                              {opp.value && <span className="font-mono">${opp.value}</span>}
-                              {opp.probability !== null && (
+                            {opp.value != null && (
+                              <p className="text-sm text-primary font-semibold mt-1.5">
+                                {formatCurrency(opp.value)}
+                              </p>
+                            )}
+                            <div className="flex items-center justify-between mt-2 gap-1">
+                              {opp.probability != null ? (
                                 <Badge variant="outline" className="text-xs">
                                   {opp.probability}%
                                 </Badge>
-                              )}
+                              ) : <span />}
+                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${getPillClass(opp.status, opp.stage)}`}>
+                                {opp.status ?? opp.stage}
+                              </span>
                             </div>
                           </div>
                         ))}
@@ -789,10 +814,10 @@ export function Pipelines({ companyId }: { companyId: string }) {
                         )}
                       </Dialog>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

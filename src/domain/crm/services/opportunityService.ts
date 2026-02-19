@@ -10,6 +10,7 @@ import { opportunitySchema } from "@/domain/crm/validation/opportunitySchema";
 import { stageRuleService } from "@/domain/crm/services/stageRuleService";
 import { crmNotificationService } from "@/domain/crm/services/crmNotificationService";
 import { scoringRuleService } from "@/domain/crm/services/scoringRuleService";
+import { activityLogService } from "@/domain/crm/services/activityLogService";
 
 const applyScoringForOpportunity = async (opportunity: OpportunityDTO) => {
   const rules = await scoringRuleService.listActive(opportunity.companyId);
@@ -80,8 +81,76 @@ export const opportunityService = {
   },
 
   async update(id: string, values: OpportunityUpdate) {
+    // Fetch current state before updating to detect changes
+    const before = await opportunityRepository.getById(id);
     const updated = await opportunityRepository.update(id, values);
-    if (values.stage) {
+
+    // Detect changed fields and build activity log entries
+    const logEntries: Array<{ action: string; payload: Record<string, unknown> }> = [];
+
+    if (values.name !== undefined && values.name !== before?.name) {
+      logEntries.push({
+        action: `Nombre cambiado de "${before?.name}" a "${values.name}"`,
+        payload: { field: "name", from: before?.name, to: values.name },
+      });
+    }
+    if (values.stage !== undefined && values.stage !== before?.stage) {
+      logEntries.push({
+        action: `Etapa cambiada de "${before?.stage ?? "-"}" a "${values.stage}"`,
+        payload: { field: "stage", from: before?.stage, to: values.stage },
+      });
+    }
+    if (values.status !== undefined && values.status !== before?.status) {
+      logEntries.push({
+        action: `Estado cambiado a "${values.status}"`,
+        payload: { field: "status", from: before?.status, to: values.status },
+      });
+    }
+    if (values.tags !== undefined) {
+      const oldTags = JSON.stringify((before?.tags ?? []).slice().sort());
+      const newTags = JSON.stringify((values.tags ?? []).slice().sort());
+      if (oldTags !== newTags) {
+        logEntries.push({
+          action: `Tags actualizados`,
+          payload: { field: "tags", from: before?.tags, to: values.tags },
+        });
+      }
+    }
+    if (values.value !== undefined && values.value !== before?.value) {
+      logEntries.push({
+        action: `Valor actualizado a ${values.value ?? "-"}`,
+        payload: { field: "value", from: before?.value, to: values.value },
+      });
+    }
+    if (values.owner_id !== undefined && values.owner_id !== before?.ownerId) {
+      logEntries.push({
+        action: `Responsable actualizado`,
+        payload: { field: "owner_id", from: before?.ownerId, to: values.owner_id },
+      });
+    }
+    if (values.estimated_close_date !== undefined && values.estimated_close_date !== before?.estimatedCloseDate) {
+      logEntries.push({
+        action: `Fecha de cierre estimada actualizada`,
+        payload: { field: "estimated_close_date", from: before?.estimatedCloseDate, to: values.estimated_close_date },
+      });
+    }
+
+    // Persist activity log entries (silently — don't break the update on log failure)
+    if (logEntries.length > 0) {
+      await Promise.allSettled(
+        logEntries.map((entry) =>
+          activityLogService.create({
+            company_id: updated.companyId,
+            opportunity_id: updated.id,
+            action: entry.action,
+            payload: entry.payload,
+          })
+        )
+      );
+    }
+
+    // Notify on stage change
+    if (values.stage && values.stage !== before?.stage) {
       await crmNotificationService.notify({
         companyId: updated.companyId,
         type: "crm_stage_changed",
@@ -91,6 +160,7 @@ export const opportunityService = {
         userIds: updated.ownerId ? [updated.ownerId] : undefined,
       });
     }
+
     if (values.stage || values.pipeline_id) {
       await stageRuleService.applyForOpportunity({
         companyId: updated.companyId,

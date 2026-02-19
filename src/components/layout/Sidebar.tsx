@@ -53,12 +53,12 @@ import { useActiveModules } from "@/hooks/useActiveModules";
 import { usePermissions, Module } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useCompany } from "@/contexts/CompanyContext";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sidebar as UISidebar } from "@/components/ui/sidebar";
+import { useSidebar } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AvailableModulesDialog } from "./AvailableModulesDialog";
@@ -82,9 +82,41 @@ export function Sidebar() {
   const { isPlatformAdmin } = usePlatformAdmin();
   const { currentCompany } = useCompany();
   
+  const { open, isMobile, openMobile, setOpenMobile } = useSidebar();
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showModulesDialog, setShowModulesDialog] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const stored = localStorage.getItem("sidebar-width");
+    return stored ? parseInt(stored, 10) : 256;
+  });
+  const isResizing = useRef(false);
+
+  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isResizing.current) return;
+      const next = Math.max(180, Math.min(360, startWidth + (ev.clientX - startX)));
+      setSidebarWidth(next);
+    };
+    const onMouseUp = (ev: MouseEvent) => {
+      isResizing.current = false;
+      const final = Math.max(180, Math.min(360, startWidth + (ev.clientX - startX)));
+      localStorage.setItem("sidebar-width", String(final));
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [sidebarWidth]);
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('sidebar-favorites');
     return saved ? JSON.parse(saved) : ['/pos', '/sales', '/products'];
@@ -800,8 +832,28 @@ export function Sidebar() {
   }, [favorites, navItems]);
 
   return (
-    <UISidebar collapsible="offcanvas" className="border-r border-sidebar-border w-64">
-      <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95">
+    <>
+      {/* Mobile backdrop */}
+      {isMobile && openMobile && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50"
+          onClick={() => setOpenMobile(false)}
+        />
+      )}
+
+      <aside
+        className={cn(
+          "flex flex-col border-r border-sidebar-border shrink-0",
+          isMobile
+            ? cn(
+                "fixed left-0 top-0 h-screen z-50 transition-transform duration-200",
+                openMobile ? "translate-x-0" : "-translate-x-full"
+              )
+            : cn("h-screen sticky top-0 overflow-hidden transition-all duration-200", !open && "w-0 border-0")
+        )}
+        style={{ width: isMobile ? sidebarWidth : open ? sidebarWidth : 0 }}
+      >
+      <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95 relative" style={{ width: sidebarWidth }}>
         {/* Header - Premium */}
         <div className="px-5 py-5 border-b border-primary/20 relative overflow-hidden group" style={{animation: 'gradientShift 8s infinite ease-in-out'}}>
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 -z-10"></div>
@@ -952,8 +1004,18 @@ export function Sidebar() {
           onOpenChange={setShowModulesDialog}
           activeModules={activeModules.data || []}
         />
+
+        {/* Resize handle */}
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-50 group flex items-center justify-center"
+          onMouseDown={handleResizeMouseDown}
+          title="Arrastrar para redimensionar"
+        >
+          <div className="w-0.5 h-10 rounded-full bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
+        </div>
       </div>
-    </UISidebar>
+      </aside>
+    </>
   );
 }
 
