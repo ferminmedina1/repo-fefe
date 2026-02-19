@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -41,6 +45,7 @@ import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { DateRange } from "react-day-picker";
 import { useCompany } from "@/contexts/CompanyContext";
+import { toast } from "sonner";
 
 const DATE_RANGES = [
   { value: "7", label: "Últimos 7 días" },
@@ -75,6 +80,12 @@ export default function CrmReports() {
     from: subDays(new Date(), 30),
     to: new Date(),
   });
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleFrequency, setScheduleFrequency] = useState<"daily" | "weekly" | "monthly" | "yearly">("weekly");
+  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scheduleTimezone, setScheduleTimezone] = useState("America/Argentina/Buenos_Aires");
+  const [scheduleRecipients, setScheduleRecipients] = useState("");
+  const [payloadMode, setPayloadMode] = useState<"full" | "summary">("full");
 
   const getDateRange = () => {
     if (dateRangeType === "custom" && customDateRange?.from && customDateRange?.to) {
@@ -104,6 +115,78 @@ export default function CrmReports() {
     enabled: !!currentCompany?.id,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+  });
+
+  const { data: reportSchedule, refetch: refetchSchedule, isFetching: scheduleLoading } = useQuery({
+    queryKey: ["crm-report-schedule", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return null;
+      const { data, error } = await supabase
+        .from("crm_report_schedules" as any)
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  useEffect(() => {
+    const schedule = reportSchedule as any;
+    if (!schedule) return;
+    setScheduleEnabled(!!schedule.enabled);
+    setScheduleFrequency(schedule.frequency || "weekly");
+    setScheduleTime((schedule.send_time || "09:00:00").slice(0, 5));
+    setScheduleTimezone(schedule.timezone || "America/Argentina/Buenos_Aires");
+    setScheduleRecipients((schedule.recipients || []).join(", "));
+    setPayloadMode(schedule.payload_mode || "full");
+  }, [reportSchedule]);
+
+  const saveSchedule = useMutation({
+    mutationFn: async () => {
+      if (!currentCompany?.id) throw new Error("Empresa inválida");
+      const recipients = scheduleRecipients
+        .split(/[\n,;]+/)
+        .map((email) => email.trim())
+        .filter(Boolean);
+
+      const payload = {
+        company_id: currentCompany.id,
+        enabled: scheduleEnabled,
+        frequency: scheduleFrequency,
+        send_time: scheduleTime.length === 5 ? `${scheduleTime}:00` : scheduleTime,
+        timezone: scheduleTimezone,
+        recipients,
+        payload_mode: payloadMode,
+      };
+
+      const { error } = await supabase
+        .from("crm_report_schedules" as any)
+        .upsert(payload, { onConflict: "company_id" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Configuración guardada");
+      refetchSchedule();
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al guardar configuración");
+    },
+  });
+
+  const sendNow = useMutation({
+    mutationFn: async () => {
+      const schedule = reportSchedule as any;
+      if (!schedule?.id) throw new Error("Guardá la configuración primero");
+      const { data, error } = await supabase.functions.invoke("send-crm-report-webhook", {
+        body: { scheduleId: schedule.id },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => toast.success("Reporte enviado"),
+    onError: (error: any) => toast.error(error.message || "Error al enviar reporte"),
   });
 
   const { data: opportunities = [], isFetching, refetch } = useQuery({
@@ -318,6 +401,81 @@ export default function CrmReports() {
   return (
     <Layout>
       <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Reportes automáticos CRM</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Activar reportes automáticos</Label>
+                <p className="text-xs text-muted-foreground">
+                  Envía reportes periódicos al endpoint configurado internamente.
+                </p>
+              </div>
+              <Switch checked={scheduleEnabled} onCheckedChange={setScheduleEnabled} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Frecuencia</Label>
+                <Select value={scheduleFrequency} onValueChange={(value) => setScheduleFrequency(value as any)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Diario</SelectItem>
+                    <SelectItem value="weekly">Semanal</SelectItem>
+                    <SelectItem value="monthly">Mensual</SelectItem>
+                    <SelectItem value="yearly">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Hora de envío</Label>
+                <Input type="time" value={scheduleTime} onChange={(e) => setScheduleTime(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Zona horaria</Label>
+                <Input value={scheduleTimezone} onChange={(e) => setScheduleTimezone(e.target.value)} />
+                <p className="text-xs text-muted-foreground">Ej: America/Argentina/Buenos_Aires</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Modo de payload</Label>
+                <Select value={payloadMode} onValueChange={(value) => setPayloadMode(value as any)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full">Completo</SelectItem>
+                    <SelectItem value="summary">Resumido</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Emails destinatarios</Label>
+              <Input
+                value={scheduleRecipients}
+                onChange={(e) => setScheduleRecipients(e.target.value)}
+                placeholder="email1@empresa.com, email2@empresa.com"
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => saveSchedule.mutate()} disabled={saveSchedule.isPending || scheduleLoading}>
+                Guardar configuración
+              </Button>
+              <Button variant="outline" onClick={() => sendNow.mutate()} disabled={sendNow.isPending || !(reportSchedule as any)?.id}>
+                Enviar ahora
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Header */}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
