@@ -231,7 +231,7 @@ export default function CrmRoles() {
     <Layout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Roles CRM</h1>
+          <h1 className="text-2xl font-bold">Roles CRM</h1>
           <p className="text-sm text-muted-foreground">
             Administrá los roles CRM (owner/team/manager) por usuario.
           </p>
@@ -253,12 +253,13 @@ export default function CrmRoles() {
               Actualizá el rol CRM de cada usuario. Solo admin puede editar.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Usuario</TableHead>
-                  <TableHead>Identificador</TableHead>
+                  <TableHead className="hidden md:table-cell">Identificador</TableHead>
                   <TableHead>Rol CRM</TableHead>
                   <TableHead>Estado</TableHead>
                 </TableRow>
@@ -276,7 +277,7 @@ export default function CrmRoles() {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                       {member.user_id}
                     </TableCell>
                     <TableCell>
@@ -337,7 +338,8 @@ export default function CrmRoles() {
                 )}
               </TableBody>
             </Table>
-            <div className="flex justify-end mt-4">
+            </div>
+            <div className="flex justify-end mt-4 px-6 pb-4">
               <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["crm-role-members", currentCompany?.id] })}>
                 Recargar
               </Button>
@@ -358,7 +360,8 @@ export default function CrmRoles() {
               Crear rol
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0 pb-2">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -397,6 +400,7 @@ export default function CrmRoles() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       </div>

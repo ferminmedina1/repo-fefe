@@ -445,7 +445,10 @@ export function Pipelines({ companyId }: { companyId: string }) {
     return (
       <div className="p-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Pipelines</h1>
+          <div>
+            <h1 className="text-2xl font-bold">Pipelines</h1>
+            <p className="text-sm text-muted-foreground">Gestioná tus embudos de venta.</p>
+          </div>
         </div>
         <Card>
           <CardContent className="py-12 text-center">
@@ -482,7 +485,10 @@ export function Pipelines({ companyId }: { companyId: string }) {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Pipelines</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Pipelines</h1>
+          <p className="text-sm text-muted-foreground">Gestioná tus embudos de venta.</p>
+        </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button>
@@ -508,7 +514,7 @@ export function Pipelines({ companyId }: { companyId: string }) {
         </Dialog>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-3">
         <Select
           value={selectedPipeline?.id || ""}
           onValueChange={(value) => setSelectedPipelineId(value)}
@@ -661,7 +667,7 @@ export function Pipelines({ companyId }: { companyId: string }) {
                             draggable
                             onDragStart={() => handleDragStart(opp)}
                             onClick={() => handleEditOpportunity(opp.id)}
-                            className="p-3 bg-white border rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+                            className="p-3 bg-card border rounded-lg cursor-pointer hover:shadow-md transition-shadow"
                           >
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex items-start gap-2 flex-1">

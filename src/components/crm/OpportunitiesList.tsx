@@ -35,6 +35,28 @@ import type { OpportunityDTO } from "@/domain/crm/dtos/opportunity";
 import { pipelineService } from "@/domain/crm/services/pipelineService";
 import { tagService } from "@/domain/crm/services/tagService";
 
+// --- Stage badge color helper ---
+function getStageBadgeClass(stage: string) {
+  const s = stage.toLowerCase();
+  if (s.includes("ganad") || s.includes("won")) return "bg-green-100 text-green-800 border-green-200";
+  if (s.includes("perdid") || s.includes("lost")) return "bg-red-100 text-red-800 border-red-200";
+  return "";
+}
+
+function getStatusBadgeClass(status?: string | null) {
+  const s = (status ?? "").toLowerCase();
+  if (s.includes("ganad") || s === "won") return "bg-green-100 text-green-800 border-green-200";
+  if (s.includes("perdid") || s === "lost") return "bg-red-100 text-red-800 border-red-200";
+  return "bg-blue-100 text-blue-800 border-blue-200";
+}
+
+function getStatusLabel(status?: string | null) {
+  const s = (status ?? "").toLowerCase();
+  if (s.includes("ganad") || s === "won") return "Ganado";
+  if (s.includes("perdid") || s === "lost") return "Perdido";
+  return "Abierta";
+}
+
 // --- Types ---
 type SortableField = keyof Omit<Database["public"]["Tables"]["crm_opportunities"]["Row"], "closed_at" | "close_date" | "currency" | "expected_revenue" | "last_activity_at" | "lost_reason" | "next_step" | "source" | "status" | "tags" | "won_reason">;
 type OpportunityRow = Database["public"]["Tables"]["crm_opportunities"]["Row"];
@@ -348,6 +370,7 @@ export function OpportunitiesList({
     { key: "name", label: "Oportunidad" },
     { key: "score_total", label: "Score" },
     { key: "stage", label: "Etapa" },
+    { key: "status", label: "Estado" },
     { key: "value", label: "Monto" },
     { key: "estimated_close_date", label: "Cierre" },
     { key: "probability", label: "%" },
@@ -384,9 +407,9 @@ export function OpportunitiesList({
     : "";
 
   return (
-    <div className="bg-white rounded-lg shadow p-0">
+    <div className="bg-card rounded-lg border p-0">
       {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 p-3 border-b bg-gray-50">
+        <div className="flex flex-wrap items-center gap-2 p-3 border-b bg-muted/50">
           <span className="text-sm">Seleccionadas: {selectedIds.size}</span>
           <Dialog open={bulkModalOpen} onOpenChange={setBulkModalOpen}>
             <DialogTrigger asChild>
@@ -510,7 +533,7 @@ export function OpportunitiesList({
       )}
       <div ref={tableParentRef} className="overflow-auto max-h-[600px]">
         <table className="min-w-full border-separate border-spacing-0">
-          <thead className="bg-gray-100 sticky top-0 z-10">
+          <thead className="bg-muted sticky top-0 z-10">
             <tr>
               <th className="px-4 py-2 text-left">
                 <input
@@ -592,7 +615,7 @@ export function OpportunitiesList({
                     key={opp.id}
                     ref={rowVirtualizer.measureElement}
                     data-index={virtualRow.index}
-                    className="border-b hover:bg-gray-50 group"
+                    className="border-b hover:bg-muted/40 group"
                     style={{
                       position: "absolute",
                       top: 0,
@@ -633,7 +656,15 @@ export function OpportunitiesList({
                     </td>
 
                     <td className="px-4 py-2">
-                      {opp.stage ? <Badge variant="secondary">{opp.stage}</Badge> : <Badge variant="secondary">-</Badge>}
+                      {opp.stage
+                        ? <Badge variant="secondary" className={getStageBadgeClass(opp.stage)}>{opp.stage}</Badge>
+                        : <Badge variant="secondary">-</Badge>}
+                    </td>
+
+                    <td className="px-4 py-2">
+                      <Badge variant="secondary" className={getStatusBadgeClass(opp.status)}>
+                        {getStatusLabel(opp.status)}
+                      </Badge>
                     </td>
 
                     <td className="px-4 py-2 font-mono">{opp.value ? `$${opp.value}` : "-"}</td>
@@ -683,7 +714,7 @@ export function OpportunitiesList({
       </div>
 
       {data?.total ? (
-        <div className="flex items-center justify-between px-4 py-2 border-t bg-gray-50 text-sm">
+        <div className="flex items-center justify-between px-4 py-2 border-t bg-muted/40 text-sm">
           <span>
             Página {page} de {Math.ceil(data.total / pageSize)}
           </span>

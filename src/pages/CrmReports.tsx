@@ -13,9 +13,30 @@ import {
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { CalendarIcon, RefreshCw } from "lucide-react";
-import { format, subDays, startOfDay, endOfDay, differenceInDays } from "date-fns";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  Legend,
+} from "recharts";
+import { CalendarIcon, RefreshCw, Target, TrendingUp, Trophy, Clock, DollarSign, Users } from "lucide-react";
+import {
+  format,
+  subDays,
+  startOfDay,
+  endOfDay,
+  differenceInDays,
+  addDays,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+} from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { DateRange } from "react-day-picker";
@@ -31,7 +52,7 @@ const DATE_RANGES = [
 ];
 
 const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(value);
+  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(value);
 
 const normalizeStatus = (value?: string | null) => (value ?? "").trim().toLowerCase();
 
@@ -92,7 +113,7 @@ export default function CrmReports() {
       const { start, end } = getDateRange();
       const { data, error } = await supabase
         .from("crm_opportunities")
-        .select("id, pipeline_id, stage, value, status, created_at, close_date")
+        .select("id, pipeline_id, stage, value, status, created_at, close_date, owner_id")
         .eq("company_id", currentCompany.id)
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString());
@@ -100,6 +121,64 @@ export default function CrmReports() {
       return data ?? [];
     },
     enabled: !!currentCompany?.id,
+  });
+
+  // Trend: last 12 months, independent of date range selector
+  const { data: trendRaw = [] } = useQuery({
+    queryKey: ["crm-trend", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const { data, error } = await supabase
+        .from("crm_opportunities")
+        .select("id, created_at, status, stage")
+        .eq("company_id", currentCompany.id)
+        .gte("created_at", startOfDay(subMonths(new Date(), 11)).toISOString());
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!currentCompany?.id,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Upcoming closes: next 30 days, open only
+  const { data: upcomingCloses = [] } = useQuery({
+    queryKey: ["crm-upcoming", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const { data, error } = await supabase
+        .from("crm_opportunities")
+        .select("id, name, value, estimated_close_date, stage, status")
+        .eq("company_id", currentCompany.id)
+        .gte("estimated_close_date", format(new Date(), "yyyy-MM-dd"))
+        .lte("estimated_close_date", format(addDays(new Date(), 30), "yyyy-MM-dd"))
+        .order("estimated_close_date", { ascending: true })
+        .limit(10);
+      if (error) throw error;
+      return (data ?? []).filter(
+        (o) => !isWon(o.status, o.stage) && !isLost(o.status, o.stage)
+      );
+    },
+    enabled: !!currentCompany?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Employees for owner ranking
+  const { data: employees = [] } = useQuery({
+    queryKey: ["crm-owners", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const { data, error } = await supabase
+        .from("employees")
+        .select("id, first_name, last_name")
+        .eq("company_id", currentCompany.id)
+        .order("first_name");
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!currentCompany?.id,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const kpis = useMemo(() => {
@@ -110,10 +189,13 @@ export default function CrmReports() {
     );
     const averageValue = totalCount ? totalValue / totalCount : 0;
 
-    const wonCount = opportunities.filter((opp) => isWon(opp.status, opp.stage)).length;
-    const lostCount = opportunities.filter((opp) => isLost(opp.status, opp.stage)).length;
+    const wonOpps = opportunities.filter((opp) => isWon(opp.status, opp.stage));
+    const lostOpps = opportunities.filter((opp) => isLost(opp.status, opp.stage));
+    const wonCount = wonOpps.length;
+    const lostCount = lostOpps.length;
     const closedCount = wonCount + lostCount;
     const winRate = closedCount ? (wonCount / closedCount) * 100 : 0;
+    const wonValue = wonOpps.reduce((sum, opp) => sum + (Number(opp.value) || 0), 0);
 
     const cycleDays = opportunities
       .filter((opp) => opp.close_date && opp.created_at)
@@ -131,6 +213,7 @@ export default function CrmReports() {
       wonCount,
       lostCount,
       winRate,
+      wonValue,
       avgCycle,
     };
   }, [opportunities]);
@@ -174,6 +257,50 @@ export default function CrmReports() {
     });
   }, [pipelines, opportunities]);
 
+  // Monthly trend data for last 12 months
+  const trendData = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const month = subMonths(startOfMonth(new Date()), 11 - i);
+      const monthStart = startOfMonth(month);
+      const monthEnd = endOfMonth(month);
+      const monthOpps = trendRaw.filter((o) => {
+        const d = new Date(o.created_at!);
+        return d >= monthStart && d <= monthEnd;
+      });
+      return {
+        mes: format(month, "MMM yy", { locale: es }),
+        nuevas: monthOpps.length,
+        ganadas: monthOpps.filter((o) => isWon(o.status, o.stage)).length,
+      };
+    });
+  }, [trendRaw]);
+
+  // Owner ranking derived from current period opportunities
+  const ownerRanking = useMemo(() => {
+    const map: Record<
+      string,
+      { name: string; total: number; won: number; wonValue: number }
+    > = {};
+    opportunities.forEach((opp) => {
+      if (!opp.owner_id) return;
+      if (!map[opp.owner_id]) {
+        const emp = employees.find((e: any) => e.id === opp.owner_id);
+        const name = emp
+          ? `${emp.first_name ?? ""} ${emp.last_name ?? ""}`.trim() || opp.owner_id
+          : opp.owner_id;
+        map[opp.owner_id] = { name, total: 0, won: 0, wonValue: 0 };
+      }
+      map[opp.owner_id].total++;
+      if (isWon(opp.status, opp.stage)) {
+        map[opp.owner_id].won++;
+        map[opp.owner_id].wonValue += Number(opp.value) || 0;
+      }
+    });
+    return Object.values(map)
+      .sort((a, b) => b.wonValue - a.wonValue)
+      .slice(0, 8);
+  }, [opportunities, employees]);
+
   const dateLabel = useMemo(() => {
     if (dateRangeType !== "custom") {
       const option = DATE_RANGES.find((item) => item.value === dateRangeType);
@@ -191,9 +318,10 @@ export default function CrmReports() {
   return (
     <Layout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Reporting CRM</h1>
+            <h1 className="text-2xl font-bold">Reportes CRM</h1>
             <p className="text-sm text-muted-foreground">
               Dashboards de KPIs y embudos por pipeline.
             </p>
@@ -242,47 +370,211 @@ export default function CrmReports() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {/* KPI cards — 5 cards */}
+        <div className="grid gap-4 grid-cols-2 xl:grid-cols-5">
           <Card>
-            <CardHeader>
-              <CardTitle>Total oportunidades</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total oportunidades</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{kpis.totalCount}</div>
-              <p className="text-xs text-muted-foreground">{dateLabel}</p>
+              <div className="text-2xl font-bold">{kpis.totalCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">{dateLabel}</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader>
-              <CardTitle>Valor total</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Valor total</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{formatCurrency(kpis.totalValue)}</div>
-              <p className="text-xs text-muted-foreground">Promedio {formatCurrency(kpis.averageValue)}</p>
+              <div className="text-2xl font-bold">{formatCurrency(kpis.totalValue)}</div>
+              <p className="text-xs text-muted-foreground mt-1">Prom. {formatCurrency(kpis.averageValue)}</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader>
-              <CardTitle>Tasa de cierre</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Valor ganado</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{kpis.winRate.toFixed(1)}%</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-2xl font-bold text-green-600">{formatCurrency(kpis.wonValue)}</div>
+              <p className="text-xs text-muted-foreground mt-1">{kpis.wonCount} oportunidades cerradas</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Tasa de cierre</CardTitle>
+              <Trophy className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{kpis.winRate.toFixed(1)}%</div>
+              <p className="text-xs text-muted-foreground mt-1">
                 Ganadas {kpis.wonCount} · Perdidas {kpis.lostCount}
               </p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader>
-              <CardTitle>Ciclo promedio</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Ciclo promedio</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">{kpis.avgCycle.toFixed(1)} días</div>
-              <p className="text-xs text-muted-foreground">Basado en oportunidades cerradas</p>
+              <div className="text-2xl font-bold">
+                {kpis.avgCycle.toFixed(1)}
+                <span className="text-base font-normal text-muted-foreground ml-1">días</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Basado en oportunidades cerradas</p>
             </CardContent>
           </Card>
         </div>
 
+        {/* Tendencia mensual + Próximos cierres */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Tendencia mensual */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tendencia mensual</CardTitle>
+              <p className="text-xs text-muted-foreground">Últimos 12 meses</p>
+            </CardHeader>
+            <CardContent className="h-72">
+              {trendData.some((d) => d.nuevas > 0) ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trendData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                    <Tooltip labelStyle={{ fontSize: 12 }} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Line
+                      type="monotone"
+                      dataKey="nuevas"
+                      name="Nuevas"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="ganadas"
+                      name="Ganadas"
+                      stroke="#16a34a"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                  Sin datos en los últimos 12 meses.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Próximos cierres */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Próximos cierres</CardTitle>
+              <p className="text-xs text-muted-foreground">Oportunidades abiertas en los próximos 30 días</p>
+            </CardHeader>
+            <CardContent>
+              {upcomingCloses.length === 0 ? (
+                <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
+                  Sin cierres próximos.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {upcomingCloses.map((opp) => {
+                    const daysLeft = differenceInDays(
+                      new Date(opp.estimated_close_date as string + "T00:00:00"),
+                      new Date()
+                    );
+                    const badgeClass =
+                      daysLeft <= 0
+                        ? "bg-red-100 text-red-700"
+                        : daysLeft <= 7
+                        ? "bg-orange-100 text-orange-700"
+                        : "bg-muted text-muted-foreground";
+                    return (
+                      <div
+                        key={opp.id}
+                        className="flex items-center justify-between gap-2 py-1.5 border-b last:border-0"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{opp.name}</p>
+                          {opp.stage && (
+                            <p className="text-xs text-muted-foreground">{opp.stage}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {opp.value != null && (
+                            <span className="text-xs font-medium text-primary">
+                              {formatCurrency(opp.value)}
+                            </span>
+                          )}
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeClass}`}
+                          >
+                            {daysLeft <= 0
+                              ? "Hoy"
+                              : daysLeft === 1
+                              ? "1 día"
+                              : `${daysLeft} días`}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Ranking de responsables */}
+        {ownerRanking.length > 0 && (
+          <Card>
+            <CardHeader className="flex flex-row items-center gap-2 space-y-0">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle>Ranking de responsables</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-muted-foreground text-xs">
+                      <th className="text-left py-2 pr-4 font-medium">#</th>
+                      <th className="text-left py-2 pr-4 font-medium">Responsable</th>
+                      <th className="text-right py-2 pr-4 font-medium">Total</th>
+                      <th className="text-right py-2 pr-4 font-medium">Ganadas</th>
+                      <th className="text-right py-2 font-medium">Valor ganado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ownerRanking.map((owner, i) => (
+                      <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="py-2 pr-4 text-muted-foreground font-medium">{i + 1}</td>
+                        <td className="py-2 pr-4 font-medium">{owner.name}</td>
+                        <td className="py-2 pr-4 text-right text-muted-foreground">{owner.total}</td>
+                        <td className="py-2 pr-4 text-right">
+                          <span className="text-green-600 font-medium">{owner.won}</span>
+                        </td>
+                        <td className="py-2 text-right font-semibold text-primary">
+                          {formatCurrency(owner.wonValue)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Valor por pipeline */}
         <Card>
           <CardHeader>
             <CardTitle>Valor por pipeline</CardTitle>
@@ -307,6 +599,7 @@ export default function CrmReports() {
           </CardContent>
         </Card>
 
+        {/* Embudos por pipeline */}
         <div className="grid gap-4 lg:grid-cols-2">
           {pipelineFunnels.map((pipeline) => (
             <Card key={pipeline.id}>
