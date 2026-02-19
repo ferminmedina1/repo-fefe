@@ -21,6 +21,7 @@ export const opportunityRepository = {
       const raw = params.search.trim();
       const needle = raw.replace(/,/g, "\\,");
       const ilike = `%${needle}%`;
+      const tagValue = raw.replace(/"/g, '\\"');
       const orFilters = [
         `name.ilike.${ilike}`,
         `email.ilike.${ilike}`,
@@ -33,7 +34,8 @@ export const opportunityRepository = {
         `lost_reason.ilike.${ilike}`,
         `won_reason.ilike.${ilike}`,
         `currency.ilike.${ilike}`,
-        `tags.cs.{${needle}}`,
+        `tags.cs.{"${tagValue}"}`,
+        `tags::text.ilike.${ilike}`,
       ];
 
       if (/^\d+(\.\d+)?$/.test(raw)) {
