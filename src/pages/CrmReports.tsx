@@ -153,6 +153,7 @@ export default function CrmReports() {
 
       const payload = {
         company_id: currentCompany.id,
+        company_name: currentCompany.name,
         enabled: scheduleEnabled,
         frequency: scheduleFrequency,
         send_time: scheduleTime.length === 5 ? `${scheduleTime}:00` : scheduleTime,
