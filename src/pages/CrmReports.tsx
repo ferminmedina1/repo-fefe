@@ -142,10 +142,19 @@ export default function CrmReports() {
     setScheduleRecipients((schedule.recipients || []).join(", "));
     setPayloadMode(schedule.payload_mode || "full");
   }, [reportSchedule]);
-
+  
+  const [companyName, setCompanyName] = useState<string>("");
   const saveSchedule = useMutation({
     mutationFn: async () => {
       if (!currentCompany?.id) throw new Error("Empresa inválida");
+      useEffect(() => {
+        supabase
+          .from("companies")
+          .select("name")
+          .eq("id", currentCompany.id)
+          .maybeSingle()
+          .then(({ data }) => setCompanyName(data?.name ?? ""));
+      }, [currentCompany?.id]);
       const recipients = scheduleRecipients
         .split(/[\n,;]+/)
         .map((email) => email.trim())
@@ -153,7 +162,7 @@ export default function CrmReports() {
 
       const payload = {
         company_id: currentCompany.id,
-        company_name: currentCompany.name,
+        company_name: companyName,
         enabled: scheduleEnabled,
         frequency: scheduleFrequency,
         send_time: scheduleTime.length === 5 ? `${scheduleTime}:00` : scheduleTime,
