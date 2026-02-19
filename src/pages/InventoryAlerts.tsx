@@ -219,31 +219,6 @@ export default function InventoryAlerts() {
     refetchNotifications();
   };
 
-  const checkAlerts = async () => {
-    try {
-      const { error: lowStockError } = await supabase.rpc("check_low_stock_alerts");
-      if (lowStockError) throw lowStockError;
-
-      const { error: expiringError } = await supabase.rpc("check_expiring_products");
-      if (expiringError) throw expiringError;
-
-      const { error: inactiveCustomersError } = await supabase.rpc("check_inactive_customers");
-      if (inactiveCustomersError) throw inactiveCustomersError;
-
-      const { error: overdueInvoicesError } = await supabase.rpc("check_overdue_invoices");
-      if (overdueInvoicesError) throw overdueInvoicesError;
-
-      const { error: expiringChecksError } = await supabase.rpc("check_expiring_checks");
-      if (expiringChecksError) throw expiringChecksError;
-
-      toast.success("Todas las alertas generadas exitosamente");
-      refetchNotifications();
-    } catch (error) {
-      console.error("Error checking alerts:", error);
-      toast.error("Error al generar alertas");
-    }
-  };
-
   const filteredLowStock = lowStockProducts?.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -264,15 +239,10 @@ export default function InventoryAlerts() {
               Monitoreo de stock bajo y productos próximos a vencer
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={checkAlerts} className="w-full sm:w-auto">
-              Generar Alertas
-            </Button>
-            <Button onClick={() => setCreateDialogOpen(true)} className="w-full sm:w-auto">
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar Alertas
-            </Button>
-          </div>
+          <Button onClick={() => setCreateDialogOpen(true)} className="w-full sm:w-auto">
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Alertas
+          </Button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">

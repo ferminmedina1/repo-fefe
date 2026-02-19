@@ -42,25 +42,25 @@ ALTER TABLE public.inventory_alert_rules ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own company alert rules"
   ON public.inventory_alert_rules FOR SELECT
   USING (company_id IN (
-    SELECT company_id FROM public.profiles WHERE id = auth.uid()
+    SELECT company_id FROM public.company_users WHERE user_id = auth.uid() AND active = true
   ));
 
 CREATE POLICY "Users can insert own company alert rules"
   ON public.inventory_alert_rules FOR INSERT
   WITH CHECK (company_id IN (
-    SELECT company_id FROM public.profiles WHERE id = auth.uid()
+    SELECT company_id FROM public.company_users WHERE user_id = auth.uid() AND active = true
   ));
 
 CREATE POLICY "Users can update own company alert rules"
   ON public.inventory_alert_rules FOR UPDATE
   USING (company_id IN (
-    SELECT company_id FROM public.profiles WHERE id = auth.uid()
+    SELECT company_id FROM public.company_users WHERE user_id = auth.uid() AND active = true
   ));
 
 CREATE POLICY "Users can delete own company alert rules"
   ON public.inventory_alert_rules FOR DELETE
   USING (company_id IN (
-    SELECT company_id FROM public.profiles WHERE id = auth.uid()
+    SELECT company_id FROM public.company_users WHERE user_id = auth.uid() AND active = true
   ));
 
 -- Auto-update updated_at

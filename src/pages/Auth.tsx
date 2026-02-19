@@ -106,7 +106,7 @@ export default function Auth() {
 
   return (
     <>
-      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto py-8 px-4">
         {/* Advanced animated background effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           {/* Main breathing orbs */}
@@ -128,7 +128,7 @@ export default function Auth() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-cyan-500/5 rounded-full" style={{animation: 'pulse 12s infinite ease-in-out 2s'}}></div>
         </div>
 
-        <div className="relative z-10 w-full max-w-md mx-auto px-4 md:px-0 my-auto">
+        <div className="relative z-10 w-full max-w-md mx-auto">
           <Card
             className="w-full shadow-[0_28px_80px_rgba(0,0,0,0.55)] border-primary/40 bg-gradient-to-br from-slate-800/90 via-slate-700/90 to-slate-800/90 backdrop-blur-2xl p-5 md:p-8"
             style={{animation: 'fadeInUp 0.6s ease-out'}}
