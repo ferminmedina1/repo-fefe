@@ -20,7 +20,8 @@ import {
   Bell,
   Trash2,
   Power,
-  Eye
+  Eye,
+  Pencil
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -45,6 +46,7 @@ export default function InventoryAlerts() {
   const { currentCompany } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<any>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -379,6 +381,17 @@ export default function InventoryAlerts() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-8 w-8"
+                      onClick={() => {
+                        setEditingRule(rule);
+                        setCreateDialogOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       className="h-8 w-8 text-destructive hover:text-destructive"
                       onClick={() => {
                         if (confirm('¿Eliminar esta alerta?')) {
@@ -625,7 +638,14 @@ export default function InventoryAlerts() {
         </TabsContent>
       </Tabs>
     </div>
-      <CreateAlertDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+      <CreateAlertDialog
+        open={createDialogOpen}
+        onOpenChange={(v) => {
+          setCreateDialogOpen(v);
+          if (!v) setEditingRule(null);
+        }}
+        editingRule={editingRule}
+      />
     </Layout>
   );
 }

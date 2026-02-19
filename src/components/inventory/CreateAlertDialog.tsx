@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -26,9 +26,30 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Search, AlertTriangle, Package, Tag, Bell, Power } from "lucide-react";
 import { toast } from "sonner";
 
+interface AlertRule {
+  id: string;
+  company_id: string;
+  created_by: string | null;
+  condition_type: string;
+  scope: string;
+  scope_category: string | null;
+  scope_product_id: string | null;
+  threshold: number;
+  notify_system: boolean;
+  notify_email: boolean;
+  notify_whatsapp: boolean;
+  active: boolean;
+  name: string | null;
+  last_triggered_at: string | null;
+  triggered_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
 interface CreateAlertDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  editingRule?: AlertRule | null;
 }
 
 const CONDITION_TYPES = [
@@ -43,9 +64,10 @@ const SCOPE_OPTIONS = [
   { value: "product", label: "Producto específico" },
 ] as const;
 
-export function CreateAlertDialog({ open, onOpenChange }: CreateAlertDialogProps) {
+export function CreateAlertDialog({ open, onOpenChange, editingRule }: CreateAlertDialogProps) {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
+  const isEditing = !!editingRule;
 
   // Form state
   const [conditionType, setConditionType] = useState<string>("stock_lte");
@@ -59,6 +81,25 @@ export function CreateAlertDialog({ open, onOpenChange }: CreateAlertDialogProps
   const [activeImmediately, setActiveImmediately] = useState(true);
   const [productSearch, setProductSearch] = useState("");
   const [alertName, setAlertName] = useState("");
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editingRule && open) {
+      setConditionType(editingRule.condition_type);
+      setScope(editingRule.scope);
+      setScopeCategory(editingRule.scope_category || "");
+      setScopeProductId(editingRule.scope_product_id || "");
+      setThreshold(String(editingRule.threshold));
+      setNotifySystem(editingRule.notify_system);
+      setNotifyEmail(editingRule.notify_email);
+      setNotifyWhatsapp(editingRule.notify_whatsapp);
+      setActiveImmediately(editingRule.active);
+      setAlertName(editingRule.name || "");
+      setProductSearch("");
+    } else if (!open) {
+      resetForm();
+    }
+  }, [editingRule, open]);
 
   // Fetch products for categories and product selector
   const { data: products } = useQuery({
@@ -121,6 +162,20 @@ export function CreateAlertDialog({ open, onOpenChange }: CreateAlertDialogProps
     setAlertName("");
   };
 
+  // Build payload helper
+  const buildPayload = () => ({
+    condition_type: conditionType,
+    scope,
+    scope_category: scope === "category" ? scopeCategory : null,
+    scope_product_id: scope === "product" ? scopeProductId : null,
+    threshold: conditionType === "stock_eq_zero" ? 0 : Number(threshold),
+    notify_system: notifySystem,
+    notify_email: notifyEmail,
+    notify_whatsapp: notifyWhatsapp,
+    active: activeImmediately,
+    name: alertName.trim() || null,
+  });
+
   // Create mutation
   const createAlert = useMutation({
     mutationFn: async () => {
@@ -128,24 +183,9 @@ export function CreateAlertDialog({ open, onOpenChange }: CreateAlertDialogProps
       if (!userData.user) throw new Error("No autenticado");
       if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
 
-      const payload = {
-        company_id: currentCompany.id,
-        created_by: userData.user.id,
-        condition_type: conditionType,
-        scope,
-        scope_category: scope === "category" ? scopeCategory : null,
-        scope_product_id: scope === "product" ? scopeProductId : null,
-        threshold: conditionType === "stock_eq_zero" ? 0 : Number(threshold),
-        notify_system: notifySystem,
-        notify_email: notifyEmail,
-        notify_whatsapp: notifyWhatsapp,
-        active: activeImmediately,
-        name: alertName.trim() || null,
-      };
-
       const { data, error } = await supabase
         .from("inventory_alert_rules")
-        .insert(payload)
+        .insert({ ...buildPayload(), company_id: currentCompany.id, created_by: userData.user.id })
         .select()
         .single();
 
@@ -168,20 +208,55 @@ export function CreateAlertDialog({ open, onOpenChange }: CreateAlertDialogProps
     },
   });
 
+  // Update mutation
+  const updateAlert = useMutation({
+    mutationFn: async () => {
+      if (!editingRule) throw new Error("No hay alerta para editar");
+
+      const { data, error } = await supabase
+        .from("inventory_alert_rules")
+        .update(buildPayload())
+        .eq("id", editingRule.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Alerta actualizada exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["inventory-alert-rules"] });
+      resetForm();
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      console.error("Error updating alert:", error);
+      toast.error("Error al actualizar la alerta", {
+        description: error.message || "Intenta nuevamente.",
+      });
+    },
+  });
+
+  const isSaving = createAlert.isPending || updateAlert.isPending;
+
   const handleSubmit = () => {
     if (!isValid) return;
-    createAlert.mutate();
+    if (isEditing) {
+      updateAlert.mutate();
+    } else {
+      createAlert.mutate();
+    }
   };
 
   const selectedProduct = products?.find(p => p.id === scopeProductId);
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!createAlert.isPending) onOpenChange(v); }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!isSaving) onOpenChange(v); }}>
       <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">Nueva alerta de inventario</DialogTitle>
+          <DialogTitle className="text-xl">{isEditing ? "Editar alerta de inventario" : "Nueva alerta de inventario"}</DialogTitle>
           <DialogDescription>
-            Configura una condición automática para monitorear tu stock.
+            {isEditing ? "Modificá los parámetros de esta alerta." : "Configura una condición automática para monitorear tu stock."}
           </DialogDescription>
         </DialogHeader>
 
@@ -417,21 +492,21 @@ export function CreateAlertDialog({ open, onOpenChange }: CreateAlertDialogProps
           <Button
             variant="outline"
             onClick={() => { resetForm(); onOpenChange(false); }}
-            disabled={createAlert.isPending}
+            disabled={isSaving}
           >
             Cancelar
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!isValid || createAlert.isPending}
+            disabled={!isValid || isSaving}
           >
-            {createAlert.isPending ? (
+            {isSaving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Guardando...
               </>
             ) : (
-              "Guardar alerta"
+              isEditing ? "Actualizar alerta" : "Guardar alerta"
             )}
           </Button>
         </DialogFooter>
