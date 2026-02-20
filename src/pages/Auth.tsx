@@ -144,7 +144,7 @@ export default function Auth() {
             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/10 via-transparent to-cyan-500/10 border border-primary/30 flex items-center justify-center overflow-visible" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
               <div className="absolute inset-2 rounded-full border border-white/10"></div>
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/12 to-transparent opacity-80" style={{animation: 'shine 3s infinite'}}></div>
-              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-12 h-12 relative z-10 drop-shadow-[0_8px_18px_rgba(59,130,246,0.45)]" />
+              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify" className="w-12 h-12 relative z-10 drop-shadow-[0_8px_18px_rgba(59,130,246,0.45)]" />
             </div>
           </div>
 
