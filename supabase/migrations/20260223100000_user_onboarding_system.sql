@@ -35,19 +35,24 @@ ALTER TABLE public.user_onboarding ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_module_tutorials ENABLE ROW LEVEL SECURITY;
 
 -- user_onboarding: users can only see/update their own rows
+DROP POLICY IF EXISTS "Users can view own onboarding" ON public.user_onboarding;
 CREATE POLICY "Users can view own onboarding" ON public.user_onboarding
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own onboarding" ON public.user_onboarding;
 CREATE POLICY "Users can insert own onboarding" ON public.user_onboarding
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own onboarding" ON public.user_onboarding;
 CREATE POLICY "Users can update own onboarding" ON public.user_onboarding
   FOR UPDATE USING (auth.uid() = user_id);
 
 -- user_module_tutorials: users can only manage their own rows
+DROP POLICY IF EXISTS "Users can view own tutorials" ON public.user_module_tutorials;
 CREATE POLICY "Users can view own tutorials" ON public.user_module_tutorials
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own tutorials" ON public.user_module_tutorials;
 CREATE POLICY "Users can insert own tutorials" ON public.user_module_tutorials
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 

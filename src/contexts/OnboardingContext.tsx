@@ -30,6 +30,8 @@ interface OnboardingContextType {
   state: OnboardingState | null;
   /** Whether onboarding is loading */
   loading: boolean;
+  /** Whether the RPC call failed (skip onboarding if true) */
+  error: boolean;
   /** Whether onboarding has been completed */
   isCompleted: boolean;
   /** Progress 0..1 */
@@ -54,6 +56,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   const [state, setState] = useState<OnboardingState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [showModuleSelector, setShowModuleSelector] = useState(false);
   const advancingRef = useRef(false);
 
@@ -66,6 +69,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     }
     try {
       setLoading(true);
+      setError(false);
       const s = await fetchOnboardingState(companyId);
       setState(s);
       // If just completed, show module selector
@@ -77,6 +81,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       }
     } catch (e) {
       console.error('[OnboardingProvider] Load error:', e);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -142,6 +147,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     () => ({
       state,
       loading,
+      error,
       isCompleted,
       progress,
       currentStepConfig,
@@ -150,7 +156,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       showModuleSelector,
       dismissModuleSelector,
     }),
-    [state, loading, isCompleted, progress, currentStepConfig, emitEvent, loadState, showModuleSelector, dismissModuleSelector],
+    [state, loading, error, isCompleted, progress, currentStepConfig, emitEvent, loadState, showModuleSelector, dismissModuleSelector],
   );
 
   return (

@@ -22,3 +22,5 @@ export type {
   OnboardingState,
   OnboardingStepConfig,
 } from './types';
+export { TOUR_STEPS, getStepsForPhase, getTotalTourSteps } from './tourSteps';
+export type { TourStep } from './tourSteps';

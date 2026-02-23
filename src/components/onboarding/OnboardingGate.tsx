@@ -1,12 +1,12 @@
 // ============================================================
-// OnboardingGate — Feature gating middleware component
-// Blocks access to the app while onboarding != COMPLETED.
-// Renders the OnboardingFlow overlay instead.
+// OnboardingGate — Non-blocking wrapper.
+// Always renders children (the real app). Overlays the guided
+// tour on top when onboarding is not yet completed.
 // ============================================================
 
 import { type ReactNode } from 'react';
 import { useOnboarding } from '@/contexts/OnboardingContext';
-import { OnboardingFlow } from './OnboardingFlow';
+import { OnboardingTour } from './OnboardingTour';
 import { ModuleTutorialSelector } from './ModuleTutorialSelector';
 import { ModuleTutorialRunner } from './ModuleTutorialRunner';
 
@@ -15,9 +15,9 @@ interface OnboardingGateProps {
 }
 
 export function OnboardingGate({ children }: OnboardingGateProps) {
-  const { loading, isCompleted, showModuleSelector } = useOnboarding();
+  const { loading, error, isCompleted, showModuleSelector } = useOnboarding();
 
-  // While loading, show a minimal loader (not the onboarding flow)
+  // While loading, show a minimal loader (don't start app yet)
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -26,20 +26,18 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
     );
   }
 
-  // Onboarding not completed — block everything, show the flow
-  if (!isCompleted) {
-    return <OnboardingFlow />;
-  }
-
-  // Module selector screen (shown right after completion)
-  if (showModuleSelector) {
-    return <ModuleTutorialSelector />;
-  }
-
-  // Normal app + tutorial runner overlay
   return (
     <>
+      {/* Always render the real app */}
       {children}
+
+      {/* Overlay: guided tour when onboarding not completed */}
+      {!error && !isCompleted && <OnboardingTour />}
+
+      {/* Module selector (shown right after completing the tour) */}
+      {showModuleSelector && <ModuleTutorialSelector />}
+
+      {/* Per-module guided tutorials */}
       <ModuleTutorialRunner />
     </>
   );

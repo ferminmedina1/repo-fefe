@@ -4,7 +4,7 @@
 // Used for onboarding step guidance and module tutorials.
 // ============================================================
 
-import { useEffect, useState, useCallback, type ReactNode } from 'react';
+import { useEffect, useState, useCallback, useId, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 interface FocusOverlayProps {
@@ -38,6 +38,7 @@ export function FocusOverlay({
   className,
 }: FocusOverlayProps) {
   const [rect, setRect] = useState<TargetRect | null>(null);
+  const maskId = useId().replace(/:/g, '_');
 
   const measure = useCallback(() => {
     if (!targetSelector || !open) {
@@ -50,9 +51,10 @@ export function FocusOverlay({
       return;
     }
     const r = el.getBoundingClientRect();
+    // Use viewport-relative coords (for position:fixed layout)
     setRect({
-      top: r.top + window.scrollY,
-      left: r.left + window.scrollX,
+      top: r.top,
+      left: r.left,
       width: r.width,
       height: r.height,
     });
@@ -89,34 +91,33 @@ export function FocusOverlay({
     }
 
     const base: React.CSSProperties = { position: 'fixed' };
-    const scrollY = window.scrollY;
 
     switch (tooltipPosition) {
       case 'bottom':
         return {
           ...base,
-          top: rect.top - scrollY + rect.height + padding + 12,
+          top: rect.top + rect.height + padding + 12,
           left: rect.left + rect.width / 2,
           transform: 'translateX(-50%)',
         };
       case 'top':
         return {
           ...base,
-          bottom: window.innerHeight - (rect.top - scrollY) + padding + 12,
+          bottom: window.innerHeight - rect.top + padding + 12,
           left: rect.left + rect.width / 2,
           transform: 'translateX(-50%)',
         };
       case 'right':
         return {
           ...base,
-          top: rect.top - scrollY + rect.height / 2,
+          top: rect.top + rect.height / 2,
           left: rect.left + rect.width + padding + 12,
           transform: 'translateY(-50%)',
         };
       case 'left':
         return {
           ...base,
-          top: rect.top - scrollY + rect.height / 2,
+          top: rect.top + rect.height / 2,
           right: window.innerWidth - rect.left + padding + 12,
           transform: 'translateY(-50%)',
         };
@@ -132,12 +133,12 @@ export function FocusOverlay({
         onClick={onClose}
       >
         <defs>
-          <mask id="focus-overlay-mask">
+          <mask id={maskId}>
             <rect x="0" y="0" width="100%" height="100%" fill="white" />
             {rect && (
               <rect
                 x={rect.left - padding}
-                y={rect.top - window.scrollY - padding}
+                y={rect.top - padding}
                 width={rect.width + padding * 2}
                 height={rect.height + padding * 2}
                 rx="8"
@@ -152,7 +153,7 @@ export function FocusOverlay({
           width="100%"
           height="100%"
           fill="rgba(0,0,0,0.6)"
-          mask="url(#focus-overlay-mask)"
+          mask={`url(#${maskId})`}
         />
       </svg>
 
@@ -162,7 +163,7 @@ export function FocusOverlay({
           className="absolute rounded-lg ring-2 ring-primary ring-offset-2 pointer-events-none"
           style={{
             position: 'fixed',
-            top: rect.top - window.scrollY - padding,
+            top: rect.top - padding,
             left: rect.left - padding,
             width: rect.width + padding * 2,
             height: rect.height + padding * 2,
