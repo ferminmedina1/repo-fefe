@@ -53,6 +53,7 @@ import { useActiveModules } from "@/hooks/useActiveModules";
 import { usePermissions, Module } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useModuleTutorials } from "@/hooks/useModuleTutorials";
 import { useState, useMemo } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -81,6 +82,7 @@ export function Sidebar() {
   const { hasPermission, isAdmin, loading: permissionsLoading } = usePermissions();
   const { isPlatformAdmin } = usePlatformAdmin();
   const { currentCompany } = useCompany();
+  const { isViewed: isTutorialViewed } = useModuleTutorials();
   
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -687,6 +689,9 @@ export function Sidebar() {
       >
         <Icon className="w-4 h-4 shrink-0" />
         <span className="truncate flex-1 text-sm">{item.title}</span>
+        {item.module && !isTutorialViewed(item.module) && (
+          <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" title="Tutorial disponible" />
+        )}
         {item.badge && item.badge > 0 && (
           <Badge variant="destructive" className="text-[10px] h-4 px-1">
             {item.badge}

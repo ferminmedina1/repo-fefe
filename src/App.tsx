@@ -10,6 +10,8 @@ import { User, Session } from "@supabase/supabase-js";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
 import { usePermissions } from "@/hooks/usePermissions";
+import { OnboardingProvider } from "@/contexts/OnboardingContext";
+import { OnboardingGate } from "@/components/onboarding/OnboardingGate";
 
 // Lazy load all page components
 const Landing = lazy(() => import("./pages/Landing"));
@@ -161,7 +163,11 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
     return <div className="flex items-center justify-center min-h-screen">Sin empresa seleccionada...</div>;
   }
 
-  return <>{children}</>;
+  return (
+    <OnboardingProvider>
+      <OnboardingGate>{children}</OnboardingGate>
+    </OnboardingProvider>
+  );
 }
 
 // Protected route that only checks authentication (no company check)
