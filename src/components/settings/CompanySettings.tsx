@@ -58,6 +58,7 @@ export function CompanySettings() {
   const [testingConnection, setTestingConnection] = useState(false);
   const [editingCurrency, setEditingCurrency] = useState<string | null>(null);
   const [editingRate, setEditingRate] = useState<string>("");
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Query para obtener tipos de cambio
   const { data: exchangeRates = [], isLoading: loadingRates } = useQuery({
@@ -444,7 +445,20 @@ export function CompanySettings() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    const result = companySchema.safeParse(formData);
+    if (!result.success) {
+      const newErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          newErrors[err.path[0] as string] = err.message;
+        }
+      });
+      setFormErrors(newErrors);
+      return;
+    }
+    setFormErrors({});
+
     if (logoFile) {
       setUploading(true);
       await uploadLogoMutation.mutateAsync(logoFile);
@@ -523,13 +537,14 @@ export function CompanySettings() {
           {/* Basic Info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Nombre *</Label>
+              <Label htmlFor="name">Nombre <span className="text-destructive">*</span></Label>
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
+                onChange={(e) => { setFormData({ ...formData, name: e.target.value }); if (formErrors.name) setFormErrors((p) => ({ ...p, name: "" })); }}
+                className={formErrors.name ? "border-destructive" : ""}
               />
+              {formErrors.name && <p className="text-sm text-destructive mt-1">{formErrors.name}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="tax_id">CUIT / Tax ID</Label>
@@ -548,8 +563,10 @@ export function CompanySettings() {
                 id="email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => { setFormData({ ...formData, email: e.target.value }); if (formErrors.email) setFormErrors((p) => ({ ...p, email: "" })); }}
+                className={formErrors.email ? "border-destructive" : ""}
               />
+              {formErrors.email && <p className="text-sm text-destructive mt-1">{formErrors.email}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Teléfono</Label>

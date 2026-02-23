@@ -19,11 +19,20 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
+import { z } from "zod";
+
+const expenseSchema = z.object({
+  description: z.string().trim().min(1, "La descripción es requerida").max(500, "La descripción debe tener máximo 500 caracteres"),
+  amount: z.number({ invalid_type_error: "El monto debe ser un número" })
+    .positive("El monto debe ser mayor a 0")
+    .max(9999999999.99, "El monto es demasiado alto"),
+});
 
 export default function Expenses() {
   const navigate = useNavigate();
   const { currentCompany } = useCompany();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     category_id: "",
     description: "",
@@ -128,6 +137,7 @@ export default function Expenses() {
       queryClient.invalidateQueries({ queryKey: ["expenses"] });
       toast.success("Gasto registrado correctamente");
       setDialogOpen(false);
+      setFormErrors({});
       setFormData({
         category_id: "",
         description: "",
@@ -147,11 +157,26 @@ export default function Expenses() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.description || !formData.amount) {
-      toast.error("Por favor completa los campos requeridos");
-      return;
+    try {
+      expenseSchema.parse({
+        description: formData.description,
+        amount: formData.amount ? parseFloat(formData.amount) : undefined,
+      });
+      setFormErrors({});
+      createExpenseMutation.mutate(formData);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const newErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            newErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setFormErrors(newErrors);
+      } else {
+        toast.error("Error al validar los datos del gasto");
+      }
     }
-    createExpenseMutation.mutate(formData);
   };
 
   if (permissionsLoading) {
@@ -211,6 +236,7 @@ export default function Expenses() {
                   </DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  <p className="text-xs text-muted-foreground">Los campos con <span className="text-destructive">*</span> son obligatorios.</p>
                   {/* Información básica */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 pb-2 border-b">
@@ -221,13 +247,14 @@ export default function Expenses() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="description">Descripción *</Label>
+                        <Label htmlFor="description">Descripción <span className="text-destructive">*</span></Label>
                         <Input
                           id="description"
                           value={formData.description}
-                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                          required
+                          onChange={(e) => { setFormData({ ...formData, description: e.target.value }); if (formErrors.description) setFormErrors((p) => ({ ...p, description: "" })); }}
+                          className={formErrors.description ? "border-destructive" : ""}
                         />
+                        {formErrors.description && <p className="text-sm text-destructive mt-1">{formErrors.description}</p>}
                       </div>
                       <div>
                         <Label htmlFor="expense_date">Fecha</Label>
@@ -240,16 +267,17 @@ export default function Expenses() {
                       </div>
                     </div>
                     <div>
-                      <Label htmlFor="amount">Monto *</Label>
+                      <Label htmlFor="amount">Monto <span className="text-destructive">*</span></Label>
                       <Input
                         id="amount"
                         type="number"
                         step="0.01"
                         placeholder="0.00"
                         value={formData.amount}
-                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                        required
+                        onChange={(e) => { setFormData({ ...formData, amount: e.target.value }); if (formErrors.amount) setFormErrors((p) => ({ ...p, amount: "" })); }}
+                        className={formErrors.amount ? "border-destructive" : ""}
                       />
+                      {formErrors.amount && <p className="text-sm text-destructive mt-1">{formErrors.amount}</p>}
                     </div>
                   </div>
 

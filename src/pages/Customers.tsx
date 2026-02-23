@@ -52,6 +52,7 @@ export default function Customers() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -367,6 +368,7 @@ export default function Customers() {
       payment_terms: "",
       price_list_id: "",
     });
+    setFormErrors({});
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -403,7 +405,13 @@ export default function Customers() {
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
+        const newErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            newErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setFormErrors(newErrors);
       } else {
         toast.error("Error al validar los datos del cliente");
       }
@@ -542,6 +550,7 @@ export default function Customers() {
                   </DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  <p className="text-xs text-muted-foreground">Los campos con <span className="text-destructive">*</span> son obligatorios.</p>
                   {/* Sección Información Básica */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 pb-2 border-b">
@@ -552,12 +561,14 @@ export default function Customers() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="name">Nombre *</Label>
-                        <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+                        <Label htmlFor="name">Nombre <span className="text-destructive">*</span></Label>
+                        <Input id="name" value={formData.name} onChange={(e) => { setFormData({ ...formData, name: e.target.value }); if (formErrors.name) setFormErrors((p) => ({ ...p, name: "" })); }} className={formErrors.name ? "border-destructive" : ""} />
+                        {formErrors.name && <p className="text-sm text-destructive mt-1">{formErrors.name}</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                        <Input id="email" type="email" value={formData.email} onChange={(e) => { setFormData({ ...formData, email: e.target.value }); if (formErrors.email) setFormErrors((p) => ({ ...p, email: "" })); }} className={formErrors.email ? "border-destructive" : ""} />
+                        {formErrors.email && <p className="text-sm text-destructive mt-1">{formErrors.email}</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="phone">Teléfono</Label>
@@ -616,7 +627,8 @@ export default function Customers() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="credit_limit">Límite de Crédito</Label>
-                        <Input id="credit_limit" type="number" step="0.01" value={formData.credit_limit} onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })} />
+                        <Input id="credit_limit" type="number" step="0.01" value={formData.credit_limit} onChange={(e) => { setFormData({ ...formData, credit_limit: e.target.value }); if (formErrors.credit_limit) setFormErrors((p) => ({ ...p, credit_limit: "" })); }} className={formErrors.credit_limit ? "border-destructive" : ""} />
+                        {formErrors.credit_limit && <p className="text-sm text-destructive mt-1">{formErrors.credit_limit}</p>}
                       </div>
                       <div className="space-y-2">
                         <Label>Estado</Label>
