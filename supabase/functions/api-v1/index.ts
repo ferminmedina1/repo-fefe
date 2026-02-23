@@ -777,26 +777,15 @@ router.post("/purchases", async (req, auth) => {
   const { error: itemsError } = await supabase.from("purchase_items").insert(items);
   if (itemsError) throw itemsError;
 
+  // Atomic batch stock update via RPC (instead of 2N queries)
+  const stockAdjustments: Record<string, number> = {};
   for (const item of validated.items as any[]) {
-    const { data: product, error: productError } = await supabase
-      .from("products")
-      .select("stock")
-      .eq("id", item.product_id)
-      .eq("company_id", authWithCompany.companyId)
-      .single();
-
-    if (productError) throw productError;
-    const currentStock = Number(product?.stock ?? 0);
-    const nextStock = currentStock + item.quantity;
-
-    const { error: stockError } = await supabase
-      .from("products")
-      .update({ stock: nextStock })
-      .eq("id", item.product_id)
-      .eq("company_id", authWithCompany.companyId);
-
-    if (stockError) throw stockError;
+    stockAdjustments[item.product_id] = (stockAdjustments[item.product_id] || 0) + item.quantity;
   }
+  const { error: stockRpcError } = await supabase.rpc('batch_update_product_stock', {
+    adjustments: stockAdjustments,
+  });
+  if (stockRpcError) throw stockRpcError;
 
   await auditLog(authWithCompany, "create", "purchase", purchase.id, validated as Record<string, unknown>);
   await triggerWebhook(authWithCompany, "purchase.created", { purchase_id: purchase.id });
@@ -897,59 +886,48 @@ router.post("/warehouses/:from_id/transfer/:to_id", async (req, auth, params) =>
 
   if (transferError) throw transferError;
 
+  // Validate sufficient stock before transferring (batch fetch)
+  const transferProductIds = (validated.items as any[]).map((item: any) => item.product_id);
+  const { data: fromStocks, error: fromFetchError } = await supabase
+    .from("warehouse_stock")
+    .select("product_id, quantity")
+    .eq("warehouse_id", params.from_id)
+    .in("product_id", transferProductIds);
+
+  if (fromFetchError) throw fromFetchError;
+
+  const fromStockMap = new Map(
+    (fromStocks || []).map((s: any) => [s.product_id, Number(s.quantity ?? 0)])
+  );
+
   for (const item of validated.items as any[]) {
-    const { data: fromStock, error: fromError } = await supabase
-      .from("warehouse_stock")
-      .select("id, quantity")
-      .eq("warehouse_id", params.from_id)
-      .eq("product_id", item.product_id)
-      .maybeSingle();
-
-    if (fromError || !fromStock) {
+    const available = fromStockMap.get(item.product_id) ?? 0;
+    if (available < item.quantity) {
       throw new Error(`Insufficient stock for product ${item.product_id}`);
-    }
-
-    const currentFromQty = Number(fromStock.quantity ?? 0);
-    if (currentFromQty < item.quantity) {
-      throw new Error(`Insufficient stock for product ${item.product_id}`);
-    }
-
-    const { error: updateFromError } = await supabase
-      .from("warehouse_stock")
-      .update({ quantity: currentFromQty - item.quantity })
-      .eq("id", fromStock.id);
-
-    if (updateFromError) throw updateFromError;
-
-    const { data: toStock, error: toError } = await supabase
-      .from("warehouse_stock")
-      .select("id, quantity")
-      .eq("warehouse_id", params.to_id)
-      .eq("product_id", item.product_id)
-      .maybeSingle();
-
-    if (toError) throw toError;
-
-    if (!toStock) {
-      const { error: insertToError } = await supabase
-        .from("warehouse_stock")
-        .insert({
-          warehouse_id: params.to_id,
-          product_id: item.product_id,
-          quantity: item.quantity,
-        });
-
-      if (insertToError) throw insertToError;
-    } else {
-      const currentToQty = Number(toStock.quantity ?? 0);
-      const { error: updateToError } = await supabase
-        .from("warehouse_stock")
-        .update({ quantity: currentToQty + item.quantity })
-        .eq("id", toStock.id);
-
-      if (updateToError) throw updateToError;
     }
   }
+
+  // Atomic batch transfer via RPCs (decrement source, increment destination)
+  const decrementAdjustments: Record<string, number> = {};
+  const incrementAdjustments: Record<string, number> = {};
+  for (const item of validated.items as any[]) {
+    decrementAdjustments[item.product_id] = (decrementAdjustments[item.product_id] || 0) - item.quantity;
+    incrementAdjustments[item.product_id] = (incrementAdjustments[item.product_id] || 0) + item.quantity;
+  }
+
+  const [decResult, incResult] = await Promise.all([
+    supabase.rpc('batch_update_warehouse_stock', {
+      p_warehouse_id: params.from_id,
+      adjustments: decrementAdjustments,
+    }),
+    supabase.rpc('batch_update_warehouse_stock', {
+      p_warehouse_id: params.to_id,
+      adjustments: incrementAdjustments,
+    }),
+  ]);
+
+  if (decResult.error) throw decResult.error;
+  if (incResult.error) throw incResult.error;
 
   await auditLog(authWithCompany, "create", "warehouse_transfer", transfer.id, validated as Record<string, unknown>);
   return jsonResponse(transfer, 201);
@@ -1542,19 +1520,34 @@ router.post("/bulk/import/:resource", async (req, auth, params) => {
 
   if (opError) throw opError;
 
+  // Batch insert all items in one query (instead of N individual inserts)
+  const itemsWithCompany = items.map((item: any, idx: number) => ({
+    ...item,
+    company_id: authWithCompany.companyId,
+  }));
+
   let processed = 0;
   const errors: string[] = [];
 
-  for (const item of items) {
-    try {
-      const { error } = await supabase
-        .from(resource)
-        .insert({ ...item, company_id: authWithCompany.companyId });
-      if (error) errors.push(`Item ${processed + 1}: ${error.message}`);
-    } catch (e) {
-      errors.push(`Item ${processed + 1}: ${String(e)}`);
+  const { error: batchError } = await supabase
+    .from(resource)
+    .insert(itemsWithCompany);
+
+  if (batchError) {
+    // If batch fails, fall back to individual inserts to identify bad rows
+    for (const item of items) {
+      try {
+        const { error } = await supabase
+          .from(resource)
+          .insert({ ...item, company_id: authWithCompany.companyId });
+        if (error) errors.push(`Item ${processed + 1}: ${error.message}`);
+      } catch (e) {
+        errors.push(`Item ${processed + 1}: ${String(e)}`);
+      }
+      processed += 1;
     }
-    processed += 1;
+  } else {
+    processed = items.length;
   }
 
   await supabase

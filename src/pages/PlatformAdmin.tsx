@@ -248,69 +248,42 @@ export default function PlatformAdmin() {
     },
   });
 
-  // Fetch usage metrics per company
+  // Fetch usage metrics per company (single RPC with GROUP BY instead of 4N queries)
   const { data: usageMetrics, isLoading: isLoadingMetrics } = useQuery({
     queryKey: ['platform-usage-metrics'],
     queryFn: async () => {
-      const { data: companies } = await supabase
-        .from('companies')
-        .select('id, name')
-        .eq('active', true);
-      
-      if (!companies) return [];
-      
-      const metrics = await Promise.all(companies.map(async (company) => {
-        // Get sales count for current month
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-        
-        const { count: salesCount } = await supabase
-          .from('sales')
-          .select('*', { count: 'exact', head: true })
-          .eq('company_id', company.id)
-          .gte('created_at', startOfMonth.toISOString());
-        
-        // Get active products count
-        const { count: productsCount } = await supabase
-          .from('products')
-          .select('*', { count: 'exact', head: true })
-          .eq('company_id', company.id)
-          .eq('active', true);
-        
-        // Get active users count
-        const { count: usersCount } = await supabase
-          .from('company_users')
-          .select('*', { count: 'exact', head: true })
-          .eq('company_id', company.id)
-          .eq('active', true);
-        
-        // Get sales from last month for growth calculation
-        const lastMonthStart = new Date(startOfMonth);
-        lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
-        
-        const { count: lastMonthSales } = await supabase
-          .from('sales')
-          .select('*', { count: 'exact', head: true })
-          .eq('company_id', company.id)
-          .gte('created_at', lastMonthStart.toISOString())
-          .lt('created_at', startOfMonth.toISOString());
-        
-        const growth = lastMonthSales && lastMonthSales > 0
-          ? ((salesCount || 0) - lastMonthSales) / lastMonthSales * 100
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      const lastMonthStart = new Date(startOfMonth);
+      lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+
+      const { data, error } = await supabase.rpc('get_platform_usage_metrics', {
+        p_start_of_month: startOfMonth.toISOString(),
+        p_last_month_start: lastMonthStart.toISOString(),
+      });
+
+      if (error) {
+        console.error('Error fetching platform usage metrics:', error);
+        return [];
+      }
+
+      return (data || []).map((row: any) => {
+        const lastMonthSales = Number(row.last_month_sales) || 0;
+        const salesThisMonth = Number(row.sales_this_month) || 0;
+        const growth = lastMonthSales > 0
+          ? (salesThisMonth - lastMonthSales) / lastMonthSales * 100
           : 0;
-        
+
         return {
-          company_id: company.id,
-          company_name: company.name,
-          sales_this_month: salesCount || 0,
-          active_products: productsCount || 0,
-          active_users: usersCount || 0,
-          growth_percentage: growth
+          company_id: row.company_id,
+          company_name: row.company_name,
+          sales_this_month: salesThisMonth,
+          active_products: Number(row.active_products) || 0,
+          active_users: Number(row.active_users) || 0,
+          growth_percentage: growth,
         };
-      }));
-      
-      return metrics;
+      });
     }
   });
 

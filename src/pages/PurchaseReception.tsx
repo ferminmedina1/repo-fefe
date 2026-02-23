@@ -85,57 +85,26 @@ const PurchaseReception = () => {
 
       if (orderError) throw orderError;
 
-      // Update stock for each product
-      for (const item of receptionData.items) {
-        const { data: currentStock } = await (supabase as any)
-          .from("warehouse_stock")
-          .select("quantity")
-          .eq("warehouse_id", receptionData.warehouse_id)
-          .eq("product_id", item.product_id)
-          .single();
+      // Atomic warehouse stock + product stock update via RPCs (no race conditions)
+      const warehouseAdjustments: Record<string, number> = {};
+      const productAdjustments: Record<string, number> = {};
+      receptionData.items.forEach((item: any) => {
+        warehouseAdjustments[item.product_id] = (warehouseAdjustments[item.product_id] || 0) + item.received_quantity;
+        productAdjustments[item.product_id] = (productAdjustments[item.product_id] || 0) + item.received_quantity;
+      });
 
-        if (currentStock) {
-          // Update existing stock
-          const { error: stockError } = await (supabase as any)
-            .from("warehouse_stock")
-            .update({ 
-              quantity: (currentStock as any).quantity + item.received_quantity,
-              updated_at: new Date().toISOString()
-            })
-            .eq("warehouse_id", receptionData.warehouse_id)
-            .eq("product_id", item.product_id);
+      const [warehouseResult, productResult] = await Promise.all([
+        supabase.rpc('batch_update_warehouse_stock', {
+          p_warehouse_id: receptionData.warehouse_id,
+          adjustments: warehouseAdjustments,
+        }),
+        supabase.rpc('batch_update_product_stock', {
+          adjustments: productAdjustments,
+        }),
+      ]);
 
-          if (stockError) throw stockError;
-        } else {
-          // Create new stock entry
-          const { error: stockError } = await (supabase as any)
-            .from("warehouse_stock")
-            .insert({
-              warehouse_id: receptionData.warehouse_id,
-              product_id: item.product_id,
-              quantity: item.received_quantity,
-              company_id: currentCompany.id,
-            });
-
-          if (stockError) throw stockError;
-        }
-
-        // Update product stock
-        const { data: product } = await supabase
-          .from("products")
-          .select("stock")
-          .eq("id", item.product_id)
-          .single();
-
-        if (product) {
-          const { error: productError } = await supabase
-            .from("products")
-            .update({ stock: product.stock + item.received_quantity })
-            .eq("id", item.product_id);
-
-          if (productError) throw productError;
-        }
-      }
+      if (warehouseResult.error) throw warehouseResult.error;
+      if (productResult.error) throw productResult.error;
 
       // Create reception record
       const { error: receptionError } = await (supabase as any)

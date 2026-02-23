@@ -150,18 +150,13 @@ const Purchases = () => {
 
       if (itemsError) throw itemsError;
 
-      // Update product stock
-      for (const item of purchaseItems) {
-        const product = products?.find(p => p.id === item.product_id);
-        if (product) {
-          const { error: stockError } = await supabase
-            .from("products")
-            .update({ stock: product.stock + item.quantity })
-            .eq("id", item.product_id);
-
-          if (stockError) throw stockError;
-        }
-      }
+      // Atomic stock increment via RPC (no race conditions, single query)
+      const adjustments: Record<string, number> = {};
+      purchaseItems.forEach(item => {
+        adjustments[item.product_id] = (adjustments[item.product_id] || 0) + item.quantity;
+      });
+      const { error: stockError } = await supabase.rpc('batch_update_product_stock', { adjustments });
+      if (stockError) throw stockError;
 
       // Update supplier balance
       const supplier = suppliers?.find(s => s.id === supplierId);

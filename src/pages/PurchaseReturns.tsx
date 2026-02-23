@@ -151,23 +151,13 @@ const PurchaseReturns = () => {
 
       if (itemsError) throw itemsError;
 
-      // Update stock for each product
-      for (const item of returnData.items) {
-        const { data: product } = await supabase
-          .from("products")
-          .select("stock")
-          .eq("id", item.product_id)
-          .single();
-
-        if (product) {
-          const { error: stockError } = await supabase
-            .from("products")
-            .update({ stock: Math.max(0, product.stock - item.quantity) })
-            .eq("id", item.product_id);
-
-          if (stockError) throw stockError;
-        }
-      }
+      // Atomic stock decrement via RPC (no race conditions, single query)
+      const adjustments: Record<string, number> = {};
+      returnData.items.forEach((item: ReturnItem) => {
+        adjustments[item.product_id] = (adjustments[item.product_id] || 0) - item.quantity;
+      });
+      const { error: stockError } = await supabase.rpc('batch_update_product_stock', { adjustments });
+      if (stockError) throw stockError;
 
       return returnRecord;
     },

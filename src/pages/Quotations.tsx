@@ -326,22 +326,20 @@ export default function Quotations() {
 
       if (saleItemsError) throw saleItemsError;
 
-      // Actualizar stock de productos
-      for (const item of quotationItems) {
-        if (item.product_id) {
-          const { data: product } = await supabase
-            .from("products")
-            .select("stock")
-            .eq("id", item.product_id)
-            .single();
-          
-          if (product) {
-            await supabase
-              .from("products")
-              .update({ stock: product.stock - item.quantity })
-              .eq("id", item.product_id);
+      // Atomic stock decrement via RPC (no race conditions, single query)
+      const stockProductIds = quotationItems
+        .map(item => item.product_id)
+        .filter(Boolean);
+
+      if (stockProductIds.length > 0) {
+        const adjustments: Record<string, number> = {};
+        quotationItems.forEach(item => {
+          if (item.product_id) {
+            adjustments[item.product_id] = (adjustments[item.product_id] || 0) - item.quantity;
           }
-        }
+        });
+        const { error: stockError } = await supabase.rpc('batch_update_product_stock', { adjustments });
+        if (stockError) throw stockError;
       }
 
       // Marcar presupuesto como convertido
@@ -482,14 +480,18 @@ export default function Quotations() {
 
       await supabase.from("delivery_note_items").insert(items);
 
-      // Actualizar cantidades entregadas en items de presupuesto
-      for (const item of deliveryItems.filter(i => i.quantity_to_deliver > 0)) {
-        const newDelivered = (item.total_delivered || 0) + item.quantity_to_deliver;
-        await supabase
-          .from("quotation_items")
-          .update({ total_delivered: newDelivered })
-          .eq("id", item.id);
-      }
+      // Parallel update of delivered quantities (instead of N sequential queries)
+      await Promise.all(
+        deliveryItems
+          .filter(i => i.quantity_to_deliver > 0)
+          .map(item => {
+            const newDelivered = (item.total_delivered || 0) + item.quantity_to_deliver;
+            return supabase
+              .from("quotation_items")
+              .update({ total_delivered: newDelivered })
+              .eq("id", item.id);
+          })
+      );
 
       // Actualizar estado de entrega del presupuesto
       const allItems = await supabase

@@ -517,40 +517,29 @@ export default function POS() {
 
       if (paymentsError) throw paymentsError;
 
-      // Update warehouse stock
+      // Atomic stock decrement via RPC (avoids race conditions and N+1)
       if (selectedWarehouse) {
-        for (const item of cart) {
-          const { data: warehouseStock } = await supabase
-            .from("warehouse_stock")
-            .select("stock")
-            .eq("warehouse_id", selectedWarehouse)
-            .eq("product_id", item.product_id)
-            .single();
-          
-          if (warehouseStock) {
-            await supabase
-              .from("warehouse_stock")
-              .update({ stock: warehouseStock.stock - item.quantity })
-              .eq("warehouse_id", selectedWarehouse)
-              .eq("product_id", item.product_id);
-          }
-        }
+        const warehouseAdjustments: Record<string, number> = {};
+        cart.forEach(item => {
+          warehouseAdjustments[item.product_id] = (warehouseAdjustments[item.product_id] || 0) - item.quantity;
+        });
+        const { error: whError } = await supabase.rpc('batch_update_warehouse_stock', {
+          p_warehouse_id: selectedWarehouse,
+          adjustments: warehouseAdjustments,
+        });
+        if (whError) throw whError;
       }
 
-      // Update product stock (total)
-      for (const item of cart) {
-        const { data: product } = await supabase
-          .from("products")
-          .select("stock")
-          .eq("id", item.product_id)
-          .single();
-        
-        if (product) {
-          await supabase
-            .from("products")
-            .update({ stock: product.stock - item.quantity })
-            .eq("id", item.product_id);
-        }
+      // Atomic product stock decrement via RPC
+      {
+        const productAdjustments: Record<string, number> = {};
+        cart.forEach(item => {
+          productAdjustments[item.product_id] = (productAdjustments[item.product_id] || 0) - item.quantity;
+        });
+        const { error: psError } = await supabase.rpc('batch_update_product_stock', {
+          adjustments: productAdjustments,
+        });
+        if (psError) throw psError;
       }
 
       // Process loyalty points
@@ -598,24 +587,26 @@ export default function POS() {
         if (cashRegister && user) {
           const cashPayments = paymentMethods.filter(p => p.method === 'cash');
           
-          for (const payment of cashPayments) {
-            // Create detailed product list for description
+          // Batch insert all cash movements in one query instead of N individual inserts
+          if (cashPayments.length > 0) {
             const productDetails = cart.map(item => 
               `${item.product_name} (${item.quantity}x$${item.unit_price.toFixed(2)})`
             ).join(', ');
 
+            const cashMovements = cashPayments.map(payment => ({
+              cash_register_id: cashRegister.id,
+              user_id: user.id,
+              type: "income",
+              amount: payment.amount,
+              category: "Venta",
+              description: `Venta ${sale.sale_number} - Productos: ${productDetails}`,
+              reference: sale.sale_number,
+              company_id: currentCompany?.id,
+            }));
+
             await supabase
               .from("cash_movements")
-              .insert({
-                cash_register_id: cashRegister.id,
-                user_id: user.id,
-                type: "income",
-                amount: payment.amount,
-                category: "Venta",
-                description: `Venta ${sale.sale_number} - Productos: ${productDetails}`,
-                reference: sale.sale_number,
-                company_id: currentCompany?.id,
-              });
+              .insert(cashMovements);
           }
           
           queryClient.invalidateQueries({ queryKey: ["cash-register"] });

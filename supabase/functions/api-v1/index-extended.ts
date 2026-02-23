@@ -278,21 +278,13 @@ router.post("/purchases", async (req, auth) => {
 
   await supabase.from("purchase_items").insert(items);
 
-  // Update product stock
+  // Atomic batch stock update via RPC (instead of 2N queries)
+  const stockAdjustments: Record<string, number> = {};
   for (const item of purchase.items) {
-    const { data: product } = await supabase
-      .from("products")
-      .select("stock")
-      .eq("id", item.product_id)
-      .single();
-
-    if (product) {
-      await supabase
-        .from("products")
-        .update({ stock: (product.stock ?? 0) + item.quantity })
-        .eq("id", item.product_id);
-    }
+    stockAdjustments[item.product_id] = (stockAdjustments[item.product_id] || 0) + item.quantity;
   }
+  const { error: stockRpcError } = await supabase.rpc('batch_update_product_stock', { adjustments: stockAdjustments });
+  if (stockRpcError) throw stockRpcError;
 
   await auditLog(auth, "create", "purchases", purchaseData.id, { items: purchase.items });
   await triggerWebhook(auth, "purchase.created", { purchase_id: purchaseData.id });
@@ -371,20 +363,19 @@ router.post("/warehouses/:from_id/transfer/:to_id", async (req, auth, params) =>
 
   if (error) return errorResponse("Failed to create transfer", 500);
 
-  // Update warehouse stock for each item
+  // Atomic batch warehouse stock transfer via RPCs (instead of 2N queries)
+  const decAdj: Record<string, number> = {};
+  const incAdj: Record<string, number> = {};
   for (const item of transfer.items) {
-    await supabase
-      .from("warehouse_stock")
-      .update({ quantity: -item.quantity })
-      .eq("warehouse_id", params.from_id)
-      .eq("product_id", item.product_id);
-
-    await supabase
-      .from("warehouse_stock")
-      .update({ quantity: item.quantity })
-      .eq("warehouse_id", params.to_id)
-      .eq("product_id", item.product_id);
+    decAdj[item.product_id] = (decAdj[item.product_id] || 0) - item.quantity;
+    incAdj[item.product_id] = (incAdj[item.product_id] || 0) + item.quantity;
   }
+  const [decResult, incResult] = await Promise.all([
+    supabase.rpc('batch_update_warehouse_stock', { p_warehouse_id: params.from_id, adjustments: decAdj }),
+    supabase.rpc('batch_update_warehouse_stock', { p_warehouse_id: params.to_id, adjustments: incAdj }),
+  ]);
+  if (decResult.error) throw decResult.error;
+  if (incResult.error) throw incResult.error;
 
   await auditLog(auth, "create", "warehouse_transfers", data.id);
 
@@ -872,33 +863,35 @@ router.post("/bulk/import/:resource", async (req, auth, params) => {
 
   if (opError) return errorResponse("Failed to create bulk operation", 500);
 
-  // Process asynchronously
+  // Batch insert all items in one query (instead of N individual inserts)
+  const itemsWithCompany = items.map((item: any) => ({
+    ...item,
+    company_id: auth.companyId,
+  }));
+
   let processed = 0;
   const errors: string[] = [];
 
-  for (const item of items) {
-    try {
-      // Validate based on resource type
-      let validated = item;
-      if (params.resource === "products") {
-        // Would validate with schema
-      } else if (params.resource === "customers") {
-        // Would validate with schema
-      }
+  const { error: batchError } = await supabase
+    .from(params.resource as string)
+    .insert(itemsWithCompany);
 
-      // Insert into database
-      const { error } = await supabase.from(params.resource as string).insert({
-        ...validated,
-        company_id: auth.companyId,
-      });
-
-      if (error) {
-        errors.push(`Item ${processed + 1}: ${error.message}`);
+  if (batchError) {
+    // If batch fails, fall back to individual inserts to identify bad rows
+    for (const item of items) {
+      try {
+        const { error } = await supabase.from(params.resource as string).insert({
+          ...item,
+          company_id: auth.companyId,
+        });
+        if (error) errors.push(`Item ${processed + 1}: ${error.message}`);
+      } catch (e) {
+        errors.push(`Item ${processed + 1}: ${String(e)}`);
       }
-    } catch (e) {
-      errors.push(`Item ${processed + 1}: ${String(e)}`);
+      processed++;
     }
-    processed++;
+  } else {
+    processed = items.length;
   }
 
   // Update operation record
