@@ -22,6 +22,7 @@ function parseOnboardingState(raw: Record<string, unknown>): OnboardingState {
 
 /** Fetch (or initialize) onboarding state for the current user + company */
 export async function fetchOnboardingState(companyId: string): Promise<OnboardingState> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RPC not in generated types yet
   const { data, error } = await (supabase.rpc as any)('get_onboarding_state', {
     p_company_id: companyId,
   });
@@ -35,6 +36,7 @@ export async function advanceOnboardingStep(
   companyId: string,
   completedStep: OnboardingStep,
 ): Promise<OnboardingState> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RPC not in generated types yet
   const { data, error } = await (supabase.rpc as any)('advance_onboarding_step', {
     p_company_id: companyId,
     p_completed_step: completedStep,
@@ -49,6 +51,7 @@ export async function markModuleTutorialViewed(
   companyId: string,
   moduleName: string,
 ): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RPC not in generated types yet
   const { error } = await (supabase.rpc as any)('mark_module_tutorial_viewed', {
     p_company_id: companyId,
     p_module_name: moduleName,
@@ -59,6 +62,7 @@ export async function markModuleTutorialViewed(
 
 /** Get all module tutorial names the user has already viewed */
 export async function fetchViewedModuleTutorials(companyId: string): Promise<string[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RPC not in generated types yet
   const { data, error } = await (supabase.rpc as any)('get_viewed_module_tutorials', {
     p_company_id: companyId,
   });
