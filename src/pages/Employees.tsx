@@ -17,10 +17,22 @@ import { toast } from "sonner";
 import { Users, Plus, Edit, Trash2, Shield, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { z } from "zod";
 import { EmployeePermissionsManager } from "@/components/employees/EmployeePermissionsManager";
 import { EmployeeRoleAssignment } from "@/components/employees/EmployeeRoleAssignment";
 import { EmployeeTimeTracking } from "@/components/employees/EmployeeTimeTracking";
 import { EmployeeSelfTimeTracking } from "@/components/employees/EmployeeSelfTimeTracking";
+
+const employeeSchema = z.object({
+  first_name: z.string().trim().min(1, "El nombre es requerido").max(100, "El nombre debe tener máximo 100 caracteres"),
+  last_name: z.string().trim().min(1, "El apellido es requerido").max(100, "El apellido debe tener máximo 100 caracteres"),
+  email: z.string().trim().max(255, "El email debe tener máximo 255 caracteres")
+    .refine((val) => val === "" || z.string().email().safeParse(val).success, "Email inválido")
+    .optional(),
+  phone: z.string().max(20, "El teléfono debe tener máximo 20 caracteres").optional(),
+  document_number: z.string().max(50, "El número de documento debe tener máximo 50 caracteres").optional(),
+  hire_date: z.string().min(1, "La fecha de ingreso es requerida"),
+});
 
 interface EmployeeFormData {
   first_name: string;
@@ -68,6 +80,7 @@ const Employees = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
   const [formData, setFormData] = useState<EmployeeFormData>(initialFormData);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const canCreate = hasPermission("employees", "create");
   const canEdit = hasPermission("employees", "edit");
@@ -179,6 +192,7 @@ const Employees = () => {
       toast.success("Empleado creado exitosamente. Se ha enviado una invitacion por email.");
       setDialogOpen(false);
       setFormData(initialFormData);
+      setFormErrors({});
     },
     onError: (error: any) => {
       toast.error("Error al crear empleado: " + error.message);
@@ -271,19 +285,33 @@ const Employees = () => {
   });
 
   const handleSubmit = () => {
-    if (!formData.first_name || !formData.last_name) {
-      toast.error("Nombre y apellido son requeridos");
-      return;
-    }
-    if (!formData.hire_date) {
-      toast.error("Fecha de ingreso es requerida");
-      return;
-    }
-
-    if (editingEmployee) {
-      updateMutation.mutate({ id: editingEmployee.id, data: formData });
-    } else {
-      createMutation.mutate(formData);
+    try {
+      employeeSchema.parse({
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        email: formData.email || undefined,
+        phone: formData.phone || undefined,
+        document_number: formData.document_number || undefined,
+        hire_date: formData.hire_date,
+      });
+      setFormErrors({});
+      if (editingEmployee) {
+        updateMutation.mutate({ id: editingEmployee.id, data: formData });
+      } else {
+        createMutation.mutate(formData);
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const newErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            newErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setFormErrors(newErrors);
+      } else {
+        toast.error("Error al validar los datos del empleado");
+      }
     }
   };
 
@@ -320,6 +348,7 @@ const Employees = () => {
   const handleOpenDialog = () => {
     setEditingEmployee(null);
     setFormData(initialFormData);
+    setFormErrors({});
     setDialogOpen(true);
   };
 
@@ -402,24 +431,29 @@ const Employees = () => {
                               : "Completa los datos del nuevo empleado"}
                           </DialogDescription>
                         </DialogHeader>
+                        <p className="text-xs text-muted-foreground pt-2">Los campos con <span className="text-destructive">*</span> son obligatorios.</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
                           <div className="space-y-2">
-                            <Label htmlFor="first_name">Nombre *</Label>
+                            <Label htmlFor="first_name">Nombre <span className="text-destructive">*</span></Label>
                             <Input
                               id="first_name"
                               value={formData.first_name}
-                              onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                              onChange={(e) => { setFormData({ ...formData, first_name: e.target.value }); if (formErrors.first_name) setFormErrors((p) => ({ ...p, first_name: "" })); }}
                               placeholder="Juan"
+                              className={formErrors.first_name ? "border-destructive" : ""}
                             />
+                            {formErrors.first_name && <p className="text-sm text-destructive mt-1">{formErrors.first_name}</p>}
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="last_name">Apellido *</Label>
+                            <Label htmlFor="last_name">Apellido <span className="text-destructive">*</span></Label>
                             <Input
                               id="last_name"
                               value={formData.last_name}
-                              onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                              onChange={(e) => { setFormData({ ...formData, last_name: e.target.value }); if (formErrors.last_name) setFormErrors((p) => ({ ...p, last_name: "" })); }}
                               placeholder="Perez"
+                              className={formErrors.last_name ? "border-destructive" : ""}
                             />
+                            {formErrors.last_name && <p className="text-sm text-destructive mt-1">{formErrors.last_name}</p>}
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="document_type">Tipo Documento</Label>
@@ -453,9 +487,11 @@ const Employees = () => {
                               id="email"
                               type="email"
                               value={formData.email}
-                              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                              onChange={(e) => { setFormData({ ...formData, email: e.target.value }); if (formErrors.email) setFormErrors((p) => ({ ...p, email: "" })); }}
                               placeholder="juan@empresa.com"
+                              className={formErrors.email ? "border-destructive" : ""}
                             />
+                            {formErrors.email && <p className="text-sm text-destructive mt-1">{formErrors.email}</p>}
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="phone">Telefono</Label>
@@ -467,13 +503,15 @@ const Employees = () => {
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="hire_date">Fecha de Ingreso *</Label>
+                            <Label htmlFor="hire_date">Fecha de Ingreso <span className="text-destructive">*</span></Label>
                             <Input
                               id="hire_date"
                               type="date"
                               value={formData.hire_date}
-                              onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
+                              onChange={(e) => { setFormData({ ...formData, hire_date: e.target.value }); if (formErrors.hire_date) setFormErrors((p) => ({ ...p, hire_date: "" })); }}
+                              className={formErrors.hire_date ? "border-destructive" : ""}
                             />
+                            {formErrors.hire_date && <p className="text-sm text-destructive mt-1">{formErrors.hire_date}</p>}
                           </div>
                           {canManageEmployees && (
                             <div className="space-y-2">

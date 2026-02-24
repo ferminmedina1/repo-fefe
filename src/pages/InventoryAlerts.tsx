@@ -8,10 +8,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  AlertTriangle, 
-  Calendar, 
-  Package, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
+  AlertTriangle,
+  Calendar,
+  Package,
   Search,
   MapPin,
   Loader2,
@@ -44,11 +59,19 @@ const SCOPE_LABELS: Record<string, string> = {
 
 export default function InventoryAlerts() {
   const { currentCompany } = useCompany();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<any>(null);
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+
+  // Agregar Alertas dialog state
+  const [showAddAlert, setShowAddAlert] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [minStockValue, setMinStockValue] = useState<string>("");
+
+  // Loading state for "Generar Alertas"
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const { data: lowStockProducts, isLoading: loadingLowStock } = useQuery({
     queryKey: ["low-stock-products", currentCompany?.id],
@@ -142,6 +165,22 @@ export default function InventoryAlerts() {
     enabled: !!currentCompany?.id,
   });
 
+  // All products for the "Agregar Alerta" selector
+  const { data: allProducts = [] } = useQuery({
+    queryKey: ["products-for-alerts", currentCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, sku, stock, min_stock")
+        .eq("company_id", currentCompany?.id!)
+        .eq("active", true)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!currentCompany?.id,
+  });
+
   // Custom alert rules
   const { data: alertRules, isLoading: loadingAlertRules } = useQuery({
     queryKey: ["inventory-alert-rules", currentCompany?.id],
@@ -156,6 +195,36 @@ export default function InventoryAlerts() {
     },
     enabled: !!currentCompany?.id,
   });
+
+  const selectedProduct = allProducts.find((p) => p.id === selectedProductId);
+
+  const saveAlertMutation = useMutation({
+    mutationFn: async ({ productId, minStock }: { productId: string; minStock: number }) => {
+      const { error } = await supabase
+        .from("products")
+        .update({ min_stock: minStock })
+        .eq("id", productId)
+        .eq("company_id", currentCompany?.id!);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["low-stock-products"] });
+      queryClient.invalidateQueries({ queryKey: ["products-for-alerts"] });
+      toast.success("Alerta configurada correctamente");
+      setShowAddAlert(false);
+      setSelectedProductId("");
+      setMinStockValue("");
+    },
+    onError: () => {
+      toast.error("Error al guardar la alerta");
+    },
+  });
+
+  const handleSaveAlert = () => {
+    const minStock = Number(minStockValue);
+    if (!selectedProductId || isNaN(minStock) || minStock < 0) return;
+    saveAlertMutation.mutate({ productId: selectedProductId, minStock });
+  };
 
   // Toggle alert rule active status
   const toggleAlertRule = useMutation({
@@ -221,6 +290,35 @@ export default function InventoryAlerts() {
     refetchNotifications();
   };
 
+  const checkAlerts = async () => {
+    setIsGenerating(true);
+    try {
+      const { error: lowStockError } = await supabase.rpc("check_low_stock_alerts");
+      if (lowStockError) throw lowStockError;
+
+      const { error: expiringError } = await supabase.rpc("check_expiring_products");
+      if (expiringError) throw expiringError;
+
+      const { error: inactiveCustomersError } = await supabase.rpc("check_inactive_customers");
+      if (inactiveCustomersError) throw inactiveCustomersError;
+
+      const { error: overdueInvoicesError } = await supabase.rpc("check_overdue_invoices");
+      if (overdueInvoicesError) throw overdueInvoicesError;
+
+      const { error: expiringChecksError } = await supabase.rpc("check_expiring_checks");
+      if (expiringChecksError) throw expiringChecksError;
+
+      toast.success("Todas las alertas generadas exitosamente");
+      refetchNotifications();
+    } catch (error) {
+      console.error("Error checking alerts:", error);
+      toast.error("Error al generar alertas");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+
   const filteredLowStock = lowStockProducts?.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -241,10 +339,26 @@ export default function InventoryAlerts() {
               Monitoreo de stock bajo y productos próximos a vencer
             </p>
           </div>
-          <Button onClick={() => setCreateDialogOpen(true)} className="w-full sm:w-auto">
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar Alertas
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => setCreateDialogOpen(true)}
+              className="w-full sm:w-auto"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Alerta
+            </Button>
+            <Button
+              onClick={checkAlerts}
+              disabled={isGenerating}
+              className="w-full sm:w-auto"
+            >
+              {isGenerating ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Generar Alertas
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">

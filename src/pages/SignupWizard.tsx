@@ -162,7 +162,7 @@ export default function SignupWizard() {
           <div className="flex items-center justify-center gap-3 mb-2 md:mb-4">
             <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex items-center justify-center relative overflow-hidden group" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{animation: 'shine 3s infinite'}}></div>
-              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-8 h-8 md:w-10 md:h-10 relative z-10 drop-shadow-lg" />
+              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify" className="w-8 h-8 md:w-10 md:h-10 relative z-10 drop-shadow-lg" />
             </div>
             <h1 className="text-2xl md:text-4xl font-bold text-white">Ventify</h1>
           </div>

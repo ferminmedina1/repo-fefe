@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { ShoppingCart } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 
 const authSchema = z.object({
@@ -24,6 +24,7 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
@@ -145,7 +146,7 @@ export default function Auth() {
             <div className="w-18 h-18 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-primary/10 via-transparent to-cyan-500/10 border border-primary/30 flex items-center justify-center overflow-visible" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
               <div className="absolute inset-2 rounded-full border border-white/10"></div>
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/12 to-transparent opacity-80" style={{animation: 'shine 3s infinite'}}></div>
-              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify Space" className="w-10 h-10 md:w-12 md:h-12 relative z-10 drop-shadow-[0_8px_18px_rgba(59,130,246,0.45)]" />
+              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify" className="w-10 h-10 md:w-12 md:h-12 relative z-10 drop-shadow-[0_8px_18px_rgba(59,130,246,0.45)]" />
             </div>
           </div>
           <div>
@@ -200,15 +201,26 @@ export default function Auth() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="login-password" className="text-white font-medium">Contraseña</Label>
-              <Input
-                id="login-password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="bg-slate-900/50 border-primary/30 text-white placeholder:text-slate-400 focus:border-primary focus:ring-primary/20"
-              />
+              <div className="relative">
+                <Input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-slate-900/50 border-primary/30 text-white placeholder:text-slate-400 focus:border-primary focus:ring-primary/20 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <Button type="submit" className="w-full mt-2 h-11 bg-primary hover:bg-primary/90 text-white font-semibold shadow-lg" disabled={isLoading}>
               {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}

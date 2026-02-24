@@ -75,6 +75,12 @@ const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRequests"));
 
+
+const Opportunities = lazy(() => import("./pages/Opportunities"));
+const Pipelines = lazy(() => import("./pages/Pipelines"));
+const CrmReports = lazy(() => import("./pages/CrmReports"));
+const CrmRoles = lazy(() => import("./pages/CrmRoles"));
+
 const queryClient = new QueryClient();
 
 
@@ -324,6 +330,7 @@ const App = () => (
             <Route path="/settings" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="settings"><Settings /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/settings/email" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="settings"><EmailConfig /></ModuleProtectedRoute></ProtectedRoute>} />
             
+           
             {/* Módulos Adicionales - requieren contrato */}
             <Route path="/quotations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="quotations"><Quotations /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/delivery-notes" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="delivery_notes"><DeliveryNotes /></ModuleProtectedRoute></ProtectedRoute>} />
@@ -332,7 +339,12 @@ const App = () => (
             <Route path="/customer-account" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><CustomerAccount /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/accounts-receivable" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><AccountsReceivable /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/promotions" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="promotions"><Promotions /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/opportunities" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><Opportunities /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/pipelines" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pipelines"><Pipelines /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/crm-reports" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmReports /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/settings/crm-roles" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmRoles /></ModuleProtectedRoute></ProtectedRoute>} />
             
+
             {/* Inventario & Compras */}
             <Route path="/suppliers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="suppliers"><Suppliers /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/purchases" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><Purchases /></ModuleProtectedRoute></ProtectedRoute>} />

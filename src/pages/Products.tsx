@@ -94,6 +94,7 @@ export default function Products() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   
   // Reset form when dialog opens for new product
   useEffect(() => {
@@ -524,6 +525,7 @@ export default function Products() {
     setEditingProduct(null);
     setImageFile(null);
     setImagePreview("");
+    setFormErrors({});
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -605,9 +607,13 @@ export default function Products() {
     } catch (error) {
       console.error('Error en handleSubmit:', error);
       if (error instanceof z.ZodError) {
-        const firstError = error.errors[0];
-        console.error('Error de validación Zod:', firstError);
-        toast.error(firstError.message);
+        const newErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            newErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setFormErrors(newErrors);
       } else {
         toast.error("Error al validar el producto");
       }
@@ -1296,9 +1302,10 @@ export default function Products() {
                     <Input
                       id="name"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      required
+                      onChange={(e) => { setFormData({ ...formData, name: e.target.value }); if (formErrors.name) setFormErrors((p) => ({ ...p, name: "" })); }}
+                      className={formErrors.name ? "border-destructive" : ""}
                     />
+                    {formErrors.name && <p className="text-sm text-destructive mt-1">{formErrors.name}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="category">Categoría</Label>
@@ -1396,10 +1403,11 @@ export default function Products() {
                       type="number"
                       step="0.01"
                       value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      required
+                      onChange={(e) => { setFormData({ ...formData, price: e.target.value }); if (formErrors.price) setFormErrors((p) => ({ ...p, price: "" })); }}
                       placeholder="0.00"
+                      className={formErrors.price ? "border-destructive" : ""}
                     />
+                    {formErrors.price && <p className="text-sm text-destructive mt-1">{formErrors.price}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="cost">Costo (Opcional)</Label>
@@ -1408,9 +1416,11 @@ export default function Products() {
                       type="number"
                       step="0.01"
                       value={formData.cost}
-                      onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                      onChange={(e) => { setFormData({ ...formData, cost: e.target.value }); if (formErrors.cost) setFormErrors((p) => ({ ...p, cost: "" })); }}
                       placeholder="0.00"
+                      className={formErrors.cost ? "border-destructive" : ""}
                     />
+                    {formErrors.cost && <p className="text-sm text-destructive mt-1">{formErrors.cost}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currency">Moneda</Label>
@@ -1438,10 +1448,11 @@ export default function Products() {
                       id="stock"
                       type="number"
                       value={formData.stock}
-                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                      required
+                      onChange={(e) => { setFormData({ ...formData, stock: e.target.value }); if (formErrors.stock) setFormErrors((p) => ({ ...p, stock: "" })); }}
                       placeholder="0"
+                      className={formErrors.stock ? "border-destructive" : ""}
                     />
+                    {formErrors.stock && <p className="text-sm text-destructive mt-1">{formErrors.stock}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="min_stock">Stock Mínimo (Alerta)</Label>
@@ -1449,9 +1460,11 @@ export default function Products() {
                       id="min_stock"
                       type="number"
                       value={formData.min_stock}
-                      onChange={(e) => setFormData({ ...formData, min_stock: e.target.value })}
+                      onChange={(e) => { setFormData({ ...formData, min_stock: e.target.value }); if (formErrors.min_stock) setFormErrors((p) => ({ ...p, min_stock: "" })); }}
                       placeholder="0"
+                      className={formErrors.min_stock ? "border-destructive" : ""}
                     />
+                    {formErrors.min_stock && <p className="text-sm text-destructive mt-1">{formErrors.min_stock}</p>}
                   </div>
                   </div>
                 </div>
