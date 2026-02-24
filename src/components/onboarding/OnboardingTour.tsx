@@ -234,7 +234,7 @@ export function OnboardingTour() {
 
     return (
       <div
-        className="fixed bottom-6 left-6 z-[9999] flex items-center gap-1.5"
+        className="fixed bottom-6 right-24 z-[9999] flex items-center gap-1.5"
         style={{ animation: 'tourBadgeIn 200ms ease-out' }}
       >
         <button
