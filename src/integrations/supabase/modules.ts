@@ -407,6 +407,7 @@ export async function checkModuleLimits(
 
 /**
  * Get all module limits and usage for a company
+ * Fetches all data in bulk (2 queries) instead of N*4 queries per module
  */
 export async function getCompanyModuleLimits(
   companyId: string
@@ -422,25 +423,74 @@ export async function getCompanyModuleLimits(
       .eq('active', true);
 
     if (error) throw error;
+    if (!companyModules || companyModules.length === 0) return [];
+
+    // Batch fetch all usage stats for all modules in ONE query
+    const moduleIds = companyModules.map(cm => cm.module_id);
+    const { data: allUsageStats, error: usageError } = await supabase
+      .from('module_usage_stats')
+      .select('*')
+      .eq('company_id', companyId)
+      .in('module_id', moduleIds);
+
+    if (usageError) throw usageError;
+
+    // Group usage stats by module_id using Map
+    const usageByModule = new Map<string, ModuleUsageStats[]>();
+    (allUsageStats || []).forEach(stat => {
+      if (!usageByModule.has(stat.module_id)) {
+        usageByModule.set(stat.module_id, []);
+      }
+      usageByModule.get(stat.module_id)!.push(stat as ModuleUsageStats);
+    });
 
     const result: CompanyModuleLimits[] = [];
 
-    for (const cm of companyModules || []) {
+    for (const cm of companyModules) {
       const module = cm.module as any;
       if (!module) continue;
 
-      const limitChecks = await checkModuleLimits(companyId, cm.module_id);
-      const usageStats = await getModuleUsageStats(companyId, cm.module_id);
+      const limits = (module.limits as ModuleLimits) || {};
+      const customLimits = (cm.custom_limits as any as ModuleLimits) || {};
+      const effectiveLimits = { ...limits, ...customLimits };
+
+      const moduleUsageStats = usageByModule.get(cm.module_id) || [];
+
+      // Build limit checks from pre-fetched data (no additional queries)
+      const limitChecks: ModuleLimitCheck[] = [];
+      for (const stat of moduleUsageStats) {
+        const limitKey = `max_${stat.usage_type}` as keyof ModuleLimits;
+        const limit = effectiveLimits[limitKey] as number | undefined;
+
+        if (limit !== undefined) {
+          const percentageUsed = (stat.current_usage / limit) * 100;
+          const withinLimit = stat.current_usage <= limit;
+
+          let alertLevel: 'warning' | 'critical' | 'exceeded' | undefined;
+          if (percentageUsed >= 100) alertLevel = 'exceeded';
+          else if (percentageUsed >= 90) alertLevel = 'critical';
+          else if (percentageUsed >= 80) alertLevel = 'warning';
+
+          limitChecks.push({
+            within_limit: withinLimit,
+            usage_type: stat.usage_type as UsageType,
+            current_usage: stat.current_usage,
+            limit,
+            percentage_used: percentageUsed,
+            alert_level: alertLevel,
+          });
+        }
+      }
 
       const currentUsage: Record<string, number> = {};
-      usageStats.forEach(stat => {
+      moduleUsageStats.forEach(stat => {
         currentUsage[stat.usage_type] = stat.current_usage;
       });
 
       result.push({
         module_code: module.code,
         module_name: module.name,
-        limits: { ...(module.limits as any || {}), ...(cm.custom_limits as any || {}) },
+        limits: effectiveLimits as any,
         current_usage: currentUsage,
         limit_checks: limitChecks,
       });

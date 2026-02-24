@@ -107,7 +107,7 @@ export default function Auth() {
 
   return (
     <>
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 md:p-6">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto py-8 px-4">
         {/* Advanced animated background effects */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           {/* Main breathing orbs */}
@@ -129,24 +129,29 @@ export default function Auth() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-cyan-500/5 rounded-full" style={{animation: 'pulse 12s infinite ease-in-out 2s'}}></div>
         </div>
 
-        <Card
-          className="w-full max-w-3xl shadow-[0_28px_80px_rgba(0,0,0,0.55)] border-primary/40 relative z-10 bg-gradient-to-br from-slate-800/90 via-slate-700/90 to-slate-800/90 backdrop-blur-2xl p-6 md:p-8"
-          style={{animation: 'fadeInUp 0.6s ease-out'}}
-        >
+        <div className="relative z-10 w-full max-w-md mx-auto">
+          <Card
+            className="w-full shadow-[0_28px_80px_rgba(0,0,0,0.55)] border-primary/40 bg-gradient-to-br from-slate-800/90 via-slate-700/90 to-slate-800/90 backdrop-blur-2xl p-5 md:p-8"
+            style={{animation: 'fadeInUp 0.6s ease-out'}}
+          >
         <style>{`
           @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
           }
         `}</style>
-        <CardHeader className="pb-6 md:pb-8 flex flex-col items-center justify-center gap-6 text-center">
+        <CardHeader className="pb-4 md:pb-8 flex flex-col items-center justify-center gap-3 md:gap-6 text-center px-0">
           {/* Logo with elegant animation */}
           <div className="relative flex items-center justify-center">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/10 via-transparent to-cyan-500/10 border border-primary/30 flex items-center justify-center overflow-visible" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
+            <div className="w-18 h-18 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-primary/10 via-transparent to-cyan-500/10 border border-primary/30 flex items-center justify-center overflow-visible" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
               <div className="absolute inset-2 rounded-full border border-white/10"></div>
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/12 to-transparent opacity-80" style={{animation: 'shine 3s infinite'}}></div>
-              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify" className="w-12 h-12 relative z-10 drop-shadow-[0_8px_18px_rgba(59,130,246,0.45)]" />
+              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify" className="w-10 h-10 md:w-12 md:h-12 relative z-10 drop-shadow-[0_8px_18px_rgba(59,130,246,0.45)]" />
             </div>
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-white">Bienvenido a Ventify</h1>
+            <p className="text-sm text-slate-400 mt-1">Ingresá a tu cuenta</p>
           </div>
 
 
@@ -180,8 +185,8 @@ export default function Auth() {
             }
           `}</style>
         </CardHeader>
-        <CardContent className="pt-2 md:pt-4">
-          <form onSubmit={handleLogin} className="space-y-5 md:space-y-6">
+        <CardContent className="pt-0 md:pt-2 px-0 md:px-6">
+          <form onSubmit={handleLogin} className="space-y-4 md:space-y-5">
             <div className="space-y-2">
               <Label htmlFor="login-email" className="text-white font-medium">Email</Label>
               <Input
@@ -220,11 +225,11 @@ export default function Auth() {
             <Button type="submit" className="w-full mt-2 h-11 bg-primary hover:bg-primary/90 text-white font-semibold shadow-lg" disabled={isLoading}>
               {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
-            <div className="flex items-center justify-between mt-4 pt-2 border-t border-primary/30">
+            <div className="flex flex-col items-center gap-2 mt-4 pt-2 border-t border-primary/30">
               <Button
                 type="button"
                 variant="link"
-                className="text-sm text-slate-300 hover:text-white"
+                className="text-xs sm:text-sm text-slate-300 hover:text-white w-full sm:w-auto text-center"
                 onClick={() => setShowForgotPassword(true)}
               >
                 ¿Olvidaste tu contraseña?
@@ -232,7 +237,7 @@ export default function Auth() {
               <Button
                 type="button"
                 variant="link"
-                className="text-sm text-primary hover:text-primary/80 font-medium"
+                className="text-xs sm:text-sm text-primary hover:text-primary/80 font-medium w-full sm:w-auto text-center"
                 onClick={() => navigate("/signup")}
               >
                 ¿No tienes cuenta? Regístrate
@@ -241,6 +246,7 @@ export default function Auth() {
           </form>
         </CardContent>
       </Card>
+        </div>
       </div>
 
       {/* Forgot Password Dialog */}

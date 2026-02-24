@@ -500,12 +500,386 @@ export default function Settings() {
                 <CardDescription>Personaliza la apariencia de los tickets de venta</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Tu UI original de tickets está OK; se omitió parte larga por brevedad en preview */}
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={handleResetTicketConfig} type="button">
+                {/* Vista Previa */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Configuración */}
+                  <div className="space-y-4">
+                    <div className="space-y-4">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Información de la Empresa
+                      </h4>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="company-name">Nombre de la Empresa</Label>
+                          <Input
+                            id="company-name"
+                            value={ticketConfig.company_name}
+                            onChange={(e) => setTicketConfig({...ticketConfig, company_name: e.target.value})}
+                            placeholder="Mi Empresa S.A."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="company-phone">Teléfono</Label>
+                          <Input
+                            id="company-phone"
+                            value={ticketConfig.company_phone}
+                            onChange={(e) => setTicketConfig({...ticketConfig, company_phone: e.target.value})}
+                            placeholder="+1234567890"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="company-address">Dirección</Label>
+                        <Textarea
+                          id="company-address"
+                          value={ticketConfig.company_address}
+                          onChange={(e) => setTicketConfig({...ticketConfig, company_address: e.target.value})}
+                          placeholder="Calle Ejemplo 123, Ciudad, País"
+                          rows={2}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="company-email">Email</Label>
+                        <Input
+                          id="company-email"
+                          type="email"
+                          value={ticketConfig.company_email}
+                          onChange={(e) => setTicketConfig({...ticketConfig, company_email: e.target.value})}
+                          placeholder="contacto@miempresa.com"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="footer-message">Mensaje del Pie</Label>
+                        <Textarea
+                          id="footer-message"
+                          value={ticketConfig.footer_message}
+                          onChange={(e) => setTicketConfig({...ticketConfig, footer_message: e.target.value})}
+                          placeholder="¡Gracias por su compra!"
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="space-y-4">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Palette className="h-4 w-4" />
+                        Colores y Estilo
+                      </h4>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="header-color">Color del Encabezado</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id="header-color"
+                              type="color"
+                              value={ticketConfig.header_color}
+                              onChange={(e) => setTicketConfig({...ticketConfig, header_color: e.target.value})}
+                              className="w-12 h-10 p-1 border rounded"
+                            />
+                            <Input
+                              value={ticketConfig.header_color}
+                              onChange={(e) => setTicketConfig({...ticketConfig, header_color: e.target.value})}
+                              placeholder="#1f2937"
+                              className="flex-1"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="text-color">Color del Texto</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id="text-color"
+                              type="color"
+                              value={ticketConfig.text_color}
+                              onChange={(e) => setTicketConfig({...ticketConfig, text_color: e.target.value})}
+                              className="w-12 h-10 p-1 border rounded"
+                            />
+                            <Input
+                              value={ticketConfig.text_color}
+                              onChange={(e) => setTicketConfig({...ticketConfig, text_color: e.target.value})}
+                              placeholder="#374151"
+                              className="flex-1"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="accent-color">Color de Acento</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id="accent-color"
+                              type="color"
+                              value={ticketConfig.accent_color}
+                              onChange={(e) => setTicketConfig({...ticketConfig, accent_color: e.target.value})}
+                              className="w-12 h-10 p-1 border rounded"
+                            />
+                            <Input
+                              value={ticketConfig.accent_color}
+                              onChange={(e) => setTicketConfig({...ticketConfig, accent_color: e.target.value})}
+                              placeholder="#3b82f6"
+                              className="flex-1"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="paper-width">Ancho del Papel</Label>
+                          <select
+                            id="paper-width"
+                            title="Seleccionar ancho del papel"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            value={ticketConfig.paper_width}
+                            onChange={(e) => setTicketConfig({...ticketConfig, paper_width: e.target.value})}
+                          >
+                            <option value="58mm">58mm (Mini)</option>
+                            <option value="80mm">80mm (Estándar)</option>
+                            <option value="A4">A4 (Carta)</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="font-size">Tamaño de Fuente</Label>
+                          <select
+                            id="font-size"
+                            title="Seleccionar tamaño de fuente"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            value={ticketConfig.font_size}
+                            onChange={(e) => setTicketConfig({...ticketConfig, font_size: e.target.value})}
+                          >
+                            <option value="small">Pequeña</option>
+                            <option value="medium">Mediana</option>
+                            <option value="large">Grande</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="show-logo"
+                            title="Mostrar logo en el ticket"
+                            checked={ticketConfig.show_logo}
+                            onChange={(e) => setTicketConfig({...ticketConfig, show_logo: e.target.checked})}
+                            className="rounded border-gray-300"
+                          />
+                          <Label htmlFor="show-logo">Mostrar Logo</Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id="show-qr"
+                            title="Mostrar código QR en el ticket"
+                            checked={ticketConfig.show_qr}
+                            onChange={(e) => setTicketConfig({...ticketConfig, show_qr: e.target.checked})}
+                            className="rounded border-gray-300"
+                          />
+                          <Label htmlFor="show-qr">Mostrar Código QR</Label>
+                        </div>
+                      </div>
+
+                      {ticketConfig.show_logo && (
+                        <div className="space-y-2">
+                          <Label htmlFor="logo-upload">Logo de la Empresa</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              id="logo-upload"
+                              type="file"
+                              accept="image/*"
+                              onChange={handleLogoUpload}
+                              className="flex-1"
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => document.getElementById('logo-upload')?.click()}
+                              type="button"
+                            >
+                              <Upload className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          {ticketConfig.logo_url && (
+                            <div className="mt-2">
+                              <img
+                                src={ticketConfig.logo_url}
+                                alt="Logo"
+                                className="w-20 h-20 object-contain border rounded mx-auto"
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setTicketConfig({...ticketConfig, logo_url: ""})}
+                                className="mt-2 w-full"
+                                type="button"
+                              >
+                                Quitar Logo
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Vista Previa */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Eye className="h-4 w-4" />
+                        Vista Previa
+                      </h4>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handlePrintPreview}
+                        type="button"
+                      >
+                        Imprimir Prueba
+                      </Button>
+                    </div>
+
+                    <div
+                      className="border rounded-lg p-4 bg-white"
+                      style={{
+                        width: ticketConfig.paper_width === 'A4' ? '210mm' :
+                               ticketConfig.paper_width === '80mm' ? '80mm' : '58mm',
+                        fontSize: ticketConfig.font_size === 'large' ? '14px' :
+                                ticketConfig.font_size === 'medium' ? '12px' : '10px',
+                        color: ticketConfig.text_color,
+                        maxWidth: '300px',
+                        margin: '0 auto'
+                      }}
+                    >
+                      {/* Encabezado */}
+                      <div
+                        className="text-center mb-4"
+                        style={{
+                          backgroundColor: ticketConfig.header_color,
+                          color: 'white',
+                          padding: '8px',
+                          borderRadius: '4px'
+                        }}
+                      >
+                        {ticketConfig.show_logo && (
+                          <div className="mb-2">
+                            <div className="w-12 h-12 bg-white/20 rounded mx-auto flex items-center justify-center overflow-hidden">
+                              {ticketConfig.logo_url ? (
+                                <img
+                                  src={ticketConfig.logo_url}
+                                  alt="Logo"
+                                  className="max-w-full max-h-full object-contain"
+                                />
+                              ) : (
+                                <span className="text-xs">LOGO</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        <h3 className="font-bold text-sm">{ticketConfig.company_name || "NOMBRE EMPRESA"}</h3>
+                        <p className="text-xs opacity-90">{ticketConfig.company_address || "Dirección de la empresa"}</p>
+                        <p className="text-xs opacity-90">{ticketConfig.company_phone || "Teléfono"}</p>
+                        <p className="text-xs opacity-90">{ticketConfig.company_email || "email@empresa.com"}</p>
+                      </div>
+
+                      {/* Información de venta */}
+                      <div className="mb-3 text-xs">
+                        <div className="flex justify-between">
+                          <span>Ticket #:</span>
+                          <span>001-000001</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Fecha:</span>
+                          <span>{format(new Date(), "dd/MM/yyyy HH:mm")}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Cajero:</span>
+                          <span>Admin</span>
+                        </div>
+                      </div>
+
+                      <hr className="my-2" />
+
+                      {/* Productos de ejemplo */}
+                      <div className="mb-3">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span>Producto Ejemplo</span>
+                          <span>$10.00</span>
+                        </div>
+                        <div className="text-xs text-gray-600 ml-2">
+                          2 x $5.00
+                        </div>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span>Otro Producto</span>
+                          <span>$15.50</span>
+                        </div>
+                        <div className="text-xs text-gray-600 ml-2">
+                          1 x $15.50
+                        </div>
+                      </div>
+
+                      <hr className="my-2" />
+
+                      {/* Totales */}
+                      <div className="mb-3 text-xs">
+                        <div className="flex justify-between">
+                          <span>Subtotal:</span>
+                          <span>$25.50</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Impuestos:</span>
+                          <span>$2.55</span>
+                        </div>
+                        <div className="flex justify-between font-bold" style={{ color: ticketConfig.accent_color }}>
+                          <span>TOTAL:</span>
+                          <span>$28.05</span>
+                        </div>
+                      </div>
+
+                      <hr className="my-2" />
+
+                      {/* Pie */}
+                      <div className="text-center text-xs">
+                        <p className="mb-2">{ticketConfig.footer_message}</p>
+                        {ticketConfig.show_qr && (
+                          <div className="flex justify-center mb-2">
+                            <div className="w-12 h-12 bg-gray-200 flex items-center justify-center text-xs">
+                              QR
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-xs opacity-70">www.miempresa.com</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleResetTicketConfig}
+                    type="button"
+                    className="w-full sm:w-auto"
+                  >
                     Restablecer por Defecto
                   </Button>
-                  <Button onClick={handleSaveTicketConfig} disabled={saveTicketConfigMutation.isPending} type="button">
+                  <Button
+                    onClick={handleSaveTicketConfig}
+                    disabled={saveTicketConfigMutation.isPending}
+                    type="button"
+                    className="w-full sm:w-auto"
+                  >
                     {saveTicketConfigMutation.isPending ? "Guardando..." : "Guardar Configuración"}
                   </Button>
                 </div>

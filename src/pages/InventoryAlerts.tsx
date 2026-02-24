@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/layout/Layout";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -31,18 +32,39 @@ import {
   Loader2,
   DollarSign,
   Plus,
+  Bell,
+  Trash2,
+  Power,
+  Eye,
+  Pencil
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useCompany } from "@/contexts/CompanyContext";
+import { CreateAlertDialog } from "@/components/inventory/CreateAlertDialog";
+
+const CONDITION_LABELS: Record<string, string> = {
+  stock_lte: "Stock menor o igual a",
+  stock_eq_zero: "Sin stock",
+  stock_gte: "Stock mayor o igual a",
+};
+
+const SCOPE_LABELS: Record<string, string> = {
+  all: "Todos los productos",
+  category: "Categoría",
+  product: "Producto",
+};
 
 export default function InventoryAlerts() {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<any>(null);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Agregar Alertas dialog state
   const [showAddAlert, setShowAddAlert] = useState(false);
@@ -160,6 +182,21 @@ export default function InventoryAlerts() {
     enabled: !!currentCompany?.id,
   });
 
+  // Custom alert rules
+  const { data: alertRules, isLoading: loadingAlertRules } = useQuery({
+    queryKey: ["inventory-alert-rules", currentCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("inventory_alert_rules")
+        .select("*")
+        .eq("company_id", currentCompany?.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentCompany?.id,
+  });
+
   const selectedProduct = allProducts.find((p) => p.id === selectedProductId);
 
   const saveAlertMutation = useMutation({
@@ -189,6 +226,38 @@ export default function InventoryAlerts() {
     if (!selectedProductId || isNaN(minStock) || minStock < 0) return;
     saveAlertMutation.mutate({ productId: selectedProductId, minStock });
   };
+
+  // Toggle alert rule active status
+  const toggleAlertRule = useMutation({
+    mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
+      const { error } = await supabase
+        .from("inventory_alert_rules")
+        .update({ active })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inventory-alert-rules"] });
+      toast.success("Estado de alerta actualizado");
+    },
+    onError: () => toast.error("Error al actualizar la alerta"),
+  });
+
+  // Delete alert rule
+  const deleteAlertRule = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("inventory_alert_rules")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inventory-alert-rules"] });
+      toast.success("Alerta eliminada");
+    },
+    onError: () => toast.error("Error al eliminar la alerta"),
+  });
 
   const { data: notifications, refetch: refetchNotifications } = useQuery({
     queryKey: ["notifications"],
@@ -250,6 +319,7 @@ export default function InventoryAlerts() {
     }
   };
 
+
   const filteredLowStock = lowStockProducts?.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.sku?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -273,7 +343,7 @@ export default function InventoryAlerts() {
           <div className="flex gap-2 flex-wrap">
             <Button
               variant="outline"
-              onClick={() => setShowAddAlert(true)}
+              onClick={() => setCreateDialogOpen(true)}
               className="w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -351,13 +421,107 @@ export default function InventoryAlerts() {
         />
       </div>
 
-      <Tabs defaultValue="low-stock" className="w-full">
+      <Tabs defaultValue="my-alerts" className="w-full">
         <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
-          <TabsTrigger value="low-stock" className="flex-1 min-w-[120px] text-xs sm:text-sm">Stock Bajo</TabsTrigger>
-          <TabsTrigger value="expiring" className="flex-1 min-w-[120px] text-xs sm:text-sm">Próx. Vencer</TabsTrigger>
-          <TabsTrigger value="currency" className="flex-1 min-w-[120px] text-xs sm:text-sm">Monedas</TabsTrigger>
-          <TabsTrigger value="notifications" className="flex-1 min-w-[120px] text-xs sm:text-sm">Notificaciones</TabsTrigger>
+          <TabsTrigger value="my-alerts" className="flex-1 min-w-[100px] text-xs sm:text-sm">Mis Alertas</TabsTrigger>
+          <TabsTrigger value="low-stock" className="flex-1 min-w-[100px] text-xs sm:text-sm">Stock Bajo</TabsTrigger>
+          <TabsTrigger value="expiring" className="flex-1 min-w-[100px] text-xs sm:text-sm">Próx. Vencer</TabsTrigger>
+          <TabsTrigger value="currency" className="flex-1 min-w-[100px] text-xs sm:text-sm">Monedas</TabsTrigger>
+          <TabsTrigger value="notifications" className="flex-1 min-w-[100px] text-xs sm:text-sm">Notificaciones</TabsTrigger>
         </TabsList>
+
+        {/* Mis Alertas - custom alert rules */}
+        <TabsContent value="my-alerts" className="space-y-4">
+          {loadingAlertRules ? (
+            <div className="flex justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : alertRules?.length === 0 ? (
+            <Card className="p-8 text-center space-y-4">
+              <div className="flex justify-center">
+                <Bell className="h-12 w-12 text-muted-foreground/50" />
+              </div>
+              <div>
+                <p className="text-muted-foreground font-medium">No tenés alertas personalizadas</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Creá tu primera alerta para monitorear el stock automáticamente.
+                </p>
+              </div>
+              <Button onClick={() => setCreateDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Crear primera alerta
+              </Button>
+            </Card>
+          ) : (
+            alertRules?.map((rule) => (
+              <Card key={rule.id} className={`p-4 ${!rule.active ? 'opacity-60' : ''}`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2 flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold truncate">
+                        {rule.name || CONDITION_LABELS[rule.condition_type] || rule.condition_type}
+                      </h3>
+                      <Badge variant={rule.active ? 'default' : 'secondary'}>
+                        {rule.active ? 'Activa' : 'Inactiva'}
+                      </Badge>
+                      {rule.condition_type !== 'stock_eq_zero' && (
+                        <Badge variant="outline">Umbral: {rule.threshold} uds</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <Eye className="h-3 w-3" />
+                        {SCOPE_LABELS[rule.scope] || rule.scope}
+                        {rule.scope === 'category' && rule.scope_category && `: ${rule.scope_category}`}
+                      </span>
+                      <span>•</span>
+                      <span>{CONDITION_LABELS[rule.condition_type] || rule.condition_type}</span>
+                      {rule.condition_type !== 'stock_eq_zero' && (
+                        <span className="font-medium">{rule.threshold} unidades</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>Creada {formatDistanceToNow(new Date(rule.created_at), { addSuffix: true, locale: es })}</span>
+                      {rule.triggered_count > 0 && (
+                        <span>• Disparada {rule.triggered_count} {rule.triggered_count === 1 ? 'vez' : 'veces'}</span>
+                      )}
+                      {rule.notify_email && <Badge variant="outline" className="text-xs">Email</Badge>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Switch
+                      checked={rule.active}
+                      onCheckedChange={(checked) => toggleAlertRule.mutate({ id: rule.id, active: checked })}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => {
+                        setEditingRule(rule);
+                        setCreateDialogOpen(true);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (confirm('¿Eliminar esta alerta?')) {
+                          deleteAlertRule.mutate(rule.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))
+          )}
+        </TabsContent>
 
         <TabsContent value="low-stock" className="space-y-4">
           {loadingLowStock ? (
@@ -589,102 +753,14 @@ export default function InventoryAlerts() {
         </TabsContent>
       </Tabs>
     </div>
-
-      {/* ── Agregar Alerta Dialog ── */}
-      <Dialog open={showAddAlert} onOpenChange={(open) => {
-        setShowAddAlert(open);
-        if (!open) { setSelectedProductId(""); setMinStockValue(""); }
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Agregar Alerta de Stock</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label>Producto *</Label>
-              <Select value={selectedProductId} onValueChange={(v) => {
-                setSelectedProductId(v);
-                const p = allProducts.find((p) => p.id === v);
-                if (p?.min_stock != null) setMinStockValue(String(p.min_stock));
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccioná un producto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allProducts.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                      {p.sku ? ` · ${p.sku}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedProduct && (
-              <div className="rounded-md bg-muted px-3 py-2 text-sm space-y-0.5">
-                <p>
-                  <span className="text-muted-foreground">Stock actual:</span>{" "}
-                  <span className="font-medium">{selectedProduct.stock} unidades</span>
-                </p>
-                <p>
-                  <span className="text-muted-foreground">Umbral actual:</span>{" "}
-                  <span className="font-medium">
-                    {selectedProduct.min_stock ?? "Sin configurar"}
-                  </span>
-                </p>
-                {selectedProduct.min_stock != null &&
-                  selectedProduct.stock <= selectedProduct.min_stock && (
-                    <p className="text-destructive font-medium flex items-center gap-1 mt-1">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      Este producto ya está en alerta
-                    </p>
-                  )}
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="min-stock">Umbral mínimo de stock *</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="min-stock"
-                  type="number"
-                  min="0"
-                  placeholder="Ej: 10"
-                  value={minStockValue}
-                  onChange={(e) => setMinStockValue(e.target.value)}
-                  className="w-32"
-                />
-                <span className="text-sm text-muted-foreground">unidades</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Se generará una alerta cuando el stock baje de este valor.
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddAlert(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSaveAlert}
-              disabled={
-                !selectedProductId ||
-                minStockValue === "" ||
-                Number(minStockValue) < 0 ||
-                saveAlertMutation.isPending
-              }
-            >
-              {saveAlertMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : null}
-              Guardar alerta
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CreateAlertDialog
+        open={createDialogOpen}
+        onOpenChange={(v) => {
+          setCreateDialogOpen(v);
+          if (!v) setEditingRule(null);
+        }}
+        editingRule={editingRule}
+      />
     </Layout>
   );
 }

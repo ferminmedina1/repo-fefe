@@ -132,12 +132,37 @@ export function PaymentMethodsManager({
   return (
     <div className={cn("space-y-4", compact && "space-y-3")}>
       {showTitle && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <h3 className="text-lg font-semibold">Tus tarjetas de pago</h3>
-          <Button size="sm" variant="outline" onClick={handleAddCard}>
-            <Plus className="h-4 w-4 mr-2" />
-            Añadir tarjeta
-          </Button>
+          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline" onClick={handleAddCard} className="w-full sm:w-auto">
+                <Plus className="h-4 w-4 mr-2" />
+                Añadir tarjeta
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Añadir tarjeta de crédito o débito</DialogTitle>
+                <DialogDescription>
+                  Ingresa los datos de tu tarjeta de forma segura
+                </DialogDescription>
+              </DialogHeader>
+              {effectiveProvider === "stripe" && stripePromise && clientSecret && (
+                <Elements stripe={stripePromise} options={{ clientSecret }}>
+                  <StripePaymentForm
+                    clientSecret={clientSecret}
+                    companyId={companyId!}
+                    onSuccess={() => {
+                      setAddDialogOpen(false);
+                      setClientSecret(null);
+                      queryClient.invalidateQueries({ queryKey: ["payment-methods", companyId] });
+                    }}
+                  />
+                </Elements>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 

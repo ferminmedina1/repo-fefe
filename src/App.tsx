@@ -73,6 +73,7 @@ const EmailConfig = lazy(() => import("./pages/EmailConfig"));
 const SignupWizard = lazy(() => import("./pages/SignupWizard"));
 const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
+const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRequests"));
 
 
 const Opportunities = lazy(() => import("./pages/Opportunities"));
@@ -399,6 +400,9 @@ const App = () => (
             
             {/* Soporte de Plataforma - siempre disponible para empresas */}
             <Route path="/platform-support" element={<ProtectedRoute><PlatformSupport /></ProtectedRoute>} />
+            
+            {/* Bot Personalizado - siempre disponible */}
+            <Route path="/bot-requests" element={<ProtectedRoute><BotImplementationRequests /></ProtectedRoute>} />
             
             {/* Notificaciones - siempre disponible */}
             <Route path="/notification-settings" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="notifications"><NotificationSettings /></ModuleProtectedRoute></ProtectedRoute>} />
