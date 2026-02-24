@@ -64,7 +64,6 @@ export default function InventoryAlerts() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<any>(null);
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
   // Agregar Alertas dialog state
   const [showAddAlert, setShowAddAlert] = useState(false);
