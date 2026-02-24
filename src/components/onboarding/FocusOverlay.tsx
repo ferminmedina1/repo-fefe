@@ -69,21 +69,47 @@ export function FocusOverlay({
       return;
     }
 
-    // Scroll into view if not visible
+    // Check visibility: element must be inside the viewport AND inside its
+    // nearest scroll parent's visible bounds (e.g. sidebar with overflow-y: auto).
     const r = el.getBoundingClientRect();
-    const inViewport =
+
+    const isVisibleInViewport =
       r.top >= 0 &&
       r.left >= 0 &&
       r.bottom <= window.innerHeight &&
       r.right <= window.innerWidth;
 
-    if (!inViewport) {
+    // Also check if the element is clipped by a scroll parent
+    const isVisibleInScrollParent = (() => {
+      let parent = el.parentElement;
+      while (parent) {
+        const style = getComputedStyle(parent);
+        const overflowY = style.overflowY;
+        const overflowX = style.overflowX;
+        if (overflowY === 'auto' || overflowY === 'scroll' || overflowX === 'auto' || overflowX === 'scroll') {
+          const parentRect = parent.getBoundingClientRect();
+          // Element must be within scroll parent's visible area (with some tolerance)
+          if (
+            r.bottom < parentRect.top + 4 ||
+            r.top > parentRect.bottom - 4 ||
+            r.right < parentRect.left + 4 ||
+            r.left > parentRect.right - 4
+          ) {
+            return false;
+          }
+        }
+        parent = parent.parentElement;
+      }
+      return true;
+    })();
+
+    if (!isVisibleInViewport || !isVisibleInScrollParent) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
       // Re-measure after scroll settles
       setTimeout(() => {
         const r2 = el.getBoundingClientRect();
         setRect({ top: r2.top, left: r2.left, width: r2.width, height: r2.height });
-      }, 350);
+      }, 400);
       return;
     }
 
