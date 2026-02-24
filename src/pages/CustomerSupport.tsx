@@ -35,6 +35,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 import { ArticleSuggestions } from "@/components/support/ArticleSuggestions";
 import { SLAIndicator } from "@/components/support/SLAIndicator";
 import { ResponseTemplatesManager } from "@/components/support/ResponseTemplatesManager";
@@ -43,6 +44,7 @@ export default function CustomerSupport() {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { isCompleted: isOnboardingCompleted } = useOnboarding();
   const [searchQuery, setSearchQuery] = useState("");
   const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
@@ -255,6 +257,10 @@ export default function CustomerSupport() {
             <Button
               variant="outline"
               onClick={() => {
+                if (!isOnboardingCompleted) {
+                  toast.info('Completa el onboarding inicial antes de acceder a los tutoriales de módulo.');
+                  return;
+                }
                 sessionStorage.setItem(
                   'pending_module_tutorials',
                   JSON.stringify(['customer_support']),
@@ -380,7 +386,7 @@ export default function CustomerSupport() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div data-tutorial-section="stats" className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Abiertos</CardTitle>
@@ -420,7 +426,7 @@ export default function CustomerSupport() {
         </div>
 
         {/* Main Content */}
-        <div className="grid md:grid-cols-3 gap-6">
+        <div data-tutorial-section="tickets" className="grid md:grid-cols-3 gap-6">
           {/* Tickets List */}
           <Card className="md:col-span-1">
             <CardHeader>
@@ -599,8 +605,9 @@ export default function CustomerSupport() {
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
                           className="min-h-[80px]"
-                          onKeyPress={(e) => {
+                          onKeyDown={(e) => {
                             if (e.key === 'Enter' && e.ctrlKey && newMessage.trim()) {
+                              e.preventDefault();
                               sendMessageMutation.mutate();
                             }
                           }}

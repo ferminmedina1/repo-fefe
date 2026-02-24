@@ -53,8 +53,7 @@ import { useActiveModules } from "@/hooks/useActiveModules";
 import { usePermissions, Module } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useCompany } from "@/contexts/CompanyContext";
-import { useModuleTutorials } from "@/hooks/useModuleTutorials";
-import { useState, useMemo } from "react";
+import { useModuleTutorials } from "@/hooks/useModuleTutorials";import { MODULE_TUTORIALS } from '@/lib/onboarding/moduleTutorials';import { useState, useMemo } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -83,6 +82,11 @@ export function Sidebar() {
   const { isPlatformAdmin } = usePlatformAdmin();
   const { currentCompany } = useCompany();
   const { isViewed: isTutorialViewed } = useModuleTutorials();
+  // Set of module keys that actually have a tutorial config
+  const tutorialModuleKeys = useMemo(
+    () => new Set(MODULE_TUTORIALS.map((t) => t.key)),
+    [],
+  );
   
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -689,7 +693,7 @@ export function Sidebar() {
       >
         <Icon className="w-4 h-4 shrink-0" />
         <span className="truncate flex-1 text-sm">{item.title}</span>
-        {item.module && !isTutorialViewed(item.module) && (
+        {item.module && tutorialModuleKeys.has(item.module) && !isTutorialViewed(item.module) && (
           <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" title="Tutorial disponible" />
         )}
         {item.badge && item.badge > 0 && (

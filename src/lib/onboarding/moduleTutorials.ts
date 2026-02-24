@@ -68,7 +68,7 @@ export const MODULE_TUTORIALS: ModuleTutorialConfig[] = [
       {
         title: 'Indicadores clave (KPIs)',
         description: 'Las tarjetas superiores te muestran rendimiento diario, mensual y comparativas con períodos anteriores.',
-        targetSelector: 'div.grid.grid-cols-2',
+        targetSelector: '[data-tutorial-section="kpis"]',
         position: 'bottom',
         nextSteps: [
           'Hacé clic en un KPI para ver el detalle ampliado',
@@ -472,23 +472,25 @@ export const MODULE_TUTORIALS: ModuleTutorialConfig[] = [
         ],
       },
       {
-        title: 'Gestionar tickets',
-        description: 'Cada consulta se convierte en un ticket con estado, prioridad y asignación.',
-        position: 'bottom',
-        nextSteps: [
-          'Asigná un ticket a un miembro del equipo',
-          'Respondé directamente desde la vista de ticket',
-          'Cambiá el estado a "Resuelto" cuando se cierre',
-        ],
-      },
-      {
         title: 'Métricas de soporte',
-        description: 'Controlá tiempos de respuesta, tickets resueltos y satisfacción del cliente.',
-        position: 'top',
+        description: 'Estas tarjetas te muestran el resumen de tickets abiertos, en progreso, resueltos y totales.',
+        targetSelector: '[data-tutorial-section="stats"]',
+        position: 'bottom',
         nextSteps: [
           'Revisá el tiempo promedio de primera respuesta',
           'Analizá cuántos tickets se resuelven por día',
           'Identificá las consultas más frecuentes para crear FAQs',
+        ],
+      },
+      {
+        title: 'Gestionar tickets',
+        description: 'Cada consulta se convierte en un ticket con estado, prioridad y asignación. Seleccioná un ticket de la lista para responder.',
+        targetSelector: '[data-tutorial-section="tickets"]',
+        position: 'top',
+        nextSteps: [
+          'Asigná un ticket a un miembro del equipo',
+          'Respondé directamente desde la vista de ticket',
+          'Cambiá el estado a "Resuelto" cuando se cierre',
         ],
       },
     ],

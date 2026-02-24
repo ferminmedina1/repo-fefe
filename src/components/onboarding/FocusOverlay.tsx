@@ -57,17 +57,23 @@ export function FocusOverlay({
   const maskId = useId().replace(/:/g, '_');
   const tooltipRef = useRef<HTMLDivElement>(null);
 
+  // Track whether the target was expected but not found (vs. intentionally omitted)
+  const [targetNotFound, setTargetNotFound] = useState(false);
+
   // Scroll target into view + measure
   const measure = useCallback(() => {
     if (!targetSelector || !open) {
       setRect(null);
+      setTargetNotFound(false);
       return;
     }
     const el = document.querySelector(targetSelector);
     if (!el) {
       setRect(null);
+      setTargetNotFound(true);
       return;
     }
+    setTargetNotFound(false);
 
     // Check visibility: element must be inside the viewport AND inside its
     // nearest scroll parent's visible bounds (e.g. sidebar with overflow-y: auto).
@@ -124,11 +130,38 @@ export function FocusOverlay({
     window.addEventListener('resize', handleResize);
     window.addEventListener('scroll', handleResize, true);
 
+    // Retry measuring if target wasn't found yet (DOM may still be loading)
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryCount = 0;
+    const MAX_RETRIES = 5;
+    if (targetSelector && !document.querySelector(targetSelector) && retryCount < MAX_RETRIES) {
+      const retry = () => {
+        retryCount++;
+        if (document.querySelector(targetSelector)) {
+          measure();
+        } else if (retryCount < MAX_RETRIES) {
+          retryTimer = setTimeout(retry, 300);
+        }
+      };
+      retryTimer = setTimeout(retry, 300);
+    }
+
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('scroll', handleResize, true);
+      if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [measure, open]);
+  }, [measure, open, targetSelector]);
+
+  // Lock body scroll while overlay is open
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   // Keyboard support
   useEffect(() => {
@@ -222,11 +255,10 @@ export function FocusOverlay({
       aria-modal="true"
       aria-label="Tour step"
     >
-      {/* Dark overlay with cutout */}
+      {/* Dark overlay with cutout — pointer-events:none so clicks pass through the cutout to the highlighted element */}
       <svg
         className="absolute inset-0 w-full h-full"
-        style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
-        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, zIndex: 9998, pointerEvents: 'none' }}
       >
         <defs>
           <mask id={maskId}>
@@ -249,10 +281,42 @@ export function FocusOverlay({
           y="0"
           width="100%"
           height="100%"
-          fill="rgba(0,0,0,0.6)"
+          fill={rect ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.45)'}
           mask={`url(#${maskId})`}
         />
       </svg>
+
+      {/* Clickable backdrop around the cutout — dismiss on click outside highlighted area */}
+      {rect ? (
+        <>
+          {/* Top region */}
+          <div
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, height: Math.max(0, rect.top - PADDING), zIndex: 9998, cursor: 'pointer' }}
+            onClick={onClose}
+          />
+          {/* Bottom region */}
+          <div
+            style={{ position: 'fixed', top: rect.top + rect.height + PADDING, left: 0, right: 0, bottom: 0, zIndex: 9998, cursor: 'pointer' }}
+            onClick={onClose}
+          />
+          {/* Left region */}
+          <div
+            style={{ position: 'fixed', top: rect.top - PADDING, left: 0, width: Math.max(0, rect.left - PADDING), height: rect.height + PADDING * 2, zIndex: 9998, cursor: 'pointer' }}
+            onClick={onClose}
+          />
+          {/* Right region */}
+          <div
+            style={{ position: 'fixed', top: rect.top - PADDING, left: rect.left + rect.width + PADDING, right: 0, height: rect.height + PADDING * 2, zIndex: 9998, cursor: 'pointer' }}
+            onClick={onClose}
+          />
+        </>
+      ) : (
+        /* No target — full backdrop click dismisses */
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 9998, cursor: 'pointer' }}
+          onClick={onClose}
+        />
+      )}
 
       {/* Highlight border around target */}
       {rect && (
@@ -276,7 +340,7 @@ export function FocusOverlay({
           ref={tooltipRef}
           className={cn(
             'bg-card border border-border rounded-xl shadow-2xl p-4 z-[10000]',
-            rect ? 'max-w-[400px]' : 'max-w-md',
+            rect ? 'max-w-[400px]' : 'max-w-md w-[95vw] sm:w-auto',
             className,
           )}
           style={{

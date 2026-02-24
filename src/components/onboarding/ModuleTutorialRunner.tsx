@@ -36,7 +36,7 @@ export function ModuleTutorialRunner() {
   const location = useLocation();
   const navigate = useNavigate();
   const { markViewed } = useModuleTutorials();
-  const { isCompleted } = useOnboarding();
+  const { isCompleted, showModuleSelector } = useOnboarding();
 
   const [pendingKeys, setPendingKeys] = useState<string[]>([]);
   const [activeTutorial, setActiveTutorial] = useState<ModuleTutorialConfig | null>(null);
@@ -77,6 +77,7 @@ export function ModuleTutorialRunner() {
   useEffect(() => {
     if (pendingKeys.length === 0) return;
     if (activeTutorial) return; // already running
+    if (transitioningRef.current) return; // navigating between tutorials
 
     const currentPath = normPath(location.pathname);
     const match = MODULE_TUTORIALS.find(
@@ -153,6 +154,9 @@ export function ModuleTutorialRunner() {
     if (!activeTutorial || transitioningRef.current) return;
     transitioningRef.current = true;
 
+    // Mark skipped module as viewed so sidebar dot disappears
+    markViewed(activeTutorial.key);
+
     const remaining = pendingKeys.filter((k) => k !== activeTutorial.key);
     setPendingKeys(remaining);
     sessionStorage.setItem('pending_module_tutorials', JSON.stringify(remaining));
@@ -174,19 +178,31 @@ export function ModuleTutorialRunner() {
     } else {
       transitioningRef.current = false;
     }
-  }, [activeTutorial, pendingKeys, navigate]);
+  }, [activeTutorial, pendingKeys, markViewed, navigate]);
 
-  /** Close all tutorials */
+  /** Close all tutorials — mark current + remaining as viewed so sidebar dots clear */
   const handleClose = useCallback(() => {
+    // Mark current tutorial as viewed
+    if (activeTutorial) {
+      markViewed(activeTutorial.key);
+    }
+    // Mark remaining pending tutorials as viewed
+    pendingKeys.forEach((k) => {
+      if (k !== activeTutorial?.key) {
+        markViewed(k);
+      }
+    });
+
     transitioningRef.current = false;
     setPendingKeys([]);
     sessionStorage.removeItem('pending_module_tutorials');
     setActiveTutorial(null);
     setCurrentStepIndex(0);
     setIsActive(false);
-  }, []);
+  }, [activeTutorial, pendingKeys, markViewed]);
 
-  if (!isActive || !currentStep || !activeTutorial) return null;
+  // Don't render while ModuleTutorialSelector is visible (z-index conflict)
+  if (!isActive || !currentStep || !activeTutorial || showModuleSelector) return null;
 
   return (
     <FocusOverlay
