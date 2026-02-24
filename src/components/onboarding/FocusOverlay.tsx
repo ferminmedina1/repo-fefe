@@ -30,6 +30,8 @@ interface FocusOverlayProps {
   onNext?: () => void;
   /** Called on ArrowLeft */
   onPrev?: () => void;
+  /** Accessible label for the dialog (defaults to 'Tutorial') */
+  ariaLabel?: string;
 }
 
 interface TargetRect {
@@ -52,6 +54,7 @@ export function FocusOverlay({
   className,
   onNext,
   onPrev,
+  ariaLabel,
 }: FocusOverlayProps) {
   const [rect, setRect] = useState<TargetRect | null>(null);
   const maskId = useId().replace(/:/g, '_');
@@ -182,6 +185,15 @@ export function FocusOverlay({
     return () => window.removeEventListener('keydown', handleKey);
   }, [open, onClose, onNext, onPrev]);
 
+  // Auto-focus the tooltip when overlay opens or step changes
+  useEffect(() => {
+    if (open && tooltipRef.current) {
+      // Small delay to let the animation start before focusing
+      const timer = setTimeout(() => tooltipRef.current?.focus(), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [open, targetSelector]);
+
   if (!open) return null;
 
   // ── Tooltip position with viewport clamping ──────────────
@@ -253,7 +265,7 @@ export function FocusOverlay({
       style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
       role="dialog"
       aria-modal="true"
-      aria-label="Tour step"
+      aria-label={ariaLabel || 'Tutorial'}
     >
       {/* Dark overlay with cutout — pointer-events:none so clicks pass through the cutout to the highlighted element */}
       <svg
@@ -338,8 +350,9 @@ export function FocusOverlay({
       {children && (
         <div
           ref={tooltipRef}
+          tabIndex={-1}
           className={cn(
-            'bg-card border border-border rounded-xl shadow-2xl p-4 z-[10000]',
+            'bg-card border border-border rounded-xl shadow-2xl p-4 z-[10000] focus:outline-none',
             rect ? 'max-w-[400px]' : 'max-w-md w-[95vw] sm:w-auto',
             className,
           )}
@@ -347,6 +360,27 @@ export function FocusOverlay({
             ...getTooltipStyle(),
             zIndex: 10000,
             animation: 'focusOverlayFadeIn 200ms ease-out',
+          }}
+          onKeyDown={(e) => {
+            // Focus trap: prevent Tab from leaving the tooltip
+            if (e.key === 'Tab') {
+              const focusable = tooltipRef.current?.querySelectorAll<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+              );
+              if (!focusable || focusable.length === 0) {
+                e.preventDefault();
+                return;
+              }
+              const first = focusable[0];
+              const last = focusable[focusable.length - 1];
+              if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+              } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+              }
+            }
           }}
         >
           {children}

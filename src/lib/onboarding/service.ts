@@ -28,6 +28,7 @@ export async function fetchOnboardingState(companyId: string): Promise<Onboardin
   });
 
   if (error) throw new Error(`[Onboarding] fetch failed: ${error.message}`);
+  if (!data) throw new Error('[Onboarding] fetch returned null data');
   return parseOnboardingState(data as Record<string, unknown>);
 }
 
@@ -43,6 +44,7 @@ export async function advanceOnboardingStep(
   });
 
   if (error) throw new Error(`[Onboarding] advance failed: ${error.message}`);
+  if (!data) throw new Error('[Onboarding] advance returned null data');
   return parseOnboardingState(data as Record<string, unknown>);
 }
 
@@ -68,5 +70,6 @@ export async function fetchViewedModuleTutorials(companyId: string): Promise<str
   });
 
   if (error) throw new Error(`[Onboarding] fetch tutorials failed: ${error.message}`);
+  if (!data) return [];
   return (data as string[]) ?? [];
 }

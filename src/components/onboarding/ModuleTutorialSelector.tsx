@@ -111,6 +111,8 @@ export function ModuleTutorialSelector() {
   };
 
   const handleSkip = () => {
+    // Clear any previously saved module selections to avoid stale launches
+    localStorage.removeItem('initial_module_selections');
     dismissModuleSelector();
   };
 

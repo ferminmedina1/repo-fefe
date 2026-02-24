@@ -64,7 +64,13 @@ export function ModuleTutorialRunner() {
     if (raw) {
       try {
         const keys = JSON.parse(raw) as string[];
-        setPendingKeys(keys);
+        // Filter out orphaned keys that no longer exist in MODULE_TUTORIALS
+        const validKeys = keys.filter((k) => MODULE_TUTORIALS.some((t) => t.key === k));
+        if (validKeys.length !== keys.length) {
+          // Clean up sessionStorage to remove invalid keys
+          sessionStorage.setItem('pending_module_tutorials', JSON.stringify(validKeys));
+        }
+        setPendingKeys(validKeys);
       } catch {
         setPendingKeys([]);
       }
@@ -212,6 +218,7 @@ export function ModuleTutorialRunner() {
       onClose={handleClose}
       onNext={handleNext}
       onPrev={handlePrev}
+      ariaLabel={`${activeTutorial.label} — Paso ${currentStepIndex + 1} de ${totalSteps}`}
     >
       <div className="space-y-3">
         {/* Header with module label, step counter and close */}
