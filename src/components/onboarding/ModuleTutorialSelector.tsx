@@ -64,11 +64,21 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 
 export function ModuleTutorialSelector() {
   const navigate = useNavigate();
-  const { showModuleSelector, dismissModuleSelector } = useOnboarding();
+  const { showModuleSelector, dismissModuleSelector, isCompleted } = useOnboarding();
   const { viewedModules, markViewed } = useModuleTutorials();
-  const [selectedModules, setSelectedModules] = useState<Set<string>>(new Set());
+  const [selectedModules, setSelectedModules] = useState<Set<string>>(() => {
+    // Pre-populate from localStorage if the user previously selected modules
+    try {
+      const saved = localStorage.getItem('initial_module_selections');
+      if (saved) return new Set(JSON.parse(saved) as string[]);
+    } catch { /* ignore */ }
+    return new Set();
+  });
 
   const categorized = useMemo(() => getTutorialsByCategory(), []);
+
+  /** Pre-onboarding mode: shown before the tour starts */
+  const isPreOnboarding = !isCompleted;
 
   if (!showModuleSelector) return null;
 
@@ -82,15 +92,19 @@ export function ModuleTutorialSelector() {
   };
 
   const handleStart = () => {
-    // Store selected modules in sessionStorage for the tutorial runner
     const selected = Array.from(selectedModules);
     if (selected.length > 0) {
-      sessionStorage.setItem('pending_module_tutorials', JSON.stringify(selected));
-      // Navigate to the first selected module
-      const allTutorials = Array.from(categorized.values()).flat();
-      const first = allTutorials.find((t) => t.key === selected[0]);
-      if (first) {
-        navigate(first.route);
+      if (isPreOnboarding) {
+        // Pre-onboarding: save to localStorage for later (after tour completes)
+        localStorage.setItem('initial_module_selections', JSON.stringify(selected));
+      } else {
+        // Post-onboarding: store in sessionStorage and navigate to first module
+        sessionStorage.setItem('pending_module_tutorials', JSON.stringify(selected));
+        const allTutorials = Array.from(categorized.values()).flat();
+        const first = allTutorials.find((t) => t.key === selected[0]);
+        if (first) {
+          navigate(first.route);
+        }
       }
     }
     dismissModuleSelector();
@@ -113,10 +127,14 @@ export function ModuleTutorialSelector() {
           <GraduationCap className="w-8 h-8 text-primary" />
         </div>
         <h1 className="text-2xl font-bold text-white">
-          ¿Qué parte del sistema querés explorar?
+          {isPreOnboarding
+            ? '¡Bienvenido! ¿Qué querés aprender?'
+            : '¿Qué parte del sistema querés explorar?'}
         </h1>
         <p className="text-slate-400 mt-2 max-w-md mx-auto">
-          Seleccioná los módulos que te interesen y te guiamos paso a paso. Podés volver a esto cuando quieras.
+          {isPreOnboarding
+            ? 'Antes de empezar, elegí los módulos que te gustaría conocer. Al terminar el recorrido inicial, te guiaremos por cada uno.'
+            : 'Seleccioná los módulos que te interesen y te guiamos paso a paso. Podés volver a esto cuando quieras.'}
         </p>
         <div className="flex items-center justify-center gap-3 mt-4">
           <Badge variant="secondary" className="text-xs">
@@ -190,7 +208,9 @@ export function ModuleTutorialSelector() {
             disabled={selectedModules.size === 0}
             onClick={handleStart}
           >
-            Explorar {selectedModules.size > 0 ? `(${selectedModules.size})` : ''}
+            {isPreOnboarding
+              ? `Guardar y continuar ${selectedModules.size > 0 ? `(${selectedModules.size})` : ''}`
+              : `Explorar ${selectedModules.size > 0 ? `(${selectedModules.size})` : ''}`}
           </Button>
         </div>
       </div>

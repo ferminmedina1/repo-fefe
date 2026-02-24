@@ -72,11 +72,21 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       setError(false);
       const s = await fetchOnboardingState(companyId);
       setState(s);
-      // If just completed, show module selector
-      if (s.currentStep === 'COMPLETED' && s.completedAt) {
+      // Fresh user — show module selector FIRST (before the tour)
+      if (
+        s.currentStep === 'WELCOME' &&
+        (!s.completedSteps || s.completedSteps.length === 0)
+      ) {
+        setShowModuleSelector(true);
+      }
+      // If just completed, show module selector (unless user already pre-selected)
+      else if (s.currentStep === 'COMPLETED' && s.completedAt) {
         const completedRecently = Date.now() - new Date(s.completedAt).getTime() < 60_000;
         if (completedRecently) {
-          setShowModuleSelector(true);
+          const hasPreSelected = !!localStorage.getItem('initial_module_selections');
+          if (!hasPreSelected) {
+            setShowModuleSelector(true);
+          }
         }
       }
     } catch (e) {
@@ -101,7 +111,15 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         setState(newState);
         if (newState.currentStep === 'COMPLETED') {
           onboardingEventBus.emit('onboarding.completed');
-          setShowModuleSelector(true);
+          // If user pre-selected modules at the start, transfer to sessionStorage
+          const preSelected = localStorage.getItem('initial_module_selections');
+          if (preSelected) {
+            sessionStorage.setItem('pending_module_tutorials', preSelected);
+            localStorage.removeItem('initial_module_selections');
+            // Don't show selector again — runner will pick up from sessionStorage
+          } else {
+            setShowModuleSelector(true);
+          }
         }
       } catch (e) {
         console.error('[OnboardingProvider] Advance error:', e);

@@ -17,6 +17,7 @@ import { FocusOverlay } from './FocusOverlay';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useModuleTutorials } from '@/hooks/useModuleTutorials';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import {
   getTutorialByKey,
   MODULE_TUTORIALS,
@@ -35,6 +36,7 @@ export function ModuleTutorialRunner() {
   const location = useLocation();
   const navigate = useNavigate();
   const { markViewed } = useModuleTutorials();
+  const { isCompleted } = useOnboarding();
 
   const [pendingKeys, setPendingKeys] = useState<string[]>([]);
   const [activeTutorial, setActiveTutorial] = useState<ModuleTutorialConfig | null>(null);
@@ -43,8 +45,12 @@ export function ModuleTutorialRunner() {
   /** Prevents double-fire of finishTutorial / handleSkipModule */
   const transitioningRef = useRef(false);
 
-  // Load pending tutorials from sessionStorage (re-check on every navigation)
+  // Load pending tutorials from sessionStorage — only after onboarding is completed
   useEffect(() => {
+    if (!isCompleted) {
+      setPendingKeys([]);
+      return;
+    }
     const raw = sessionStorage.getItem('pending_module_tutorials');
     if (raw) {
       try {
@@ -56,7 +62,7 @@ export function ModuleTutorialRunner() {
     } else {
       setPendingKeys([]);
     }
-  }, [location.pathname]);
+  }, [location.pathname, isCompleted]);
 
   // Match current route to a pending tutorial
   useEffect(() => {

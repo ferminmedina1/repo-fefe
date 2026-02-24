@@ -31,11 +31,11 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
         </div>
       )}
 
-      {/* Overlay: guided tour when onboarding not completed */}
-      {!loading && !error && !isCompleted && <OnboardingTour />}
-
-      {/* Module selector (shown right after completing the tour) */}
+      {/* Module selector — shown FIRST at start OR after completing the tour */}
       {showModuleSelector && <ModuleTutorialSelector />}
+
+      {/* Overlay: guided tour when onboarding not completed AND selector not showing */}
+      {!loading && !error && !isCompleted && !showModuleSelector && <OnboardingTour />}
 
       {/* Per-module guided tutorials */}
       <ModuleTutorialRunner />
