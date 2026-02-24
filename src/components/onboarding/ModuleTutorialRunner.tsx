@@ -11,7 +11,7 @@
 // - SessionStorage sync across tabs/re-navigations
 // ============================================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FocusOverlay } from './FocusOverlay';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,8 @@ export function ModuleTutorialRunner() {
   const [activeTutorial, setActiveTutorial] = useState<ModuleTutorialConfig | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isActive, setIsActive] = useState(false);
+  /** Prevents double-fire of finishTutorial / handleSkipModule */
+  const transitioningRef = useRef(false);
 
   // Load pending tutorials from sessionStorage (re-check on every navigation)
   useEffect(() => {
@@ -86,7 +88,8 @@ export function ModuleTutorialRunner() {
   const remainingCount = pendingKeys.length;
 
   const finishTutorial = useCallback(() => {
-    if (!activeTutorial) return;
+    if (!activeTutorial || transitioningRef.current) return;
+    transitioningRef.current = true;
 
     // Mark as viewed in DB
     markViewed(activeTutorial.key);
@@ -104,8 +107,15 @@ export function ModuleTutorialRunner() {
     if (remaining.length > 0) {
       const next = getTutorialByKey(remaining[0]);
       if (next) {
-        setTimeout(() => navigate(next.route), 300);
+        setTimeout(() => {
+          navigate(next.route);
+          transitioningRef.current = false;
+        }, 300);
+      } else {
+        transitioningRef.current = false;
       }
+    } else {
+      transitioningRef.current = false;
     }
   }, [activeTutorial, pendingKeys, markViewed, navigate]);
 
@@ -125,7 +135,8 @@ export function ModuleTutorialRunner() {
 
   /** Skip only the current module tutorial, move to next pending */
   const handleSkipModule = useCallback(() => {
-    if (!activeTutorial) return;
+    if (!activeTutorial || transitioningRef.current) return;
+    transitioningRef.current = true;
 
     const remaining = pendingKeys.filter((k) => k !== activeTutorial.key);
     setPendingKeys(remaining);
@@ -138,13 +149,21 @@ export function ModuleTutorialRunner() {
     if (remaining.length > 0) {
       const next = getTutorialByKey(remaining[0]);
       if (next) {
-        setTimeout(() => navigate(next.route), 300);
+        setTimeout(() => {
+          navigate(next.route);
+          transitioningRef.current = false;
+        }, 300);
+      } else {
+        transitioningRef.current = false;
       }
+    } else {
+      transitioningRef.current = false;
     }
   }, [activeTutorial, pendingKeys, navigate]);
 
   /** Close all tutorials */
   const handleClose = useCallback(() => {
+    transitioningRef.current = false;
     setPendingKeys([]);
     sessionStorage.removeItem('pending_module_tutorials');
     setActiveTutorial(null);

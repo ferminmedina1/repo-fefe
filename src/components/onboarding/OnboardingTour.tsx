@@ -62,8 +62,12 @@ export function OnboardingTour() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [ready, setReady] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  /** User permanently closed the badge for this session */
+  const [closed, setClosed] = useState(false);
   /** The user is reviewing a completed step — show re-orientation */
   const [reviewing, setReviewing] = useState(false);
+  /** Phase advancement in progress — disables navigation */
+  const [advancing, setAdvancing] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const currentPhase = state?.currentStep as string | undefined;
@@ -79,9 +83,22 @@ export function OnboardingTour() {
     return idx >= 0 ? idx : 0;
   }, [currentPhase]);
 
+  // Safety timeout: if DB doesn't respond in 5 s, unlock the button
+  useEffect(() => {
+    if (!advancing) return;
+    const t = setTimeout(() => setAdvancing(false), 5000);
+    return () => clearTimeout(t);
+  }, [advancing]);
+
   // Sync to DB phase on mount / phase change
   useEffect(() => {
     if (!currentPhase || currentPhase === 'COMPLETED') return;
+    setAdvancing(false); // phase changed → no longer waiting
+
+    // Only snap if we're NOT already viewing the correct phase
+    const viewing = TOUR_STEPS[currentIndex];
+    if (viewing?.phase === currentPhase) return;
+
     setCurrentIndex(homeIndex);
     setReviewing(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,13 +154,10 @@ export function OnboardingTour() {
   // ── navigation callbacks ───────────────────────────────────
 
   const goNext = useCallback(() => {
-    if (!step) return;
+    if (!step || advancing) return;
 
-    // If reviewing and this is the last step of the completed phase,
-    // jump back to the current-progress home index.
+    // ── reviewing mode ──
     if (reviewing) {
-      // Find the next step — if it also belongs to a completed phase keep going,
-      // otherwise snap back to home.
       const nextIdx = currentIndex + 1;
       if (nextIdx < total) {
         const nextStep = TOUR_STEPS[nextIdx];
@@ -152,29 +166,33 @@ export function OnboardingTour() {
           return;
         }
       }
-      // Snap back
+      // Snap back to current progress
       setCurrentIndex(homeIndex);
       setReviewing(false);
       return;
     }
 
-    // Normal flow: advance phase if needed
+    // ── phase-advance step: lock UI, emit event, wait for DB ──
     if (step.advancesPhase) {
+      setAdvancing(true);
       const config = ONBOARDING_STEP_CONFIGS.find(
         (c) => c.step === step.phase,
       );
       if (config) {
         emitEvent(config.triggerEvent);
       }
+      // Don't increment index — useEffect on currentPhase will set the right index
+      return;
     }
 
+    // ── normal step: just move forward ──
     if (currentIndex < total - 1) {
       setCurrentIndex((i) => i + 1);
     }
-  }, [step, currentIndex, total, emitEvent, reviewing, homeIndex, completedPhases]);
+  }, [step, currentIndex, total, emitEvent, reviewing, homeIndex, completedPhases, advancing]);
 
   const goPrev = useCallback(() => {
-    if (currentIndex <= 0) return;
+    if (currentIndex <= 0 || advancing) return;
 
     const prevIdx = currentIndex - 1;
     const prevStep = TOUR_STEPS[prevIdx];
@@ -188,7 +206,7 @@ export function OnboardingTour() {
     }
 
     setCurrentIndex(prevIdx);
-  }, [currentIndex, reviewing, completedPhases]);
+  }, [currentIndex, reviewing, completedPhases, advancing]);
 
   /** Jump straight back to current progress */
   const jumpToCurrentProgress = useCallback(() => {
@@ -209,23 +227,38 @@ export function OnboardingTour() {
   if (!state || state.currentStep === 'COMPLETED') return null;
   if (!step) return null;
 
-  // Minimised badge
+  // Minimised badge — positioned bottom-left to avoid overlapping the AI assistant (bottom-right)
   if (dismissed) {
+    // If user clicked X, hide everything for this session
+    if (closed) return null;
+
     return (
-      <button
-        onClick={handleResume}
-        className="fixed bottom-6 right-6 z-[9999] flex items-center gap-2 bg-primary text-primary-foreground rounded-full px-4 py-2.5 shadow-lg hover:shadow-xl transition-shadow text-sm font-medium"
+      <div
+        className="fixed bottom-6 left-6 z-[9999] flex items-center gap-1.5"
         style={{ animation: 'tourBadgeIn 200ms ease-out' }}
       >
-        <MapPin className="w-4 h-4" />
-        Continuar tour ({currentIndex + 1}/{total})
+        <button
+          onClick={handleResume}
+          className="flex items-center gap-2 bg-primary text-primary-foreground rounded-full pl-4 pr-3 py-2.5 shadow-lg hover:shadow-xl transition-shadow text-sm font-medium"
+        >
+          <MapPin className="w-4 h-4" />
+          Continuar tour ({currentIndex + 1}/{total})
+        </button>
+        <button
+          onClick={() => setClosed(true)}
+          className="flex items-center justify-center w-7 h-7 rounded-full bg-muted/80 hover:bg-destructive/90 hover:text-white text-muted-foreground transition-colors shadow-md"
+          title="Cerrar tour"
+          aria-label="Cerrar tour"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
         <style>{`
           @keyframes tourBadgeIn {
             from { opacity: 0; transform: scale(0.9); }
             to { opacity: 1; transform: scale(1); }
           }
         `}</style>
-      </button>
+      </div>
     );
   }
 
@@ -320,7 +353,13 @@ export function OnboardingTour() {
                 className="text-xs h-8 flex-1"
               >
                 <Eye className="w-3.5 h-3.5 mr-1" />
-                Seguir revisando
+                {(() => {
+                  const nIdx = currentIndex + 1;
+                  if (nIdx < total && completedPhases.includes(TOUR_STEPS[nIdx].phase as OnboardingStep)) {
+                    return 'Seguir revisando';
+                  }
+                  return 'Ir a mi progreso';
+                })()}
               </Button>
             </div>
           </div>
@@ -401,6 +440,7 @@ export function OnboardingTour() {
               variant="ghost"
               size="sm"
               onClick={goPrev}
+              disabled={advancing}
               className="text-xs h-8"
             >
               <ChevronLeft className="w-3.5 h-3.5 mr-1" />
@@ -411,10 +451,20 @@ export function OnboardingTour() {
           <Button
             size="sm"
             onClick={goNext}
+            disabled={advancing}
             className="text-xs h-8"
           >
-            {step.actionLabel ?? (isLastStep ? 'Finalizar' : 'Siguiente')}
-            {!isLastStep && !step.actionLabel && <ChevronRight className="w-3.5 h-3.5 ml-1" />}
+            {advancing ? (
+              <>
+                <span className="w-3 h-3 mr-1.5 rounded-full border-2 border-current border-t-transparent animate-spin inline-block" />
+                Guardando…
+              </>
+            ) : (
+              <>
+                {step.actionLabel ?? (isLastStep ? 'Finalizar' : 'Siguiente')}
+                {!isLastStep && !step.actionLabel && <ChevronRight className="w-3.5 h-3.5 ml-1" />}
+              </>
+            )}
           </Button>
         </div>
       </div>
