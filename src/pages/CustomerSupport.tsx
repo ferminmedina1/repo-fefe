@@ -29,7 +29,8 @@ import {
   Send,
   Settings,
   BookOpen,
-  FileText
+  FileText,
+  GraduationCap
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -251,6 +252,19 @@ export default function CustomerSupport() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => {
+                sessionStorage.setItem(
+                  'pending_module_tutorials',
+                  JSON.stringify(['customer_support']),
+                );
+                window.dispatchEvent(new Event('start-module-tutorial'));
+              }}
+            >
+              <GraduationCap className="h-4 w-4 mr-2" />
+              Tutorial
+            </Button>
             <Button variant="outline" onClick={() => navigate("/customer-support/knowledge-base")}>
               <BookOpen className="h-4 w-4 mr-2" />
               Base de Conocimiento

@@ -44,6 +44,15 @@ export function ModuleTutorialRunner() {
   const [isActive, setIsActive] = useState(false);
   /** Prevents double-fire of finishTutorial / handleSkipModule */
   const transitioningRef = useRef(false);
+  /** Counter bumped by custom event to force re-read sessionStorage */
+  const [reloadTick, setReloadTick] = useState(0);
+
+  // Listen for manual tutorial trigger from any page
+  useEffect(() => {
+    const handler = () => setReloadTick((t) => t + 1);
+    window.addEventListener('start-module-tutorial', handler);
+    return () => window.removeEventListener('start-module-tutorial', handler);
+  }, []);
 
   // Load pending tutorials from sessionStorage — only after onboarding is completed
   useEffect(() => {
@@ -62,7 +71,7 @@ export function ModuleTutorialRunner() {
     } else {
       setPendingKeys([]);
     }
-  }, [location.pathname, isCompleted]);
+  }, [location.pathname, isCompleted, reloadTick]);
 
   // Match current route to a pending tutorial
   useEffect(() => {
