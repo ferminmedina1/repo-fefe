@@ -117,13 +117,23 @@ export function OnboardingTour() {
   // FIX: properly clean up both outer timeout AND inner interval
   useEffect(() => {
     if (!step || dismissed) return;
-    setReady(false);
 
-    if (location.pathname !== step.route) {
+    const sameRoute = location.pathname === step.route;
+
+    // Fast-path: if staying on the same route, try to find element immediately
+    if (sameRoute) {
+      const el = document.querySelector(step.targetSelector);
+      if (el) {
+        setReady(true);
+        return;
+      }
+    } else {
       navigate(step.route);
     }
 
-    const delay = step.delay ?? 300;
+    setReady(false);
+
+    const delay = sameRoute ? 50 : (step.delay ?? 300);
     let pollInterval: ReturnType<typeof setInterval> | null = null;
     let maxPollTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -196,17 +206,13 @@ export function OnboardingTour() {
 
     const prevIdx = currentIndex - 1;
     const prevStep = TOUR_STEPS[prevIdx];
+    const prevInCompleted = completedPhases.includes(prevStep.phase as OnboardingStep);
 
-    // Going back into a completed phase? Activate re-orientation.
-    if (
-      !reviewing &&
-      completedPhases.includes(prevStep.phase as OnboardingStep)
-    ) {
-      setReviewing(true);
-    }
-
+    // Entering a completed phase → activate reviewing
+    // Leaving a completed phase → deactivate reviewing
+    setReviewing(prevInCompleted);
     setCurrentIndex(prevIdx);
-  }, [currentIndex, reviewing, completedPhases, advancing]);
+  }, [currentIndex, completedPhases, advancing]);
 
   /** Jump straight back to current progress */
   const jumpToCurrentProgress = useCallback(() => {
@@ -281,11 +287,16 @@ export function OnboardingTour() {
         onPrev={goPrev}
       >
         <div className="space-y-3" style={{ minWidth: 300, maxWidth: 360 }}>
-          {/* Header */}
+          {/* Header with step counter */}
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-amber-500">
-              Revisando paso anterior
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground font-medium">
+                Paso {currentIndex + 1} de {total}
+              </span>
+              <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 rounded-full px-2 py-0.5">
+                Revisando
+              </span>
+            </div>
             <button
               onClick={handleDismiss}
               className="text-muted-foreground hover:text-foreground transition-colors -mr-1"
@@ -294,6 +305,9 @@ export function OnboardingTour() {
               <X className="w-4 h-4" />
             </button>
           </div>
+
+          {/* Progress bar */}
+          <Progress value={progress} className="h-1.5" />
 
           {/* Current position reminder */}
           <div className="bg-muted/50 rounded-lg px-3 py-2 text-xs leading-relaxed">
@@ -335,17 +349,16 @@ export function OnboardingTour() {
               Ir a mi progreso actual
             </Button>
             <div className="flex items-center gap-1.5">
-              {currentIndex > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={goPrev}
-                  className="text-xs h-8 flex-1"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5 mr-1" />
-                  Anterior
-                </Button>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goPrev}
+                disabled={isFirstStep}
+                className="text-xs h-8 flex-1"
+              >
+                <ChevronLeft className="w-3.5 h-3.5 mr-1" />
+                Anterior
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -435,18 +448,16 @@ export function OnboardingTour() {
 
         {/* Navigation */}
         <div className="flex items-center gap-2 pt-1">
-          {!isFirstStep && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={goPrev}
-              disabled={advancing}
-              className="text-xs h-8"
-            >
-              <ChevronLeft className="w-3.5 h-3.5 mr-1" />
-              Anterior
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={goPrev}
+            disabled={isFirstStep || advancing}
+            className="text-xs h-8"
+          >
+            <ChevronLeft className="w-3.5 h-3.5 mr-1" />
+            Anterior
+          </Button>
           <div className="flex-1" />
           <Button
             size="sm"
