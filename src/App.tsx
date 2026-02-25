@@ -70,7 +70,8 @@ const ModuleNotAvailable = lazy(() => import("./pages/ModuleNotAvailable"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AccountsReceivable = lazy(() => import("./pages/AccountsReceivable"));
 const EmailConfig = lazy(() => import("./pages/EmailConfig"));
-const SignupWizard = lazy(() => import("./pages/SignupWizard"));
+/*const SignupWizard = lazy(() => import("./pages/SignupWizard")); ONLY FOR PROD*/
+const SignupMaintenance = lazy(() => import("./pages/SignupMaintenance"));
 const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRequests"));
@@ -311,7 +312,8 @@ const App = () => (
         <CompanyProvider>
           <Suspense fallback={<PageLoader />}>
             <Routes>
-            <Route path="/signup" element={<SignupWizard />} />
+            {/* ONLY FOR PROD <Route path="/signup" element={<SignupWizard />} />*/}
+            <Route path="/signup" element={<SignupMaintenance />} />
             <Route path="/signup/success" element={<SignupSuccess />} />
             <Route path="/signup/cancel" element={<SignupCancel />} />
             <Route path="/auth" element={<Auth />} />
