@@ -74,6 +74,8 @@ const SignupWizard = lazy(() => import("./pages/SignupWizard"));
 const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRequests"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 
 
 const Opportunities = lazy(() => import("./pages/Opportunities"));
@@ -320,6 +322,8 @@ const App = () => (
             <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
             {/* Mostrar landing solo en la raíz */}
             <Route path="/" element={<Landing />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
 
             {/* Dashboard privado en /app */}
             <Route path="/app" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="dashboard"><Dashboard /></ModuleProtectedRoute></ProtectedRoute>} />

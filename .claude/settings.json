@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(iconv:*)",
+      "Bash(git commit:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)",
+      "Bash(git push:*)",
+      "Bash(ls:*)",
+      "Bash(npx supabase:*)",
+      "Bash(npm uninstall:*)"
+    ]
+  }
+}

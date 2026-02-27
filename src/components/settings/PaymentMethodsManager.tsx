@@ -1,11 +1,31 @@
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CreditCard, Plus, Trash2, CheckCircle2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements } from "@stripe/react-stripe-js";
+import { StripeCardFields } from "@/components/signup/StripeCardFields";
+import { MercadoPagoCardFields } from "@/components/signup/MercadoPagoCardFields";
+
+const COUNTRIES = [
+  { code: "AR", name: "Argentina" },
+  { code: "US", name: "Estados Unidos" },
+  { code: "MX", name: "México" },
+  { code: "BR", name: "Brasil" },
+  { code: "CL", name: "Chile" },
+  { code: "CO", name: "Colombia" },
+  { code: "ES", name: "España" },
+  { code: "OTHER", name: "Otro" },
+];
 
 interface PaymentMethod {
   id: string;
@@ -20,18 +40,25 @@ interface PaymentMethod {
   mp_preapproval_id?: string;
 }
 
-export function PaymentMethodsManager({ 
+export function PaymentMethodsManager({
   companyId,
   showTitle = true,
   compact = false
-}: { 
+}: {
   companyId?: string;
   showTitle?: boolean;
   compact?: boolean;
 }) {
   const queryClient = useQueryClient();
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [billingCountry, setBillingCountry] = useState("AR");
+  const [stripePromise] = useState(() => {
+    const key = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
+    return key ? loadStripe(key) : null;
+  });
 
-  // Fetch payment methods
+  const effectiveProvider = billingCountry === "AR" ? "mercadopago" : "stripe";
+
   const { data: paymentMethods, isLoading } = useQuery({
     queryKey: ["payment-methods", companyId],
     enabled: !!companyId,
@@ -50,20 +77,40 @@ export function PaymentMethodsManager({
     },
   });
 
-  const handleAddCard = async () => {
+  const handlePaymentSuccess = async (
+    paymentMethodRef: string,
+    metadata: { brand: string; last4: string; exp_month: number; exp_year: number }
+  ) => {
     try {
-      const { data, error } = await supabase.functions.invoke("create-mp-preapproval", {
-        body: { company_id: companyId },
-      });
-      if (error) throw error;
-      if (data?.redirect_url) {
-        window.location.href = data.redirect_url;
-        return;
+      if (effectiveProvider === "stripe") {
+        const { error } = await supabase.functions.invoke("save-stripe-payment-method", {
+          body: { payment_method_id: paymentMethodRef, company_id: companyId },
+        });
+        if (error) throw error;
+      } else {
+        const isFirst = !paymentMethods || paymentMethods.length === 0;
+        const { error } = await supabase
+          .from("company_payment_methods")
+          .insert({
+            company_id: companyId,
+            type: "card",
+            brand: metadata.brand,
+            last4: metadata.last4,
+            exp_month: metadata.exp_month,
+            exp_year: metadata.exp_year,
+            mp_preapproval_id: paymentMethodRef,
+            is_default: isFirst,
+            billing_country: billingCountry,
+          });
+        if (error) throw error;
       }
-      throw new Error("No se obtuvo URL de autorización");
+
+      await queryClient.invalidateQueries({ queryKey: ["payment-methods", companyId] });
+      toast.success("Tarjeta guardada exitosamente");
+      setAddDialogOpen(false);
     } catch (e: any) {
       console.error(e);
-      toast.error(e?.message ?? "Error al iniciar configuración de pago");
+      toast.error(e?.message ?? "Error al guardar el método de pago");
     }
   };
 
@@ -131,40 +178,67 @@ export function PaymentMethodsManager({
 
   return (
     <div className={cn("space-y-4", compact && "space-y-3")}>
-      {showTitle && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold">Tus tarjetas de pago</h3>
-          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        {showTitle && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <h3 className="text-lg font-semibold">Tus tarjetas de pago</h3>
             <DialogTrigger asChild>
-              <Button size="sm" variant="outline" onClick={handleAddCard} className="w-full sm:w-auto">
+              <Button size="sm" variant="outline" className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Añadir tarjeta
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Añadir tarjeta de crédito o débito</DialogTitle>
-                <DialogDescription>
-                  Ingresa los datos de tu tarjeta de forma segura
-                </DialogDescription>
-              </DialogHeader>
-              {effectiveProvider === "stripe" && stripePromise && clientSecret && (
-                <Elements stripe={stripePromise} options={{ clientSecret }}>
-                  <StripePaymentForm
-                    clientSecret={clientSecret}
-                    companyId={companyId!}
-                    onSuccess={() => {
-                      setAddDialogOpen(false);
-                      setClientSecret(null);
-                      queryClient.invalidateQueries({ queryKey: ["payment-methods", companyId] });
-                    }}
-                  />
-                </Elements>
-              )}
-            </DialogContent>
-          </Dialog>
-        </div>
-      )}
+          </div>
+        )}
+
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Añadir tarjeta de crédito o débito</DialogTitle>
+            <DialogDescription>
+              Ingresa los datos de tu tarjeta de forma segura
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>País de facturación</Label>
+              <Select value={billingCountry} onValueChange={setBillingCountry}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {effectiveProvider === "mercadopago" ? (
+              <MercadoPagoCardFields
+                onSuccess={handlePaymentSuccess}
+                isLoading={false}
+              />
+            ) : stripePromise ? (
+              <Elements stripe={stripePromise}>
+                <StripeCardFields
+                  onSuccess={handlePaymentSuccess}
+                  isLoading={false}
+                />
+              </Elements>
+            ) : (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Stripe no está configurado. Contacta al administrador.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {isLoading ? (
         <div className="grid gap-3">
@@ -206,7 +280,7 @@ export function PaymentMethodsManager({
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {method.holder_name && `${method.holder_name} • `}
-                        {method.exp_month && method.exp_year 
+                        {method.exp_month && method.exp_year
                           ? `Vence ${String(method.exp_month).padStart(2, '0')}/${method.exp_year}`
                           : `Autorizado • ${new Date(method.created_at).toLocaleDateString()}`
                         }
@@ -257,17 +331,14 @@ export function PaymentMethodsManager({
                   Añade una tarjeta para facilitar tus pagos
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleAddCard}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Añadir tarjeta
-                </Button>
-              </div>
+              <Button variant="outline" onClick={() => setAddDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Añadir tarjeta
+              </Button>
             </div>
           </CardContent>
         </Card>
       )}
-
     </div>
   );
 }

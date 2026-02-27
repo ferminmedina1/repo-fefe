@@ -22,6 +22,7 @@ import { PaymentMethodsManager } from "@/components/settings/PaymentMethodsManag
 import { PlanChanger } from "@/components/settings/PlanChanger";
 import { SubscriptionActions } from "@/components/settings/SubscriptionActions";
 import { InvoiceViewer } from "@/components/settings/InvoiceViewer";
+import { Dialog } from "@/components/ui/dialog";
 
 function getSubscriptionStatusLabel(status?: string) {
   const map: Record<string, string> = {
