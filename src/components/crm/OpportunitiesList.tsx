@@ -36,6 +36,7 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { OpportunityDrawer } from "./OpportunityDrawer";
 import { opportunityService } from "@/domain/crm/services/opportunityService";
+import { bulkOperationService } from "@/domain/crm/services/bulkOperationService";
 import type { OpportunityDTO } from "@/domain/crm/dtos/opportunity";
 import { pipelineService } from "@/domain/crm/services/pipelineService";
 import { tagService } from "@/domain/crm/services/tagService";
@@ -270,13 +271,18 @@ export function OpportunitiesList({ companyId, search, filters, onCreate }: Oppo
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("crm_opportunities").delete().in("id", Array.from(selectedIds));
-      if (error) throw error;
+      return bulkOperationService.bulkDelete({
+        companyId,
+        opportunityIds: Array.from(selectedIds),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["opportunities", companyId] });
       setSelectedIds(new Set());
+      setDeleteConfirmOpen(false);
+      toast.success("Oportunidades eliminadas y registradas");
     },
+    onError: (e: any) => toast.error(e.message || "Error al eliminar"),
   });
 
   const bulkEditMutation = useMutation({
@@ -285,15 +291,27 @@ export function OpportunitiesList({ companyId, search, filters, onCreate }: Oppo
       if (bulkStage) updates.stage = bulkStage;
       if (bulkOwner) updates.owner_id = bulkOwner;
       if (bulkTag) updates.tags = [bulkTag];
-      if (!bulkStage && !bulkOwner && !bulkTag) throw new Error("Seleccioná al menos un cambio");
-      const { error } = await supabase.from("crm_opportunities").update(updates).in("id", Array.from(selectedIds));
-      if (error) throw error;
+
+      if (!bulkStage && !bulkOwner && !bulkTag) {
+        throw new Error("Seleccioná al menos un cambio");
+      }
+
+      // ✅ Usa bulkOperationService que AUTOMÁTICAMENTE registra en activity log
+      return bulkOperationService.bulkUpdate({
+        companyId,
+        opportunityIds: Array.from(selectedIds),
+        updates,
+        stage: bulkStage || undefined,
+        ownerId: bulkOwner || undefined,
+        tags: bulkTag ? [bulkTag] : undefined,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["opportunities", companyId] });
       setSelectedIds(new Set());
       setBulkStage(""); setBulkOwner(""); setBulkTag("");
       setBulkModalOpen(false);
+      toast.success("Cambios aplicados y registrados");
     },
     onError: (e: any) => toast.error(e.message || "Error al aplicar cambios"),
   });
@@ -615,3 +633,7 @@ export function OpportunitiesList({ companyId, search, filters, onCreate }: Oppo
     </div>
   );
 }
+function setDeleteConfirmOpen(arg0: boolean) {
+  throw new Error("Function not implemented.");
+}
+
