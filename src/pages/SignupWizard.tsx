@@ -133,10 +133,9 @@ export default function SignupWizard() {
     }
   };
 
-  return /*(
-    
+  return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-3 py-4 md:p-8 relative overflow-hidden">
-     
+      {/* Advanced animated background effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         
         <div className="absolute top-1/4 right-0 w-96 h-96 bg-primary/10 rounded-full blur-3xl" style={{animation: 'breathing 8s infinite'}}></div>
@@ -158,7 +157,7 @@ export default function SignupWizard() {
       </div>
 
       <div className="max-w-2xl mx-auto relative z-10">
-        
+        {/* Header */}
         <div className="text-center mb-4 md:mb-8 px-2">
           <div className="flex items-center justify-center gap-3 mb-2 md:mb-4">
             <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 flex items-center justify-center relative overflow-hidden group" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
@@ -204,7 +203,7 @@ export default function SignupWizard() {
           }
         `}</style>
 
-        
+        {/* Stepper */}
         <div className="mb-3 md:mb-4 flex items-center justify-between text-slate-100 px-1">
           <div className="px-2.5 py-1 rounded-full bg-slate-800/80 border border-white/15 shadow-inner text-xs md:text-sm text-white">
             Paso {currentStep + 1}/{totalSteps}
@@ -260,7 +259,7 @@ export default function SignupWizard() {
           )}
         </Card>
 
-       
+        {/* Footer */}
         <p className="text-center text-xs md:text-sm text-slate-200 mt-4 md:mt-6 pb-2">
           ¿Ya tienes una cuenta?{" "}
           <a href="/auth" className="text-cyan-200 hover:text-cyan-100 underline-offset-4 hover:underline font-medium">
@@ -269,5 +268,5 @@ export default function SignupWizard() {
         </p>
       </div>
     </div>
-  );*/
+  );
 }

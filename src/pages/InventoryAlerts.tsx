@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/layout/Layout";
 import { Card } from "@/components/ui/card";
@@ -195,6 +195,7 @@ export default function InventoryAlerts() {
     },
     enabled: !!currentCompany?.id,
   });
+
   const selectedProduct = allProducts.find((p) => p.id === selectedProductId);
 
   const saveAlertMutation = useMutation({
@@ -256,6 +257,7 @@ export default function InventoryAlerts() {
     },
     onError: () => toast.error("Error al eliminar la alerta"),
   });
+
   const { data: notifications, refetch: refetchNotifications } = useQuery({
     queryKey: ["notifications"],
     queryFn: async () => {
@@ -340,7 +342,7 @@ export default function InventoryAlerts() {
           <div className="flex gap-2 flex-wrap">
             <Button
               variant="outline"
-              onClick={() => setShowAddAlert(true)}
+              onClick={() => setCreateDialogOpen(true)}
               className="w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -750,102 +752,6 @@ export default function InventoryAlerts() {
         </TabsContent>
       </Tabs>
     </div>
-
-      {/* ── Agregar Alerta Dialog ── */}
-      <Dialog open={showAddAlert} onOpenChange={(open) => {
-        setShowAddAlert(open);
-        if (!open) { setSelectedProductId(""); setMinStockValue(""); }
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Agregar Alerta de Stock</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label>Producto *</Label>
-              <Select value={selectedProductId} onValueChange={(v) => {
-                setSelectedProductId(v);
-                const p = allProducts.find((p) => p.id === v);
-                if (p?.min_stock != null) setMinStockValue(String(p.min_stock));
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccioná un producto" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allProducts.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                      {p.sku ? ` · ${p.sku}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedProduct && (
-              <div className="rounded-md bg-muted px-3 py-2 text-sm space-y-0.5">
-                <p>
-                  <span className="text-muted-foreground">Stock actual:</span>{" "}
-                  <span className="font-medium">{selectedProduct.stock} unidades</span>
-                </p>
-                <p>
-                  <span className="text-muted-foreground">Umbral actual:</span>{" "}
-                  <span className="font-medium">
-                    {selectedProduct.min_stock ?? "Sin configurar"}
-                  </span>
-                </p>
-                {selectedProduct.min_stock != null &&
-                  selectedProduct.stock <= selectedProduct.min_stock && (
-                    <p className="text-destructive font-medium flex items-center gap-1 mt-1">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      Este producto ya está en alerta
-                    </p>
-                  )}
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="min-stock">Umbral mínimo de stock *</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="min-stock"
-                  type="number"
-                  min="0"
-                  placeholder="Ej: 10"
-                  value={minStockValue}
-                  onChange={(e) => setMinStockValue(e.target.value)}
-                  className="w-32"
-                />
-                <span className="text-sm text-muted-foreground">unidades</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Se generará una alerta cuando el stock baje de este valor.
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddAlert(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSaveAlert}
-              disabled={
-                !selectedProductId ||
-                minStockValue === "" ||
-                Number(minStockValue) < 0 ||
-                saveAlertMutation.isPending
-              }
-            >
-              {saveAlertMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : null}
-              Guardar alerta
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <CreateAlertDialog
         open={createDialogOpen}
