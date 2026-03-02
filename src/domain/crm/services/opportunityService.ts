@@ -11,6 +11,7 @@ import { stageRuleService } from "@/domain/crm/services/stageRuleService";
 import { crmNotificationService } from "@/domain/crm/services/crmNotificationService";
 import { scoringRuleService } from "@/domain/crm/services/scoringRuleService";
 import { activityLogService } from "@/domain/crm/services/activityLogService";
+import { supabase } from "@/integrations/supabase/client";
 
 const applyScoringForOpportunity = async (opportunity: OpportunityDTO) => {
   const rules = await scoringRuleService.listActive(opportunity.companyId);
@@ -137,16 +138,26 @@ export const opportunityService = {
 
     // Persist activity log entries (silently — don't break the update on log failure)
     if (logEntries.length > 0) {
-      await Promise.allSettled(
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) return updated;
+
+      const results = await Promise.allSettled(
         logEntries.map((entry) =>
           activityLogService.create({
             company_id: updated.companyId,
             opportunity_id: updated.id,
             action: entry.action,
-            payload: entry.payload,
+            payload: entry.payload as any,
+            created_by: user.id,
           })
         )
       );
+
+      // Silently log failures (non-critical)
+      const failures = results.filter((r) => r.status === "rejected");
+      if (failures.length > 0) {
+        // Could send to error tracking service if needed
+      }
     }
 
     // Notify on stage change

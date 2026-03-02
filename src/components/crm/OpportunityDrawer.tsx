@@ -89,9 +89,10 @@ interface OpportunityDrawerProps {
   onClose: () => void;
   companyId: string;
   opportunity?: OpportunityRow | null;
+  initialValues?: Partial<OpportunityForm>;
 }
 
-export function OpportunityDrawer({ open, onClose, companyId, opportunity }: OpportunityDrawerProps) {
+export function OpportunityDrawer({ open, onClose, companyId, opportunity, initialValues }: OpportunityDrawerProps) {
   const queryClient = useQueryClient();
   const isEditing = !!opportunity;
 
@@ -104,6 +105,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
       status: "abierta",
       currency: "ARS",
       tags: [],
+      ...initialValues,
     },
     mode: "onChange",
   });
@@ -464,6 +466,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
         tags: [],
         lost_reason: "",
         won_reason: "",
+        ...initialValues,
       });
     }
   }, [opportunity, open, isEditing, pipelinesLoading, customersLoading, ownersLoading, form]);
@@ -481,7 +484,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
     enabled: !!companyId && !!opportunity?.id && open,
   });
 
-  const { data: activityLogList } = useQuery<ActivityLogListResult>({
+  const { data: activityLogList, error: activityLogError, isLoading: activityLogLoading } = useQuery<ActivityLogListResult>({
     queryKey: ["crm-activity-log", companyId, opportunity?.id],
     queryFn: () =>
       activityLogService.listByOpportunity({
@@ -1443,6 +1446,14 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity }: Opp
               {!opportunity?.id ? (
                 <div className="text-sm text-muted-foreground">
                   Guardá la oportunidad para ver el historial.
+                </div>
+              ) : activityLogLoading ? (
+                <div className="text-sm text-muted-foreground">
+                  Cargando historial...
+                </div>
+              ) : activityLogError ? (
+                <div className="text-sm text-destructive">
+                  Error al cargar historial: {(activityLogError as Error).message}
                 </div>
               ) : (activityLogList?.data ?? []).length === 0 ? (
                 <div className="text-sm text-muted-foreground">

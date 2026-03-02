@@ -11,8 +11,9 @@ export const activityLogRepository = {
   async listByOpportunity(params: ActivityLogListParams): Promise<ActivityLogListResult> {
     let q = supabase
       .from("crm_activity_log")
-      .select("*")
-      .eq("company_id", params.companyId);
+      .select("*");
+
+    if (!params.opportunityId) q = q.eq("company_id", params.companyId);
 
     if (params.opportunityId) q = q.eq("opportunity_id", params.opportunityId);
     if (params.activityId) q = q.eq("activity_id", params.activityId);
@@ -21,7 +22,7 @@ export const activityLogRepository = {
     const pageSize = params.pageSize ?? 50;
     q = q.range((page - 1) * pageSize, page * pageSize - 1);
 
-    const { data, error } = await q;
+    const { data, error } = await q.order("created_at", { ascending: false });
     if (error) throw error;
 
     const rows = data ?? [];
@@ -29,13 +30,21 @@ export const activityLogRepository = {
   },
 
   async create(values: ActivityLogInsert) {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("crm_activity_log")
-      .insert([values])
-      .select("*")
-      .single();
+      .insert([values]);
     if (error) throw error;
-    return toActivityLogDTO(data);
+
+    return {
+      id: "",
+      companyId: values.company_id,
+      opportunityId: values.opportunity_id ?? null,
+      activityId: values.activity_id ?? null,
+      action: values.action,
+      payload: values.payload ?? null,
+      createdBy: values.created_by ?? null,
+      createdAt: new Date().toISOString(),
+    };
   },
 
   async update(id: string, values: ActivityLogUpdate) {
