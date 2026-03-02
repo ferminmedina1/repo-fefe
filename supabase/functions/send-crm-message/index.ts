@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import DOMPurify from "https://esm.sh/dompurify@3.0.6";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,7 +51,8 @@ serve(async (req: Request) => {
       }
 
       const resend = new Resend(RESEND_API_KEY);
-      const html = `<p>${body}</p>`;
+      const sanitizedBody = DOMPurify.sanitize(body);
+      const html = `<p>${sanitizedBody}</p>`;
       const response = await resend.emails.send({
         from: "Sistema Contable <onboarding@resend.dev>",
         to: [recipient],
@@ -114,7 +116,8 @@ serve(async (req: Request) => {
       const bodyParams = new URLSearchParams();
       bodyParams.set("From", `whatsapp:${TWILIO_PHONE_NUMBER}`);
       bodyParams.set("To", recipient.startsWith("whatsapp:") ? recipient : `whatsapp:${recipient}`);
-      bodyParams.set("Body", body);
+      const sanitizedWhatsappBody = DOMPurify.sanitize(body, { ALLOWED_TAGS: [] });
+      bodyParams.set("Body", sanitizedWhatsappBody);
 
       const twilioResponse = await fetch(
         `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
