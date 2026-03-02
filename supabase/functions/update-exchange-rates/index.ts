@@ -107,101 +107,77 @@ Deno.serve(async (req) => {
     let updatedCount = 0;
     const results: any[] = [];
 
-    // Update rates for each company
+    // Batch fetch all current rates in one query instead of N queries
+    const { data: allCurrentRates } = await supabase
+      .from('exchange_rates')
+      .select('company_id, currency, rate')
+      .in('company_id', companyIds)
+      .in('currency', ['USD', 'EUR']);
+
+    const rateMap = new Map<string, Map<string, number>>();
+    (allCurrentRates || []).forEach(r => {
+      if (!rateMap.has(r.company_id)) rateMap.set(r.company_id, new Map());
+      rateMap.get(r.company_id)!.set(r.currency, r.rate);
+    });
+
+    // Prepare batch upserts
+    const exchangeRateUpserts: any[] = [];
+    const historyInserts: any[] = [];
+    const settingsUpserts: any[] = [];
+
     for (const companyId of companyIds) {
-      try {
-        // Get current rates
-        const { data: currentRates } = await supabase
-          .from('exchange_rates')
-          .select('currency, rate')
-          .eq('company_id', companyId)
-          .in('currency', ['USD', 'EUR']);
+      const companyRates = rateMap.get(companyId);
+      const currentUsdRate = companyRates?.get('USD');
+      const currentEurRate = companyRates?.get('EUR');
 
-        const currentUsdRate = currentRates?.find(r => r.currency === 'USD')?.rate;
-        const currentEurRate = currentRates?.find(r => r.currency === 'EUR')?.rate;
+      exchangeRateUpserts.push(
+        { company_id: companyId, currency: 'USD', rate: usdRate, updated_at: new Date().toISOString() },
+        { company_id: companyId, currency: 'EUR', rate: eurRate, updated_at: new Date().toISOString() }
+      );
 
-        // Update USD
-        const { error: usdError } = await supabase
-          .from('exchange_rates')
-          .upsert({
-            company_id: companyId,
-            currency: 'USD',
-            rate: usdRate,
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'company_id,currency'
-          });
-
-        if (usdError) {
-          console.error(`Error updating USD for company ${companyId}:`, usdError);
-        } else if (currentUsdRate !== usdRate) {
-          // Log history only if rate changed
-          await supabase.from('exchange_rate_history').insert({
-            company_id: companyId,
-            currency: 'USD',
-            old_rate: currentUsdRate,
-            new_rate: usdRate,
-            source: 'dolarapi',
-          });
-          updatedCount++;
-        }
-
-        // Update EUR
-        const { error: eurError } = await supabase
-          .from('exchange_rates')
-          .upsert({
-            company_id: companyId,
-            currency: 'EUR',
-            rate: eurRate,
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'company_id,currency'
-          });
-
-        if (eurError) {
-          console.error(`Error updating EUR for company ${companyId}:`, eurError);
-        } else if (currentEurRate !== eurRate) {
-          // Log history only if rate changed
-          await supabase.from('exchange_rate_history').insert({
-            company_id: companyId,
-            currency: 'EUR',
-            old_rate: currentEurRate,
-            new_rate: eurRate,
-            source: 'dolarapi',
-          });
-          updatedCount++;
-        }
-
-        // Update last_update timestamp in settings
-        await supabase
-          .from('exchange_rate_settings')
-          .upsert({
-            company_id: companyId,
-            last_update: new Date().toISOString(),
-            auto_update: true,
-            source: 'dolarapi',
-          }, {
-            onConflict: 'company_id'
-          });
-
-        results.push({
-          company_id: companyId,
-          success: true,
-          usd_rate: usdRate,
-          eur_rate: eurRate,
-          usd_changed: currentUsdRate !== usdRate,
-          eur_changed: currentEurRate !== eurRate,
-        });
-
-      } catch (error: any) {
-        console.error(`Error updating rates for company ${companyId}:`, error);
-        results.push({
-          company_id: companyId,
-          success: false,
-          error: error?.message || 'Unknown error',
-        });
+      if (currentUsdRate !== usdRate) {
+        historyInserts.push({ company_id: companyId, currency: 'USD', old_rate: currentUsdRate, new_rate: usdRate, source: 'dolarapi' });
+        updatedCount++;
       }
+      if (currentEurRate !== eurRate) {
+        historyInserts.push({ company_id: companyId, currency: 'EUR', old_rate: currentEurRate, new_rate: eurRate, source: 'dolarapi' });
+        updatedCount++;
+      }
+
+      settingsUpserts.push({
+        company_id: companyId,
+        last_update: new Date().toISOString(),
+        auto_update: true,
+        source: 'dolarapi',
+      });
+
+      results.push({
+        company_id: companyId,
+        success: true,
+        usd_rate: usdRate,
+        eur_rate: eurRate,
+        usd_changed: currentUsdRate !== usdRate,
+        eur_changed: currentEurRate !== eurRate,
+      });
     }
+
+    // Execute 3 batch operations instead of ~6N individual queries
+    const { error: rateError } = await supabase
+      .from('exchange_rates')
+      .upsert(exchangeRateUpserts, { onConflict: 'company_id,currency' });
+    if (rateError) console.error('Error batch updating rates:', rateError);
+
+    if (historyInserts.length > 0) {
+      const { error: historyError } = await supabase
+        .from('exchange_rate_history')
+        .insert(historyInserts);
+      if (historyError) console.error('Error batch inserting history:', historyError);
+    }
+
+    const { error: settingsError } = await supabase
+      .from('exchange_rate_settings')
+      .upsert(settingsUpserts, { onConflict: 'company_id' });
+    if (settingsError) console.error('Error batch updating settings:', settingsError);
 
     console.log(`Successfully updated ${updatedCount} exchange rates across ${companyIds.length} companies`);
 

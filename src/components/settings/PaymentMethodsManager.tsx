@@ -132,7 +132,7 @@ export function PaymentMethodsManager({
   return (
     <div className={cn("space-y-4", compact && "space-y-3")}>
       {showTitle && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <h3 className="text-lg font-semibold">Tus tarjetas de pago</h3>
           <Button size="sm" variant="outline" onClick={handleAddCard}>
             <Plus className="h-4 w-4 mr-2" />

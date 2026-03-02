@@ -868,13 +868,13 @@ export function Sidebar() {
             <div className="p-3 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/40 shadow-lg shadow-primary/20 backdrop-blur-sm transition-all duration-1000" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
               <img 
                 src={currentCompany?.logo_url || "/landing/images/logo_transparente_hd.png"} 
-                alt={currentCompany?.name || "Ventify Space"} 
+                alt={currentCompany?.name || "Ventify"} 
                 className="w-10 h-10 drop-shadow-lg object-contain" 
               />
             </div>
             <div className="flex-1 min-w-0">
               <span className="text-base font-bold text-white block truncate">{currentCompany?.name || 'Tienda.Space'}</span>
-              <p className="text-xs text-primary/80 font-medium">Ventify Space</p>
+              <p className="text-xs text-primary/80 font-medium">Ventify</p>
             </div>
           </div>
           
@@ -903,6 +903,14 @@ export function Sidebar() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 h-8 text-sm bg-sidebar-accent/50 border-sidebar-accent"
+              autoFocus={false}
+              readOnly={false}
+              onFocus={(e) => {
+                // Prevenir que se abra el teclado automáticamente en mobile
+                if (window.innerWidth < 768) {
+                  e.target.blur();
+                }
+              }}
             />
           </div>
         </div>
@@ -955,28 +963,41 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Footer - Más compacto */}
-        <div className="px-3 py-2 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-1.5">
+        {/* Footer - Touch-friendly */}
+        <div className="px-3 py-3 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-2">
           <Link
             to="/ai-assistant"
-            className="flex items-center gap-2 px-3 py-2 text-xs rounded-md transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-md hover:shadow-lg"
+            className="flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-md hover:shadow-lg active:scale-[0.98]"
           >
             <Sparkles className="w-4 h-4" />
             <span className="font-semibold">Asistente IA</span>
           </Link>
 
-          <div className="flex gap-1.5">
+          <div className="flex gap-2">
             <Link to="/platform-support" className="flex-1">
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all"
+                className="w-full h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all active:scale-[0.98]"
               >
                 <LifeBuoy className="w-3.5 h-3.5" />
                 <span>Soporte</span>
               </Button>
             </Link>
 
+            <Link to="/bot-requests" className="flex-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-purple-500/50 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 transition-all active:scale-[0.98]"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Contáctanos</span>
+              </Button>
+            </Link>
+          </div>
+
+          <div className="flex gap-2">
             <Button
               onClick={async () => {
                 const { error } = await supabase.auth.signOut();
@@ -990,7 +1011,7 @@ export function Sidebar() {
               }}
               variant="outline"
               size="sm"
-              className="flex-1 flex items-center gap-2 px-2 py-1.5 text-xs rounded-md border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
+              className="flex-1 h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all active:scale-[0.98]"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Salir</span>

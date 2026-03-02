@@ -326,22 +326,20 @@ export default function Quotations() {
 
       if (saleItemsError) throw saleItemsError;
 
-      // Actualizar stock de productos
-      for (const item of quotationItems) {
-        if (item.product_id) {
-          const { data: product } = await supabase
-            .from("products")
-            .select("stock")
-            .eq("id", item.product_id)
-            .single();
-          
-          if (product) {
-            await supabase
-              .from("products")
-              .update({ stock: product.stock - item.quantity })
-              .eq("id", item.product_id);
+      // Atomic stock decrement via RPC (no race conditions, single query)
+      const stockProductIds = quotationItems
+        .map(item => item.product_id)
+        .filter(Boolean);
+
+      if (stockProductIds.length > 0) {
+        const adjustments: Record<string, number> = {};
+        quotationItems.forEach(item => {
+          if (item.product_id) {
+            adjustments[item.product_id] = (adjustments[item.product_id] || 0) - item.quantity;
           }
-        }
+        });
+        const { error: stockError } = await supabase.rpc('batch_update_product_stock', { adjustments });
+        if (stockError) throw stockError;
       }
 
       // Marcar presupuesto como convertido
@@ -482,14 +480,18 @@ export default function Quotations() {
 
       await supabase.from("delivery_note_items").insert(items);
 
-      // Actualizar cantidades entregadas en items de presupuesto
-      for (const item of deliveryItems.filter(i => i.quantity_to_deliver > 0)) {
-        const newDelivered = (item.total_delivered || 0) + item.quantity_to_deliver;
-        await supabase
-          .from("quotation_items")
-          .update({ total_delivered: newDelivered })
-          .eq("id", item.id);
-      }
+      // Parallel update of delivered quantities (instead of N sequential queries)
+      await Promise.all(
+        deliveryItems
+          .filter(i => i.quantity_to_deliver > 0)
+          .map(item => {
+            const newDelivered = (item.total_delivered || 0) + item.quantity_to_deliver;
+            return supabase
+              .from("quotation_items")
+              .update({ total_delivered: newDelivered })
+              .eq("id", item.id);
+          })
+      );
 
       // Actualizar estado de entrega del presupuesto
       const allItems = await supabase
@@ -550,15 +552,15 @@ export default function Quotations() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Presupuestos</h1>
-            <p className="text-muted-foreground">Gestiona presupuestos para clientes</p>
+            <h1 className="text-2xl sm:text-3xl font-bold">Presupuestos</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Gestiona presupuestos para clientes</p>
           </div>
           {canCreate && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo Presupuesto
                 </Button>

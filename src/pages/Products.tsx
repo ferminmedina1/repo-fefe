@@ -94,6 +94,7 @@ export default function Products() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   
   // Reset form when dialog opens for new product
   useEffect(() => {
@@ -420,35 +421,21 @@ export default function Products() {
       
       if (error) throw error;
       
-      // Update warehouse stock if provided
+      // Update warehouse stock if provided (batch upsert instead of N queries)
       if (warehouses && warehouseStockData[id] && Object.keys(warehouseStockData[id]).length > 0) {
-        for (const [warehouseId, stock] of Object.entries(warehouseStockData[id])) {
-          // Check if warehouse stock entry exists
-          const { data: existingStock } = await supabase
+        const upsertEntries = Object.entries(warehouseStockData[id])
+          .map(([warehouseId, stock]) => ({
+            warehouse_id: warehouseId,
+            product_id: id,
+            stock: stock || 0,
+            min_stock: data.min_stock || 0,
+            company_id: currentCompany.id,
+          }));
+
+        if (upsertEntries.length > 0) {
+          await supabase
             .from("warehouse_stock")
-            .select("id")
-            .eq("warehouse_id", warehouseId)
-            .eq("product_id", id)
-            .single();
-          
-          if (existingStock) {
-            // Update existing entry
-            await supabase
-              .from("warehouse_stock")
-              .update({ stock: stock || 0 })
-              .eq("id", existingStock.id);
-          } else if (stock > 0) {
-            // Create new entry only if stock > 0
-            await supabase
-              .from("warehouse_stock")
-              .insert({
-                warehouse_id: warehouseId,
-                product_id: id,
-                stock: stock || 0,
-                min_stock: data.min_stock || 0,
-                company_id: currentCompany.id,
-              });
-          }
+            .upsert(upsertEntries, { onConflict: 'warehouse_id,product_id' });
         }
         
         // Recalculate total stock
@@ -538,6 +525,7 @@ export default function Products() {
     setEditingProduct(null);
     setImageFile(null);
     setImagePreview("");
+    setFormErrors({});
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -619,9 +607,13 @@ export default function Products() {
     } catch (error) {
       console.error('Error en handleSubmit:', error);
       if (error instanceof z.ZodError) {
-        const firstError = error.errors[0];
-        console.error('Error de validación Zod:', firstError);
-        toast.error(firstError.message);
+        const newErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            newErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setFormErrors(newErrors);
       } else {
         toast.error("Error al validar el producto");
       }
@@ -754,40 +746,26 @@ export default function Products() {
     if (!priceListProduct) return;
 
     try {
-      for (const [priceListId, priceValue] of Object.entries(priceListPrices)) {
-        if (!priceValue) continue;
+      // Batch upsert instead of N SELECT+INSERT/UPDATE queries
+      const upsertEntries = Object.entries(priceListPrices)
+        .filter(([_, priceValue]) => priceValue)
+        .map(([priceListId, priceValue]) => ({
+          product_id: priceListProduct.id,
+          price_list_id: priceListId,
+          price: parseFloat(priceValue),
+        }))
+        .filter(entry => !isNaN(entry.price) && entry.price >= 0);
 
-        const price = parseFloat(priceValue);
-        if (isNaN(price) || price < 0) {
-          toast.error("Precio inválido");
-          continue;
-        }
-
-        // Check if price already exists
-        const { data: existingPrice } = await supabase
-          .from("product_prices")
-          .select("id")
-          .eq("product_id", priceListProduct.id)
-          .eq("price_list_id", priceListId)
-          .single();
-
-        if (existingPrice) {
-          // Update existing price
-          await supabase
-            .from("product_prices")
-            .update({ price })
-            .eq("id", existingPrice.id);
-        } else {
-          // Insert new price
-          await supabase
-            .from("product_prices")
-            .insert({
-              product_id: priceListProduct.id,
-              price_list_id: priceListId,
-              price,
-            });
-        }
+      if (upsertEntries.length === 0) {
+        toast.error("No hay precios válidos para actualizar");
+        return;
       }
+
+      const { error } = await supabase
+        .from("product_prices")
+        .upsert(upsertEntries, { onConflict: 'product_id,price_list_id' });
+
+      if (error) throw error;
 
       toast.success("Precios actualizados exitosamente");
       queryClient.invalidateQueries({ queryKey: ["product-prices"] });
@@ -803,43 +781,27 @@ export default function Products() {
     if (!adjustingProduct) return;
 
     try {
-      for (const [warehouseId, newStockValue] of Object.entries(stockAdjustments)) {
-        if (newStockValue === '' || newStockValue === undefined) continue;
+      // Batch upsert instead of N SELECT+INSERT/UPDATE queries
+      const upsertEntries = Object.entries(stockAdjustments)
+        .filter(([_, newStockValue]) => newStockValue !== '' && newStockValue !== undefined)
+        .map(([warehouseId, newStockValue]) => {
+          const newStock = parseInt(newStockValue);
+          if (isNaN(newStock) || newStock < 0) return null;
+          return {
+            warehouse_id: warehouseId,
+            product_id: adjustingProduct.id,
+            stock: newStock,
+            min_stock: adjustingProduct.min_stock || 0,
+            company_id: currentCompany?.id,
+          };
+        })
+        .filter(Boolean);
 
-        const newStock = parseInt(newStockValue);
-        
-        if (isNaN(newStock) || newStock < 0) {
-          toast.error(`Valor de stock inválido para depósito ${warehouseId}`);
-          continue;
-        }
-
-        // Check if warehouse stock entry exists
-        const { data: existingStock } = await supabase
+      if (upsertEntries.length > 0) {
+        const { error } = await supabase
           .from("warehouse_stock")
-          .select("id")
-          .eq("warehouse_id", warehouseId)
-          .eq("product_id", adjustingProduct.id)
-          .single();
-
-        if (existingStock) {
-          // Update existing stock
-          await supabase
-            .from("warehouse_stock")
-            .update({ stock: newStock })
-            .eq("warehouse_id", warehouseId)
-            .eq("product_id", adjustingProduct.id);
-        } else {
-          // Create new warehouse stock entry
-          await supabase
-            .from("warehouse_stock")
-            .insert({
-              warehouse_id: warehouseId,
-              product_id: adjustingProduct.id,
-              stock: newStock,
-              min_stock: adjustingProduct.min_stock || 0,
-              company_id: currentCompany?.id,
-            });
-        }
+          .upsert(upsertEntries, { onConflict: 'warehouse_id,product_id' });
+        if (error) throw error;
       }
 
       // Recalculate total stock
@@ -946,7 +908,12 @@ export default function Products() {
           return;
         }
 
-        for (const row of data) {
+        // Validate all rows first, then batch insert (instead of N individual inserts)
+        const validProducts: any[] = [];
+        const rowWarehouseData: Map<number, { row: any; validated: any }> = new Map();
+
+        for (let i = 0; i < data.length; i++) {
+          const row = data[i];
           try {
             const nameField = row.nombre?.trim() || row.name?.trim();
             if (!nameField) {
@@ -964,7 +931,7 @@ export default function Products() {
               sku: row.sku?.trim() || undefined,
             });
 
-            const productData = {
+            validProducts.push({
               name: validatedData.name,
               barcode: validatedData.barcode || null,
               sku: validatedData.sku || null,
@@ -974,48 +941,59 @@ export default function Products() {
               min_stock: validatedData.min_stock ?? 0,
               category: validatedData.category || null,
               company_id: currentCompany?.id,
-            };
-
-            const { data: product, error } = await supabase
-              .from("products")
-              .insert(productData)
-              .select()
-              .single();
-            
-            if (error) throw error;
-
-            // Handle warehouse distribution if columns exist
-            if (warehouses && product) {
-              const warehouseStockEntries: any[] = [];
-              
-              warehouses.forEach(w => {
-                const columnName = `deposito_${w.code}`;
-                const stockValue = row[columnName];
-                
-                if (stockValue && parseInt(stockValue) > 0) {
-                  warehouseStockEntries.push({
-                    warehouse_id: w.id,
-                    product_id: product.id,
-                    stock: parseInt(stockValue),
-                    min_stock: validatedData.min_stock ?? 0,
-                  });
-                }
-              });
-
-              if (warehouseStockEntries.length > 0) {
-                // Añadir company_id a cada fila por RLS
-                const entriesWithCompany = warehouseStockEntries.map(e => ({ ...e, company_id: currentCompany!.id }));
-                await supabase.from("warehouse_stock").insert(entriesWithCompany);
-              }
-            }
-
-            successCount++;
+            });
+            rowWarehouseData.set(validProducts.length - 1, { row, validated: validatedData });
           } catch (error: any) {
             errorCount++;
-            const errorMsg = error instanceof z.ZodError 
-              ? error.errors[0].message 
+            const errorMsg = error instanceof z.ZodError
+              ? error.errors[0].message
               : error.message || "Error desconocido";
-            errors.push(`Fila ${successCount + errorCount}: ${errorMsg}`);
+            errors.push(`Fila ${i + 1}: ${errorMsg}`);
+          }
+        }
+
+        // Batch insert all valid products in one query
+        if (validProducts.length > 0) {
+          const { data: insertedProducts, error: insertError } = await supabase
+            .from("products")
+            .insert(validProducts)
+            .select();
+
+          if (insertError) {
+            errors.push(`Error al insertar productos: ${insertError.message}`);
+            errorCount += validProducts.length;
+          } else {
+            successCount = insertedProducts?.length || 0;
+
+            // Batch insert all warehouse stock entries in one query
+            if (warehouses && insertedProducts) {
+              const allWarehouseEntries: any[] = [];
+
+              insertedProducts.forEach((product, idx) => {
+                const warehouseInfo = rowWarehouseData.get(idx);
+                if (!warehouseInfo) return;
+                const { row, validated } = warehouseInfo;
+
+                warehouses.forEach(w => {
+                  const columnName = `deposito_${w.code}`;
+                  const stockValue = row[columnName];
+
+                  if (stockValue && parseInt(stockValue) > 0) {
+                    allWarehouseEntries.push({
+                      warehouse_id: w.id,
+                      product_id: product.id,
+                      stock: parseInt(stockValue),
+                      min_stock: validated.min_stock ?? 0,
+                      company_id: currentCompany!.id,
+                    });
+                  }
+                });
+              });
+
+              if (allWarehouseEntries.length > 0) {
+                await supabase.from("warehouse_stock").insert(allWarehouseEntries);
+              }
+            }
           }
         }
 
@@ -1156,16 +1134,20 @@ export default function Products() {
       let errorCount = 0;
       const errors: string[] = [];
       
-      for (const adjustment of previewAdjustments) {
-        const { error } = await supabase
-          .from("products")
-          .update({ 
-            price: adjustment.newPrice,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", adjustment.id)
-          .eq("company_id", currentCompany?.id);
+      // Parallel updates instead of sequential N queries
+      const now = new Date().toISOString();
+      const results = await Promise.all(
+        previewAdjustments.map(adjustment =>
+          supabase
+            .from("products")
+            .update({ price: adjustment.newPrice, updated_at: now })
+            .eq("id", adjustment.id)
+            .eq("company_id", currentCompany?.id)
+            .then(({ error }) => ({ adjustment, error }))
+        )
+      );
 
+      for (const { adjustment, error } of results) {
         if (error) {
           console.error(`Error actualizando producto ${adjustment.name}:`, error);
           errors.push(`${adjustment.name}: ${error.message}`);
@@ -1320,9 +1302,10 @@ export default function Products() {
                     <Input
                       id="name"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      required
+                      onChange={(e) => { setFormData({ ...formData, name: e.target.value }); if (formErrors.name) setFormErrors((p) => ({ ...p, name: "" })); }}
+                      className={formErrors.name ? "border-destructive" : ""}
                     />
+                    {formErrors.name && <p className="text-sm text-destructive mt-1">{formErrors.name}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="category">Categoría</Label>
@@ -1420,10 +1403,11 @@ export default function Products() {
                       type="number"
                       step="0.01"
                       value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      required
+                      onChange={(e) => { setFormData({ ...formData, price: e.target.value }); if (formErrors.price) setFormErrors((p) => ({ ...p, price: "" })); }}
                       placeholder="0.00"
+                      className={formErrors.price ? "border-destructive" : ""}
                     />
+                    {formErrors.price && <p className="text-sm text-destructive mt-1">{formErrors.price}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="cost">Costo (Opcional)</Label>
@@ -1432,9 +1416,11 @@ export default function Products() {
                       type="number"
                       step="0.01"
                       value={formData.cost}
-                      onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                      onChange={(e) => { setFormData({ ...formData, cost: e.target.value }); if (formErrors.cost) setFormErrors((p) => ({ ...p, cost: "" })); }}
                       placeholder="0.00"
+                      className={formErrors.cost ? "border-destructive" : ""}
                     />
+                    {formErrors.cost && <p className="text-sm text-destructive mt-1">{formErrors.cost}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currency">Moneda</Label>
@@ -1462,10 +1448,11 @@ export default function Products() {
                       id="stock"
                       type="number"
                       value={formData.stock}
-                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                      required
+                      onChange={(e) => { setFormData({ ...formData, stock: e.target.value }); if (formErrors.stock) setFormErrors((p) => ({ ...p, stock: "" })); }}
                       placeholder="0"
+                      className={formErrors.stock ? "border-destructive" : ""}
                     />
+                    {formErrors.stock && <p className="text-sm text-destructive mt-1">{formErrors.stock}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="min_stock">Stock Mínimo (Alerta)</Label>
@@ -1473,9 +1460,11 @@ export default function Products() {
                       id="min_stock"
                       type="number"
                       value={formData.min_stock}
-                      onChange={(e) => setFormData({ ...formData, min_stock: e.target.value })}
+                      onChange={(e) => { setFormData({ ...formData, min_stock: e.target.value }); if (formErrors.min_stock) setFormErrors((p) => ({ ...p, min_stock: "" })); }}
                       placeholder="0"
+                      className={formErrors.min_stock ? "border-destructive" : ""}
                     />
+                    {formErrors.min_stock && <p className="text-sm text-destructive mt-1">{formErrors.min_stock}</p>}
                   </div>
                   </div>
                 </div>
@@ -1668,8 +1657,8 @@ export default function Products() {
         {selectedProducts.size > 0 && (
           <Card className="shadow-soft bg-muted/50">
             <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <span className="text-sm font-medium">
                     {selectedProducts.size} producto{selectedProducts.size > 1 ? 's' : ''} seleccionado{selectedProducts.size > 1 ? 's' : ''}
                   </span>

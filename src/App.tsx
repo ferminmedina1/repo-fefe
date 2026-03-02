@@ -70,15 +70,20 @@ const ModuleNotAvailable = lazy(() => import("./pages/ModuleNotAvailable"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AccountsReceivable = lazy(() => import("./pages/AccountsReceivable"));
 const EmailConfig = lazy(() => import("./pages/EmailConfig"));
-const SignupWizard = lazy(() => import("./pages/SignupWizard"));
+/*const SignupWizard = lazy(() => import("./pages/SignupWizard")); ONLY FOR PROD*/
+const SignupMaintenance = lazy(() => import("./pages/SignupMaintenance"));
 const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
+const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRequests"));
 
 
 const Opportunities = lazy(() => import("./pages/Opportunities"));
 const Pipelines = lazy(() => import("./pages/Pipelines"));
 const CrmReports = lazy(() => import("./pages/CrmReports"));
 const CrmRoles = lazy(() => import("./pages/CrmRoles"));
+
+
+
 
 const queryClient = new QueryClient();
 
@@ -310,7 +315,8 @@ const App = () => (
         <CompanyProvider>
           <Suspense fallback={<PageLoader />}>
             <Routes>
-            <Route path="/signup" element={<SignupWizard />} />
+            {/* ONLY FOR PROD <Route path="/signup" element={<SignupWizard />} />*/}
+            <Route path="/signup" element={<SignupMaintenance />} />
             <Route path="/signup/success" element={<SignupSuccess />} />
             <Route path="/signup/cancel" element={<SignupCancel />} />
             <Route path="/auth" element={<Auth />} />
@@ -399,6 +405,9 @@ const App = () => (
             
             {/* Soporte de Plataforma - siempre disponible para empresas */}
             <Route path="/platform-support" element={<ProtectedRoute><PlatformSupport /></ProtectedRoute>} />
+            
+            {/* Bot Personalizado - siempre disponible */}
+            <Route path="/bot-requests" element={<ProtectedRoute><BotImplementationRequests /></ProtectedRoute>} />
             
             {/* Notificaciones - siempre disponible */}
             <Route path="/notification-settings" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="notifications"><NotificationSettings /></ModuleProtectedRoute></ProtectedRoute>} />
