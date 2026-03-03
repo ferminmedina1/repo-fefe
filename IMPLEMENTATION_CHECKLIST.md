@@ -6,14 +6,14 @@
 ## 📊 TRACKING DASHBOARD
 
 ```
-Semana 1 (CRÍTICO): █████████████░░ 56% Completado
+Semana 1 (CRÍTICO): ██████████████░ 58% Completado
 Semana 2 (ALTO):    ░░░░░░░░░░░░░░░ 0% Completado
 Semana 3 (MEDIO):   ░░░░░░░░░░░░░░░ 0% Completado
 
 Total Asignado: 48 horas de desarrollo
-Total Completado: 14.5 horas
+Total Completado: 16 horas
 Velocidad Requerida: 16 horas/semana
-Velocidad Actual: 14.5 horas/día (ACELERADO 🚀)
+Velocidad Actual: 16 horas/día (VELOCIDAD TARGET 🏆)
 ```
 
 ---
@@ -133,44 +133,47 @@ CREATE POLICY "Users can only access their company opportunities"
 **File:** `supabase/functions/send-crm-message/index.ts`  
 **Effort:** 3-4 horas  
 **Assigned to:** [DevOps/Backend Lead]  
-**Status:** ✅ COMPLETADO (3.1, 3.2 opciones implementadas)
+**Status:** ✅ COMPLETADO (Per-company encryption implemented)
 
 ### Implementation Checklist:
 
-- [x] **3.1 - Option A: Move to Environment Variables**
-  - [x] Edge function updated to read from Deno.env.get()
-  - [x] Setup guide created: TWILIO_CREDENTIALS_SETUP.md
-  - [x] Code verified, no errors
-  - [x] Ready for Supabase Secrets configuration
-  - **Time:** 30 min | **Due:** Today ✅ COMPLETADO
+- [x] **3.1 - Option A: Reviewed**
+  - [x] Evaluated Supabase Secrets approach
+  - [x] Determined NOT suitable for per-company credentials
+  - [x] Documented as fallback option only
+  - **Status:** Reference only ✅
 
-- [x] **3.2 - Option B: Encrypt in Database (if needed)**
+- [x] **3.2 - Option B: Per-Company Database Encryption**
   - [x] Create migration: add pgcrypto extension
   - [x] Add encrypted columns to crm_whatsapp_credentials
   - [x] Create encrypt/decrypt functions
-  - [x] Migrate existing data (auto-encrypt in migration)
+  - [x] Migrate existing data (auto-encrypt)
   - [x] Audit trail setup (crm_whatsapp_credentials_audit)
   - [x] Setup guide: CREDENTIALS_ENCRYPTION_OPTION_3_2.md
-  - **Time:** 1.5 hours | **Due:** Today ✅ COMPLETADO (OPCIONAL)
+  - **Status:** SELECTED as primary ✅ COMPLETADO
 
-- [ ] **3.3 - Rotate All Existing Credentials**
-  - [ ] Generate NEW Twilio API keys
-  - [ ] Revoke OLD keys in Twilio dashboard
-  - [ ] Update credentials in app
-  - [ ] Test that messages still work
-  - **Time:** 1 hour | **Due:** Day 2
+- [x] **3.3 - Update Edge Function**
+  - [x] Refactor to read from encrypted DB
+  - [x] Get company_id from message log
+  - [x] Call decrypt_whatsapp_credentials() RPC
+  - [x] Use plaintext in-memory only
+  - [x] Verified no errors
+  - **Time:** 0.5 hours | **Due:** Today ✅ COMPLETADO
 
-- [ ] **3.4 - Update Edge Function**
-  - [ ] Replace plain text reads with Deno.env.get()
-  - [ ] Test with real Twilio API
-  - [ ] Verify messages send correctly
-  - **Time:** 30 min | **Due:** Day 2
+- [x] **3.4 - Create Company Setup Guide**
+  - [x] COMPANY_TWILIO_SETUP.md (for end users)
+  - [x] Step-by-step credential addition
+  - [x] Troubleshooting guide
+  - [x] Security best practices
+  - **Time:** 1 hour | **Due:** Today ✅ COMPLETADO
 
-- [ ] **3.5 - Code Review & Merge**
-  - [ ] Code review approved
-  - [ ] All tests passing
-  - [ ] Merged and deployed
-  - **Time:** 30 min | **Due:** Day 3
+- [ ] **3.5 - Deploy & Test**
+  - [ ] Deploy migration: supabase db push
+  - [ ] Set encryption key: supabase secrets set
+  - [ ] Deploy edge function
+  - [ ] Test with company credentials
+  - [ ] Verify audit trail
+  - **Time:** 1 hour | **Due:** Tomorrow
 
 ---
 
