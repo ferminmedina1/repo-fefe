@@ -23,6 +23,14 @@ export function CreateCustomerDialog({ open, onOpenChange, onSubmit, isLoading }
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [document, setDocument] = useState("");
+  const [emailError, setEmailError] = useState("");
+
+  const validateEmail = (value: string) => {
+    if (!value) { setEmailError(""); return true; }
+    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    setEmailError(valid ? "" : "Formato de email inválido");
+    return valid;
+  };
 
   const handleOpenChange = (val: boolean) => {
     if (!val) {
@@ -30,6 +38,7 @@ export function CreateCustomerDialog({ open, onOpenChange, onSubmit, isLoading }
       setPhone("");
       setEmail("");
       setDocument("");
+      setEmailError("");
     }
     onOpenChange(val);
   };
@@ -65,9 +74,11 @@ export function CreateCustomerDialog({ open, onOpenChange, onSubmit, isLoading }
               id="customer-email"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); validateEmail(e.target.value); }}
               placeholder="Email"
+              className={emailError ? "border-destructive" : ""}
             />
+            {emailError && <p className="text-xs text-destructive mt-1">{emailError}</p>}
           </div>
           <div>
             <Label htmlFor="customer-document">DNI (Opcional)</Label>
@@ -82,7 +93,7 @@ export function CreateCustomerDialog({ open, onOpenChange, onSubmit, isLoading }
             <Button variant="outline" onClick={() => handleOpenChange(false)}>
               Cancelar
             </Button>
-            <Button onClick={() => onSubmit({ name, phone, email, document })} disabled={isLoading}>
+            <Button onClick={() => { if (!validateEmail(email)) return; onSubmit({ name, phone, email, document }); }} disabled={isLoading || !!emailError}>
               {isLoading ? "Creando..." : "Crear Cliente"}
             </Button>
           </div>

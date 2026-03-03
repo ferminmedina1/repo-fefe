@@ -64,6 +64,7 @@ export default function Quotations() {
   const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
   const [selectedQuotation, setSelectedQuotation] = useState<any>(null);
   const [deliveryItems, setDeliveryItems] = useState<any[]>([]);
+  const [convertConfirmId, setConvertConfirmId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
   const queryClient = useQueryClient();
@@ -154,7 +155,7 @@ export default function Quotations() {
     enabled: !!currentCompany?.id,
   });
 
-  const { data: quotationItems } = useQuery({
+  const { data: quotationItems, isLoading: isLoadingQuotationItems } = useQuery({
     queryKey: ["quotation-items", selectedQuotation?.id],
     queryFn: async () => {
       if (!selectedQuotation?.id) return [];
@@ -272,6 +273,17 @@ export default function Quotations() {
 
   const convertToSaleMutation = useMutation({
     mutationFn: async (quotationId: string) => {
+      // CRIT-3: Verificar que no existan remitos para este presupuesto (evita doble facturación)
+      const { data: existingNotes } = await supabase
+        .from("delivery_notes")
+        .select("id")
+        .eq("quotation_id", quotationId)
+        .limit(1)
+        .maybeSingle();
+      if (existingNotes) {
+        throw new Error("Este presupuesto ya tiene remitos generados. Facture los remitos desde la sección de Remitos.");
+      }
+
       // Obtener presupuesto con items
       const { data: quotation, error: quotationError } = await supabase
         .from("quotations")
@@ -393,13 +405,14 @@ export default function Quotations() {
 
   const handleDownloadPDF = async (quotationId: string) => {
     try {
-      // Obtener presupuesto con items
+      // HIGH-4: Filtrar por company_id para prevenir IDOR
       const { data: quotation, error: quotationError } = await supabase
         .from("quotations")
         .select("*")
         .eq("id", quotationId)
+        .eq("company_id", currentCompany?.id)
         .single();
-      
+
       if (quotationError) throw quotationError;
 
       const { data: items, error: itemsError } = await supabase
@@ -513,11 +526,11 @@ export default function Quotations() {
       const allDelivered = allItems.data?.every(i => (i.total_delivered || 0) >= i.quantity);
       const someDelivered = allItems.data?.some(i => (i.total_delivered || 0) > 0);
 
+      // MED-2: No sobreescribir total_delivered con el batch actual — se deriva de los items
       await supabase
         .from("quotations")
         .update({
           delivery_status: allDelivered ? "completed" : someDelivered ? "partial" : "pending",
-          total_delivered: deliveryItems.reduce((sum, i) => sum + (i.quantity_to_deliver * i.unit_price), 0),
         })
         .eq("id", selectedQuotation.id);
 
@@ -843,7 +856,7 @@ export default function Quotations() {
                             <Button
                               size="sm"
                               variant="default"
-                              onClick={() => convertToSaleMutation.mutate(quotation.id)}
+                              onClick={() => setConvertConfirmId(quotation.id)}
                               title="Convertir a venta"
                             >
                               <ShoppingCart className="h-4 w-4 mr-1" />
@@ -882,6 +895,31 @@ export default function Quotations() {
           </CardContent>
         </Card>
 
+        {/* LOW-2: Confirmación antes de convertir presupuesto a venta (acción irreversible) */}
+        <Dialog open={!!convertConfirmId} onOpenChange={(open) => { if (!open) setConvertConfirmId(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmar conversión a venta</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Esta acción es irreversible. Se generará una venta con método de pago "crédito" y el presupuesto quedará marcado como "convertido". ¿Desea continuar?
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConvertConfirmId(null)}>Cancelar</Button>
+              <Button
+                onClick={() => {
+                  if (convertConfirmId) convertToSaleMutation.mutate(convertConfirmId);
+                  setConvertConfirmId(null);
+                }}
+                disabled={convertToSaleMutation.isPending}
+              >
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Confirmar conversión
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Diálogo para generar remito con entregas parciales */}
         <Dialog open={isDeliveryDialogOpen} onOpenChange={(open) => {
           setIsDeliveryDialogOpen(open);
@@ -891,7 +929,9 @@ export default function Quotations() {
             <DialogHeader>
               <DialogTitle>Generar Remito - {selectedQuotation?.quotation_number}</DialogTitle>
             </DialogHeader>
-            {quotationItems && (
+            {isLoadingQuotationItems ? (
+              <div className="text-center py-6 text-muted-foreground">Cargando productos...</div>
+            ) : quotationItems && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
                   Seleccione las cantidades a entregar. Puede generar múltiples remitos para entregas parciales.

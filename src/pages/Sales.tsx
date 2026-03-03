@@ -22,9 +22,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export default function Sales() {
   const { currentCompany } = useCompany();
+  const { hasPermission } = usePermissions();
+  const canEdit = hasPermission("sales", "edit");
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [productFilter, setProductFilter] = useState("ALL");
@@ -152,6 +155,9 @@ export default function Sales() {
       // Only paginate when no product filter (product filter requires client-side scan)
       if (!isProductFiltered) {
         query = query.range(from, to);
+      } else {
+        // MED-5: Cap para evitar full table scan en filtro por producto
+        query = query.limit(500);
       }
 
       const { data, error, count } = await query;
@@ -183,7 +189,8 @@ export default function Sales() {
         .select(`
           *,
           customer:customers(*),
-          sale_items(*)
+          sale_items(*),
+          returns(id, return_number, status, refund_method, total)
         `)
         .eq("id", selectedSale.id)
         .eq("company_id", currentCompany?.id)
@@ -448,21 +455,23 @@ export default function Sales() {
                             <TooltipContent>Imprimir ticket</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                size="icon" 
-                                variant="ghost"
-                                onClick={(e) => { e.stopPropagation(); createDeliveryNoteMutation.mutate(sale.id); }}
-                                disabled={createDeliveryNoteMutation.isPending}
-                              >
-                                <Truck className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Generar remito</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        {canEdit && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={(e) => { e.stopPropagation(); createDeliveryNoteMutation.mutate(sale.id); }}
+                                  disabled={createDeliveryNoteMutation.isPending}
+                                >
+                                  <Truck className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Generar remito</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -637,6 +646,29 @@ export default function Sales() {
                   </Card>
                 )}
 
+                {saleDetails.returns && saleDetails.returns.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <RotateCcw className="h-4 w-4 text-orange-500" />
+                        Devoluciones asociadas
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {saleDetails.returns.map((ret: any) => (
+                          <div key={ret.id} className="flex items-center justify-between text-sm border rounded p-2">
+                            <span className="font-medium">{ret.return_number}</span>
+                            <span className="text-muted-foreground">{ret.refund_method === "credit_note" ? "Nota de Crédito" : ret.refund_method}</span>
+                            <span className="font-bold text-destructive">${Number(ret.total).toFixed(2)}</span>
+                            <Badge variant="outline" className="text-xs">{ret.status}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <div className="flex justify-end gap-2 flex-wrap">
                   {saleDetails.customer_id && (
                     <>
@@ -663,17 +695,19 @@ export default function Sales() {
                     <RotateCcw className="mr-2 h-4 w-4" />
                     Crear Nota de Crédito
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      createDeliveryNoteMutation.mutate(saleDetails.id);
-                      setIsDetailOpen(false);
-                    }}
-                    disabled={createDeliveryNoteMutation.isPending}
-                  >
-                    <Truck className="mr-2 h-4 w-4" />
-                    Generar Remito
-                  </Button>
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        createDeliveryNoteMutation.mutate(saleDetails.id);
+                        setIsDetailOpen(false);
+                      }}
+                      disabled={createDeliveryNoteMutation.isPending}
+                    >
+                      <Truck className="mr-2 h-4 w-4" />
+                      Generar Remito
+                    </Button>
+                  )}
                   <Button onClick={() => handlePrintReceipt(saleDetails)}>
                     <Printer className="mr-2 h-4 w-4" />
                     Imprimir Ticket

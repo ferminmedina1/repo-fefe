@@ -109,6 +109,8 @@ export default function DeliveryNotes() {
     onSuccess: () => {
       toast.success("Estado actualizado");
       queryClient.invalidateQueries({ queryKey: ["delivery-notes"] });
+      // HIGH-6: Actualizar también los contadores de estadísticas
+      queryClient.invalidateQueries({ queryKey: ["delivery-notes-stats"] });
     },
     onError: (error: Error) => {
       toast.error(getUserErrorMessage(error, "Error al actualizar estado"));
@@ -117,6 +119,16 @@ export default function DeliveryNotes() {
 
   const convertToSaleMutation = useMutation({
     mutationFn: async (deliveryNoteId: string) => {
+      // HIGH-5: Verificar desde el servidor que el remito no haya sido facturado ya (previene doble clic / carrera)
+      const { data: checkNote, error: checkError } = await supabase
+        .from("delivery_notes")
+        .select("id, sale_id")
+        .eq("id", deliveryNoteId)
+        .eq("company_id", currentCompany?.id)
+        .single();
+      if (checkError) throw checkError;
+      if (checkNote.sale_id) throw new Error("Este remito ya fue facturado");
+
       const { data: deliveryNote, error: noteError } = await supabase
         .from("delivery_notes")
         .select("*, delivery_note_items(*)")
@@ -193,6 +205,9 @@ export default function DeliveryNotes() {
     onSuccess: () => {
       toast.success("Remito facturado exitosamente");
       queryClient.invalidateQueries({ queryKey: ["sales"] });
+      // HIGH-5: Refrescar lista y estadísticas de remitos tras facturar
+      queryClient.invalidateQueries({ queryKey: ["delivery-notes"] });
+      queryClient.invalidateQueries({ queryKey: ["delivery-notes-stats"] });
     },
     onError: (error: Error) => {
       toast.error(getUserErrorMessage(error, "Error al facturar remito"));
@@ -218,12 +233,14 @@ export default function DeliveryNotes() {
 
   const handleDownloadPDF = async (deliveryNoteId: string) => {
     try {
+      // HIGH-4: Filtrar por company_id para prevenir IDOR
       const { data: deliveryNote, error: noteError } = await supabase
         .from("delivery_notes")
         .select("*")
         .eq("id", deliveryNoteId)
+        .eq("company_id", currentCompany?.id)
         .single();
-      
+
       if (noteError) throw noteError;
 
       const { data: items, error: itemsError } = await supabase

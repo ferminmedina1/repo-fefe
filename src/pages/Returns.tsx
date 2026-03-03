@@ -25,6 +25,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 
 export default function Returns() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [saleSearchQuery, setSaleSearchQuery] = useState("");
   const [selectedReturn, setSelectedReturn] = useState<any>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -44,16 +45,23 @@ export default function Returns() {
   const canCreate = hasPermission("returns", "create");
   const canEdit = hasPermission("returns", "edit");
 
-  // Sales for origin selection
+  // Sales for origin selection — MED-4: búsqueda para poder encontrar ventas antiguas
   const { data: sales } = useQuery({
-    queryKey: ["sales-for-returns", currentCompany?.id],
+    queryKey: ["sales-for-returns", currentCompany?.id, saleSearchQuery],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("sales")
         .select(`id, sale_number, customer_id, customer:customers(name), sale_items(*)`)
         .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(200);
+      if (saleSearchQuery) {
+        const sanitized = sanitizeSearchQuery(saleSearchQuery);
+        if (sanitized) {
+          query = query.ilike("sale_number", `%${sanitized}%`);
+        }
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -96,8 +104,8 @@ export default function Returns() {
     setReturnItems((prev) => {
       const next = [...prev];
       const item = next[idx];
-      // MED-04: Cap return qty at original sale quantity
-      const saleItem = selectedSale?.sale_items?.[idx];
+      // MED-3: Cap qty usando product_id (no índice de array) para evitar desajustes de orden
+      const saleItem = selectedSale?.sale_items?.find((si: any) => si.product_id === item.product_id);
       const maxQty = saleItem ? Number(saleItem.quantity) : Infinity;
       const quantity = Math.min(Math.max(0, qty), maxQty);
       item.quantity = quantity;
@@ -179,15 +187,20 @@ export default function Returns() {
       if (error) throw error;
 
       if (status === "approved") {
-        const returnData = returns?.find(r => r.id === id);
-        if (!returnData) return;
+        // HIGH-1: Fetch return data from server (no usar estado local paginado)
+        const { data: returnData, error: returnFetchError } = await supabase
+          .from("returns")
+          .select("id, customer_id, total, refund_method, warehouse_id")
+          .eq("id", id)
+          .eq("company_id", currentCompany?.id)
+          .single();
+        if (returnFetchError || !returnData) throw new Error("No se pudo obtener la información de la devolución");
 
-        // CRIT-01: Restore stock for returned items
+        // Restore stock for returned items
         const { data: returnItems, error: itemsError } = await supabase
           .from("return_items")
           .select("product_id, quantity")
           .eq("return_id", id);
-
         if (itemsError) throw itemsError;
 
         if (returnItems && returnItems.length > 0) {
@@ -212,21 +225,29 @@ export default function Returns() {
           }
         }
 
-        // HIGH-04 + MED-04: Create credit note with company_id and capture RPC errors
+        // HIGH-2: Verificar que no exista ya una nota de crédito para evitar duplicados
         if (returnData.refund_method === "credit_note") {
-          const { data: numberData, error: numberError } = await supabase.rpc("generate_credit_note_number");
-          if (numberError) throw numberError;
-          if (!numberData) throw new Error("No se pudo generar el número de nota de crédito");
+          const { data: existingCN } = await supabase
+            .from("credit_notes")
+            .select("id")
+            .eq("return_id", id)
+            .maybeSingle();
 
-          const { error: cnError } = await supabase.from("credit_notes").insert({
-            credit_note_number: numberData,
-            return_id: id,
-            customer_id: returnData.customer_id,
-            amount: returnData.total,
-            balance: returnData.total,
-            company_id: currentCompany?.id,
-          });
-          if (cnError) throw cnError;
+          if (!existingCN) {
+            const { data: numberData, error: numberError } = await supabase.rpc("generate_credit_note_number");
+            if (numberError) throw numberError;
+            if (!numberData) throw new Error("No se pudo generar el número de nota de crédito");
+
+            const { error: cnError } = await supabase.from("credit_notes").insert({
+              credit_note_number: numberData,
+              return_id: id,
+              customer_id: returnData.customer_id,
+              amount: returnData.total,
+              balance: returnData.total,
+              company_id: currentCompany?.id,
+            });
+            if (cnError) throw cnError;
+          }
         }
       }
     },
@@ -408,6 +429,12 @@ export default function Returns() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label>Venta *</Label>
+                          <Input
+                            placeholder="Buscar por número de venta..."
+                            value={saleSearchQuery}
+                            onChange={(e) => setSaleSearchQuery(e.target.value)}
+                            className="mb-1"
+                          />
                           <Select
                             value={selectedSaleId}
                             onValueChange={(v) => {

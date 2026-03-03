@@ -98,6 +98,21 @@ export default function Reservations() {
     },
   });
 
+  const { data: companySettings } = useQuery({
+    queryKey: ["company-settings", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return null;
+      const { data, error } = await supabase
+        .from("companies")
+        .select("default_tax_rate")
+        .eq("id", currentCompany.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
+  });
+
   const { data: products } = useQuery({
     queryKey: ["products-for-reservation", currentCompany?.id],
     queryFn: async () => {
@@ -329,8 +344,20 @@ export default function Reservations() {
 
   const generateSaleMutation = useMutation({
     mutationFn: async (reservation: any) => {
-      // Validate payment is complete before generating sale
-      const remainingAmount = Number(reservation.remaining_amount) || 0;
+      // CRIT-2: Server-side status check — previene condición de carrera (doble clic / dos pestañas)
+      const { data: currentRes, error: currentResError } = await supabase
+        .from("reservations")
+        .select("status, remaining_amount")
+        .eq("id", reservation.id)
+        .eq("company_id", currentCompany?.id)
+        .single();
+      if (currentResError) throw currentResError;
+      if (currentRes.status !== "active") {
+        throw new Error(`La reserva ya no está activa (estado: ${currentRes.status})`);
+      }
+
+      // Validate payment is complete
+      const remainingAmount = Number(currentRes.remaining_amount) || 0;
       if (remainingAmount > 0.01) {
         throw new Error(
           `No se puede generar la factura. Faltan $${remainingAmount.toFixed(2)} por pagar.`
@@ -340,27 +367,63 @@ export default function Reservations() {
       // Get reservation items with product names
       const { data: items, error: itemsError } = await supabase
         .from("reservation_items")
-        .select(`
-          *,
-          products(name)
-        `)
+        .select(`*, products(name)`)
         .eq("reservation_id", reservation.id);
-      
       if (itemsError) throw itemsError;
       if (!items || items.length === 0) throw new Error("No hay items en la reserva");
-      
+
       // Get user ID
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
-      
+
+      // MED-6: Determine primary payment method from reservation payments
+      const { data: payments } = await supabase
+        .from("reservation_payments")
+        .select("payment_method, amount")
+        .eq("reservation_id", reservation.id)
+        .order("amount", { ascending: false });
+      const primaryPaymentMethod = payments?.[0]?.payment_method || "cash";
+
       // Calculate subtotal (before discount)
       const subtotal = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
-      
+
       // Atomic sale number generation (no race conditions)
       const { data: saleNumberData, error: saleNumberError } = await supabase.rpc("generate_sale_number");
       if (saleNumberError) throw saleNumberError;
 
-      // Decrement stock for items in the reservation
+      // CRIT-1: Create sale and items BEFORE decrementing stock
+      const { data: sale, error: saleError } = await supabase
+        .from("sales")
+        .insert({
+          sale_number: saleNumberData as string,
+          customer_id: reservation.customer_id,
+          user_id: user.id,
+          company_id: currentCompany?.id,
+          subtotal: subtotal,
+          discount: 0,
+          tax: 0,
+          total: reservation.total,
+          payment_method: primaryPaymentMethod,
+          status: "completed",
+          notes: `Generada desde reserva ${reservation.reservation_number || reservation.id}`,
+        })
+        .select()
+        .single();
+      if (saleError) throw saleError;
+
+      const saleItems = items.map((item: any) => ({
+        sale_id: sale.id,
+        product_id: item.product_id,
+        product_name: item.products?.name || item.product_name || "Producto",
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.subtotal,
+        company_id: currentCompany?.id,
+      }));
+      const { error: itemsInsertError } = await supabase.from("sale_items").insert(saleItems);
+      if (itemsInsertError) throw itemsInsertError;
+
+      // CRIT-1: Decrement stock AFTER sale and items are persisted
       const productAdjustments: Record<string, number> = {};
       items.forEach((item: any) => {
         if (item.product_id) {
@@ -374,50 +437,11 @@ export default function Reservations() {
         if (stockError) throw stockError;
       }
 
-      // Create sale with required fields matching schema
-      const { data: sale, error: saleError } = await supabase
-        .from("sales")
-        .insert({
-          sale_number: saleNumberData as string,
-          customer_id: reservation.customer_id,
-          user_id: user.id,
-          company_id: currentCompany?.id,
-          subtotal: subtotal,
-          discount: 0,
-          tax: 0,
-          total: reservation.total,
-          payment_method: "cash",
-          status: "completed",
-          notes: `Generada desde reserva ${reservation.reservation_number || reservation.id}`,
-        })
-        .select()
-        .single();
-      
-      if (saleError) throw saleError;
-      
-      // Create sale items with product names and company_id
-      const saleItems = items.map((item: any) => ({
-        sale_id: sale.id,
-        product_id: item.product_id,
-        product_name: item.products?.name || item.product_name || "Producto",
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        subtotal: item.subtotal,
-        company_id: currentCompany?.id,
-      }));
-      
-      const { error: itemsInsertError } = await supabase
-        .from("sale_items")
-        .insert(saleItems);
-      
-      if (itemsInsertError) throw itemsInsertError;
-
       // Update reservation status to completed
       const { error: updateError } = await supabase
         .from("reservations")
         .update({ status: "completed" })
         .eq("id", reservation.id);
-
       if (updateError) throw updateError;
     },
     onSuccess: () => {
@@ -433,37 +457,45 @@ export default function Reservations() {
 
   const generateDeliveryNoteMutation = useMutation({
     mutationFn: async (reservation: any) => {
+      // CRIT-2: Server-side status check — previene condición de carrera
+      const { data: currentRes, error: currentResError } = await supabase
+        .from("reservations")
+        .select("status")
+        .eq("id", reservation.id)
+        .eq("company_id", currentCompany?.id)
+        .single();
+      if (currentResError) throw currentResError;
+      if (currentRes.status !== "active") {
+        throw new Error(`La reserva ya no está activa (estado: ${currentRes.status})`);
+      }
+
       // Get reservation items with product names
       const { data: items, error: itemsError } = await supabase
         .from("reservation_items")
-        .select(`
-          *,
-          products(name)
-        `)
+        .select(`*, products(name)`)
         .eq("reservation_id", reservation.id);
-      
       if (itemsError) throw itemsError;
       if (!items || items.length === 0) throw new Error("No hay items en la reserva");
-      
+
       // Get customer info
       const { data: customer } = await supabase
         .from("customers")
         .select("name")
         .eq("id", reservation.customer_id)
         .single();
-      
+
       // Get user ID
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
-      
+
       // Calculate subtotal
       const subtotal = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
-      
+
       // Atomic delivery note number generation
       const { data: deliveryNumberData, error: deliveryNumberError } = await supabase.rpc("generate_delivery_number");
       if (deliveryNumberError) throw deliveryNumberError;
 
-      // Create delivery note with correct fields matching schema
+      // Create delivery note
       const { data: deliveryNote, error: deliveryError } = await supabase
         .from("delivery_notes")
         .insert({
@@ -479,10 +511,9 @@ export default function Reservations() {
         })
         .select()
         .single();
-      
       if (deliveryError) throw deliveryError;
-      
-      // Create delivery note items with product names and company_id
+
+      // Create delivery note items
       const deliveryItems = items.map((item: any) => ({
         delivery_note_id: deliveryNote.id,
         product_id: item.product_id,
@@ -492,20 +523,11 @@ export default function Reservations() {
         subtotal: item.subtotal,
         company_id: currentCompany?.id,
       }));
-      
-      const { error: itemsInsertError } = await supabase
-        .from("delivery_note_items")
-        .insert(deliveryItems);
-      
+      const { error: itemsInsertError } = await supabase.from("delivery_note_items").insert(deliveryItems);
       if (itemsInsertError) throw itemsInsertError;
 
-      // Update reservation status to completed
-      const { error: updateError } = await supabase
-        .from("reservations")
-        .update({ status: "completed" })
-        .eq("id", reservation.id);
-
-      if (updateError) throw updateError;
+      // MED-1: La reserva permanece "active" — el remito aún no implica entrega confirmada.
+      // El usuario debe completarla manualmente cuando los productos sean entregados.
     },
     onSuccess: () => {
       toast.success("Remito generado exitosamente");
@@ -519,6 +541,9 @@ export default function Reservations() {
   });
 
   const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+  const taxRate = companySettings?.default_tax_rate || 0;
+  const taxAmountDisplay = subtotal * (taxRate / 100);
+  const totalWithTax = subtotal + taxAmountDisplay;
 
   return (
     <Layout>
@@ -633,8 +658,18 @@ export default function Reservations() {
                     </Table>
                   </div>
                   {cart.length > 0 && (
-                    <div className="text-right font-bold text-lg pt-2">
-                      Total: ${Number(subtotal).toFixed(2)}
+                    <div className="text-right space-y-1 pt-2">
+                      <div className="text-sm text-muted-foreground">
+                        Subtotal: ${Number(subtotal).toFixed(2)}
+                      </div>
+                      {taxRate > 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          IVA ({taxRate}%): ${Number(taxAmountDisplay).toFixed(2)}
+                        </div>
+                      )}
+                      <div className="font-bold text-lg">
+                        Total: ${Number(totalWithTax).toFixed(2)}
+                      </div>
                     </div>
                   )}
                 </div>
