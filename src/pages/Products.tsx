@@ -163,7 +163,7 @@ export default function Products() {
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
-      let query = supabase.from("products").select("*").eq("company_id", currentCompany.id).order("created_at", { ascending: false });
+      let query = supabase.from("products").select("*").eq("company_id", currentCompany.id).eq("active", true).order("created_at", { ascending: false });
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -480,9 +480,10 @@ export default function Products() {
       if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
       if (!canDelete) throw new Error('No tienes permiso para eliminar productos en esta empresa');
       
+      // Soft delete: marcar como inactivo en lugar de borrar (evita FK conflict con ventas)
       const { error } = await supabase
         .from("products")
-        .delete()
+        .update({ active: false, updated_at: new Date().toISOString() })
         .eq("id", id)
         .eq("company_id", currentCompany.id);
       
@@ -1060,9 +1061,10 @@ export default function Products() {
 
     try {
       const productIds = Array.from(selectedProducts);
+      // Soft delete: marcar como inactivos en lugar de borrar (evita FK conflict con ventas)
       const { error } = await supabase
         .from("products")
-        .delete()
+        .update({ active: false, updated_at: new Date().toISOString() })
         .in("id", productIds);
 
       if (error) throw error;
