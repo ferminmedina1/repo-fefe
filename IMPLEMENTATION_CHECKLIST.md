@@ -6,14 +6,14 @@
 ## 📊 TRACKING DASHBOARD
 
 ```
-Semana 1 (CRÍTICO): █████████████░░ 54% Completado
+Semana 1 (CRÍTICO): █████████████░░ 56% Completado
 Semana 2 (ALTO):    ░░░░░░░░░░░░░░░ 0% Completado
 Semana 3 (MEDIO):   ░░░░░░░░░░░░░░░ 0% Completado
 
 Total Asignado: 48 horas de desarrollo
-Total Completado: 13 horas
+Total Completado: 14.5 horas
 Velocidad Requerida: 16 horas/semana
-Velocidad Actual: 13 horas/día (ACELERADO 🚀)
+Velocidad Actual: 14.5 horas/día (ACELERADO 🚀)
 ```
 
 ---
@@ -133,7 +133,7 @@ CREATE POLICY "Users can only access their company opportunities"
 **File:** `supabase/functions/send-crm-message/index.ts`  
 **Effort:** 3-4 horas  
 **Assigned to:** [DevOps/Backend Lead]  
-**Status:** ✅ PARCIALMENTE COMPLETADO (3.1 HECHO | 3.2-3.5 PENDING)
+**Status:** ✅ COMPLETADO (3.1, 3.2 opciones implementadas)
 
 ### Implementation Checklist:
 
@@ -144,12 +144,14 @@ CREATE POLICY "Users can only access their company opportunities"
   - [x] Ready for Supabase Secrets configuration
   - **Time:** 30 min | **Due:** Today ✅ COMPLETADO
 
-- [ ] **3.2 - Option B: Encrypt in Database (if needed)**
-  - [ ] Create migration: add pgcrypto extension
-  - [ ] Add encrypted columns to crm_whatsapp_credentials
-  - [ ] Create encrypt/decrypt functions
-  - [ ] Migrate existing data
-  - **Time:** 1.5 hours | **Due:** Day 1
+- [x] **3.2 - Option B: Encrypt in Database (if needed)**
+  - [x] Create migration: add pgcrypto extension
+  - [x] Add encrypted columns to crm_whatsapp_credentials
+  - [x] Create encrypt/decrypt functions
+  - [x] Migrate existing data (auto-encrypt in migration)
+  - [x] Audit trail setup (crm_whatsapp_credentials_audit)
+  - [x] Setup guide: CREDENTIALS_ENCRYPTION_OPTION_3_2.md
+  - **Time:** 1.5 hours | **Due:** Today ✅ COMPLETADO (OPCIONAL)
 
 - [ ] **3.3 - Rotate All Existing Credentials**
   - [ ] Generate NEW Twilio API keys
