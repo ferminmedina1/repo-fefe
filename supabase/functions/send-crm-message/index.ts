@@ -76,35 +76,15 @@ serve(async (req: Request) => {
     }
 
     if (channel === "whatsapp") {
-      const { data: logRow } = await supabase
-        .from("crm_message_logs")
-        .select("company_id")
-        .eq("id", log_id)
-        .single();
-
-      const companyId = logRow?.company_id as string | undefined;
-      if (!companyId) {
-        await supabase.from("crm_message_logs").update({ status: "failed", error: "Empresa no encontrada" }).eq("id", log_id);
-        return new Response(JSON.stringify({ error: "Empresa no encontrada" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const { data: creds } = await supabase
-        .from("crm_whatsapp_credentials")
-        .select("account_sid, auth_token, phone_number")
-        .eq("company_id", companyId)
-        .single();
-
-      const TWILIO_ACCOUNT_SID = creds?.account_sid;
-      const TWILIO_AUTH_TOKEN = creds?.auth_token;
-      const TWILIO_PHONE_NUMBER = creds?.phone_number;
+      // Read Twilio credentials from Supabase Secrets (environment variables)
+      const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
+      const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
+      const TWILIO_PHONE_NUMBER = Deno.env.get("TWILIO_PHONE_NUMBER");
 
       if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
         await supabase
           .from("crm_message_logs")
-          .update({ status: "failed", error: "Credenciales Twilio no configuradas" })
+          .update({ status: "failed", error: "Credenciales Twilio no configuradas en Supabase Secrets" })
           .eq("id", log_id);
         return new Response(JSON.stringify({ error: "Credenciales Twilio no configuradas" }), {
           status: 500,
