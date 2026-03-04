@@ -4,6 +4,7 @@ import { Resend } from "https://esm.sh/resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import DOMPurify from "https://esm.sh/dompurify@3.0.6";
 import { z } from "https://esm.sh/zod@3.22.4";
+import { Ratelimit } from "https://deno.land/x/upstash_ratelimit@1.0.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,6 +22,30 @@ function isValidUUID(uuid: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(uuid);
 }
+
+// 5.1 - Extract user ID from JWT token
+function extractUserIdFromJWT(authHeader: string): string | null {
+  try {
+    const token = authHeader.replace("Bearer ", "");
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    
+    const payload = JSON.parse(atob(parts[1]));
+    return payload.sub || null;
+  } catch {
+    return null;
+  }
+}
+
+// 5.1 - Initialize Upstash rate limiter (10 requests per minute per user)
+const ratelimit = new Ratelimit({
+  redis: {
+    token: Deno.env.get("UPSTASH_REDIS_REST_TOKEN") ?? "",
+    url: Deno.env.get("UPSTASH_REDIS_REST_URL") ?? "",
+  },
+  limiter: Ratelimit.slidingWindow(10, "60 s"), // 10 requests per minute
+  prefix: "crm_message", // Namespace for rate limit keys
+});
 
 // 4.1 - Zod Validation Schema
 const messageRequestSchema = z.object({
@@ -52,7 +77,39 @@ serve(async (req: Request) => {
   }
 
   try {
+    // 5.2 - Extract user ID from JWT and check rate limit
     const authHeader = req.headers.get("Authorization") ?? "";
+    const userId = extractUserIdFromJWT(authHeader);
+    
+    if (userId) {
+      try {
+        const rateLimitResult = await ratelimit.limit(userId);
+        
+        if (!rateLimitResult.success) {
+          // Rate limited: return 429 with Retry-After header
+          const retryAfter = Math.ceil((rateLimitResult.resetMs - Date.now()) / 1000);
+          return new Response(
+            JSON.stringify({
+              error: "Límite de tasa excedido",
+              message: "Has excedido el límite de 10 solicitudes por minuto",
+              retryAfter,
+            }),
+            {
+              status: 429,
+              headers: {
+                ...corsHeaders,
+                "Content-Type": "application/json",
+                "Retry-After": Math.max(1, retryAfter).toString(),
+              },
+            }
+          );
+        }
+      } catch (rateLimitError) {
+        // If rate limiting fails, log but don't block (fail open)
+        console.error("Rate limit check failed:", rateLimitError);
+      }
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
