@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import DOMPurify from "https://esm.sh/dompurify@3.0.6";
+import { z } from "https://esm.sh/zod@3.22.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,28 @@ function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
+
+// UUID validation regex
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
+// 4.1 - Zod Validation Schema
+const messageRequestSchema = z.object({
+  log_id: z.string()
+    .uuid("log_id debe ser un UUID válido"),
+  channel: z.enum(["email", "whatsapp"])
+    .refine((v) => v !== undefined, "channel debe ser 'email' o 'whatsapp'"),
+  recipient: z.string()
+    .email("recipient debe ser un email válido"),
+  subject: z.string().optional().nullable(),
+  body: z.string()
+    .min(1, "body no puede estar vacío")
+    .max(5000, "body no puede exceder 5000 caracteres"),
+});
+
+type MessageRequest = z.infer<typeof messageRequestSchema>;
 
 interface CRMMessageRequest {
   log_id: string;
@@ -36,16 +59,31 @@ serve(async (req: Request) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const payload = (await req.json()) as CRMMessageRequest;
-    const { log_id, channel, recipient, subject, body } = payload;
-
-    // Validate required fields
-    if (!log_id || !channel || !recipient || !body) {
-      return new Response(JSON.stringify({ error: "Parámetros inválidos" }), {
+    // 4.2 - Parse and validate request body with Zod schema
+    let payload: MessageRequest;
+    try {
+      const rawPayload = await req.json();
+      payload = messageRequestSchema.parse(rawPayload);
+    } catch (error) {
+      // Handle Zod validation errors
+      if (error instanceof z.ZodError) {
+        const errorMessages = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ");
+        return new Response(JSON.stringify({ 
+          error: "Validación fallida",
+          details: errorMessages 
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Handle JSON parse errors
+      return new Response(JSON.stringify({ error: "JSON inválido" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const { log_id, channel, recipient, subject, body } = payload;
 
     // 7.1 - Validate email format
     if (!isValidEmail(recipient)) {
