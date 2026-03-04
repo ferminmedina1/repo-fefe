@@ -111,9 +111,25 @@ serve(async (req: Request) => {
       }
 
       // Decrypt credentials using database function
+      // Encryption key comes from Supabase Secrets
+      const ENCRYPTION_KEY = Deno.env.get("ENCRYPTION_KEY");
+      if (!ENCRYPTION_KEY) {
+        await supabase.from("crm_message_logs").update({ 
+          status: "failed", 
+          error: "Encryption key not configured (contact admin)" 
+        }).eq("id", log_id);
+        return new Response(JSON.stringify({ error: "Configuration error" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const { data: decryptedCreds, error: decryptError } = await supabase.rpc(
         "decrypt_whatsapp_credentials",
-        { row_id: credsEncrypted.id }
+        { 
+          row_id: credsEncrypted.id,
+          encryption_key: ENCRYPTION_KEY
+        }
       );
 
       if (decryptError || !decryptedCreds || decryptedCreds.length === 0) {
