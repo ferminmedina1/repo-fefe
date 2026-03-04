@@ -26,7 +26,9 @@ ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN DEFAULT FALSE;
 -- - Pero todas se encriptan con la MISMA ENCRYPTION_KEY
 -- - Solo el desarrollador/DevOps conoce esta key
 -- 
--- Set encryption key via: supabase secrets set ENCRYPTION_KEY "b6vzqR9ZXwGpUFOarJo08yhtgCsH7YAxME2nNm4dlcQ3fKBu"
+-- ⚠️ SI YA EXISTE UN SECRET "ENCRYPTION_KEY": Usa ese existente (NO lo cambies)
+-- 📝 SI NO EXISTE: Genera una nueva key y ejecuta:
+--    supabase secrets set ENCRYPTION_KEY "tu-key-generada-aleatoria-minimo-32-chars"
 
 -- Step 4: Create encryption function
 -- Takes encryption_key as parameter (passed from edge function)
@@ -253,9 +255,11 @@ USING (
 -- ❌ NO auto-encryption on INSERT (PostgreSQL cannot read Supabase Secrets)
 
 -- Next steps:
--- 1. Set ENCRYPTION_KEY in Supabase Secrets:
---    supabase secrets set ENCRYPTION_KEY "b6vzqR9ZXwGpUFOarJo08yhtgCsH7YAxME2nNm4dlcQ3fKBu"
---    (Esta es UNA key GLOBAL que encripta credenciales de TODAS las empresas)
+-- 1. Verificar ENCRYPTION_KEY en Supabase Secrets:
+--    supabase secrets list
+--    ✅ Si existe: Usa ese (NO lo cambies si ya hay datos encriptados)
+--    ❌ Si NO existe: Genera una key aleatoria y ejecuta:
+--       supabase secrets set ENCRYPTION_KEY "tu-key-generada-min-32-chars"
 -- 2. Deploy this migration: supabase db push
 -- 3. Deploy edge function: supabase functions deploy send-crm-message
 -- 4. Edge function send-crm-message already:

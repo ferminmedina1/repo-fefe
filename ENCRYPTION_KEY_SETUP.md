@@ -33,23 +33,58 @@
 
 ---
 
-## 🎯 Tu ENCRYPTION_KEY Generada
+## 🎯 Tu ENCRYPTION_KEY 
+
+### ✅ Si YA tienes `ENCRYPTION_KEY` en Supabase Secrets:
+
+**USA EL EXISTENTE - NO lo cambies**
+
+Razón: Si ya hay credenciales encriptadas con esa key, cambiarla haría imposible desencriptarlas.
+
+### 🆕 Si NO tienes `ENCRYPTION_KEY`:
+
+Usa esta key generada aleatoriamente:
 
 ```
 b6vzqR9ZXwGpUFOarJo08yhtgCsH7YAxME2nNm4dlcQ3fKBu
+```
+
+O genera una nueva con:
+```powershell
+-join ((65..90) + (97..122) + (48..57) | Get-Random -Count 48 | ForEach-Object {[char]$_})
 ```
 
 **⚠️ IMPORTANTE: Guarda esta key en un lugar seguro (1Password, Bitwarden, etc.)**
 
 ---
 
-## 📝 Paso 1: Guardar en Supabase Secrets
+## 📝 Paso 1: Verificar Secret Existente
 
+⚠️ **SI YA TIENES UN `ENCRYPTION_KEY` EN SUPABASE SECRETS:**
+
+**✅ USA EL EXISTENTE - NO LO CAMBIES**
+
+Verificar si existe:
+```powershell
+# Ver todas las secrets
+supabase secrets list
+```
+
+Si ves `ENCRYPTION_KEY` en la lista:
+- ✅ **Perfecto, usa esa key existente**
+- ❌ **NO ejecutes `supabase secrets set` de nuevo**
+- ❌ **NO cambies la key si ya hay datos encriptados**
+
+---
+
+**SI NO EXISTE `ENCRYPTION_KEY`:**
+
+Crear el secret:
 ```powershell
 # Conectar a tu proyecto Supabase
 supabase link --project-ref tu-project-ref
 
-# Guardar la encryption key
+# Guardar la encryption key NUEVA
 supabase secrets set ENCRYPTION_KEY "b6vzqR9ZXwGpUFOarJo08yhtgCsH7YAxME2nNm4dlcQ3fKBu"
 ```
 
