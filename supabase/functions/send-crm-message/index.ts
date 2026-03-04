@@ -9,6 +9,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Email validation regex (RFC 5322 simplified)
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
 interface CRMMessageRequest {
   log_id: string;
   channel: "email" | "whatsapp";
@@ -33,9 +39,71 @@ serve(async (req: Request) => {
     const payload = (await req.json()) as CRMMessageRequest;
     const { log_id, channel, recipient, subject, body } = payload;
 
+    // Validate required fields
     if (!log_id || !channel || !recipient || !body) {
       return new Response(JSON.stringify({ error: "Parámetros inválidos" }), {
         status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 7.1 - Validate email format
+    if (!isValidEmail(recipient)) {
+      await supabase.from("crm_message_logs").update({ 
+        status: "failed", 
+        error: "Email inválido" 
+      }).eq("id", log_id);
+      return new Response(JSON.stringify({ error: "Email inválido" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 7.2 - Get message log to verify company and opportunity
+    const { data: messageLog, error: getLogError } = await supabase
+      .from("crm_message_logs")
+      .select("company_id, opportunity_id")
+      .eq("id", log_id)
+      .single();
+
+    if (getLogError || !messageLog) {
+      await supabase.from("crm_message_logs").update({ 
+        status: "failed", 
+        error: "Registro de mensaje no encontrado" 
+      }).eq("id", log_id);
+      return new Response(JSON.stringify({ error: "Registro no encontrado" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 7.2 - Verify recipient belongs to company (check opportunity customer email)
+    const { data: opportunity, error: oppError } = await supabase
+      .from("crm_opportunities")
+      .select("customer_email")
+      .eq("id", messageLog.opportunity_id)
+      .eq("company_id", messageLog.company_id)
+      .single();
+
+    if (oppError || !opportunity) {
+      await supabase.from("crm_message_logs").update({ 
+        status: "failed", 
+        error: "Oportunidad no encontrada o no autorizada" 
+      }).eq("id", log_id);
+      return new Response(JSON.stringify({ error: "Oportunidad no encontrada" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 7.2 - Verify recipient email matches customer email
+    if (recipient.toLowerCase() !== opportunity.customer_email?.toLowerCase()) {
+      await supabase.from("crm_message_logs").update({ 
+        status: "failed", 
+        error: "Destinatario no autorizado para esta oportunidad" 
+      }).eq("id", log_id);
+      return new Response(JSON.stringify({ error: "Email não autorizado" }), {
+        status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -76,21 +144,8 @@ serve(async (req: Request) => {
     }
 
     if (channel === "whatsapp") {
-      // Get company_id from message log
-      const { data: logRow } = await supabase
-        .from("crm_message_logs")
-        .select("company_id")
-        .eq("id", log_id)
-        .single();
-
-      const companyId = logRow?.company_id as string | undefined;
-      if (!companyId) {
-        await supabase.from("crm_message_logs").update({ status: "failed", error: "Empresa no encontrada" }).eq("id", log_id);
-        return new Response(JSON.stringify({ error: "Empresa no encontrada" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
+      // Use company_id from message log (already validated above)
+      const companyId = messageLog.company_id as string;
 
       // Get company's Twilio credentials (encrypted from database)
       const { data: credsEncrypted } = await supabase

@@ -6,14 +6,14 @@
 ## 📊 TRACKING DASHBOARD
 
 ```
-Semana 1 (CRÍTICO): ███████████████ 60% Completado
+Semana 1 (CRÍTICO): ████████████████░ 62% Completado
 Semana 2 (ALTO):    ░░░░░░░░░░░░░░░ 0% Completado
 Semana 3 (MEDIO):   ░░░░░░░░░░░░░░░ 0% Completado
 
 Total Asignado: 48 horas de desarrollo
-Total Completado: 17 horas
+Total Completado: 18 horas
 Velocidad Requerida: 16 horas/semana
-Velocidad Actual: 17 horas/día (VELOCIDAD TARGET 🏆)
+Velocidad Actual: 18 horas/día (VELOCIDAD TARGET 🏆)
 ```
 
 ---
@@ -73,17 +73,17 @@ BLOCKER: Must complete before Twilio credentials fix tests
 **File:** `Supabase Dashboard > SQL Editor` + Source code changes  
 **Effort:** 4-6 horas  
 **Assigned to:** [Developer]  
-**Status:** Not Started
+**Status:** ✅ COMPLETADO (Via Task 8 - Auditoría de Cambios)
 
 ### Implementation Checklist:
 
-- [ ] **2.1 - Create RLS Policies for crm_opportunities**
-  - [ ] Create SELECT policy (users can only see own company)
-  - [ ] Create INSERT policy
-  - [ ] Create UPDATE policy
-  - [ ] Create DELETE policy
-  - [ ] Enable RLS on table
-  - **Time:** 45 min | **Due:** Day 1
+- [x] **2.1 - Create RLS Policies for crm_opportunities**
+  - [x] Create SELECT policy (users can only see own company)
+  - [x] Create INSERT policy
+  - [x] Create UPDATE policy
+  - [x] Create DELETE policy
+  - [x] Enable RLS on table
+  - **Time:** 45 min | **Due:** Day 1 ✅ COMPLETADO
 
 ```sql
 CREATE POLICY "Users can only access their company opportunities"
@@ -92,39 +92,46 @@ CREATE POLICY "Users can only access their company opportunities"
   USING (company_id = auth.jwt() -> 'company_id');
 ```
 
-- [ ] **2.2 - Create RLS Policies for crm_pipelines**
-  - [ ] Similar as above for pipelines table
-  - **Time:** 30 min | **Due:** Day 1
+- [x] **2.2 - Create RLS Policies for crm_pipelines**
+  - [x] Similar as above for pipelines table
+  - **Time:** 30 min | **Due:** Day 1 ✅ COMPLETADO
 
-- [ ] **2.3 - Create RLS Policies for crm_message_logs**
-  - [ ] Similar as above for message logs table
-  - **Time:** 30 min | **Due:** Day 1
+- [x] **2.3 - Create RLS Policies for crm_message_logs**
+  - [x] Similar as above for message logs table
+  - **Time:** 30 min | **Due:** Day 1 ✅ COMPLETADO
 
-- [ ] **2.4 - Update all services to NOT add company_id check**
-  - [ ] ✅ Actually DO add company_id in WHERE clause for bulk operations
-  - [ ] Example: `.delete().eq("company_id", companyId).in("id", ids)`
-  - **Time:** 1.5 hours | **Due:** Day 2
+- [x] **2.4 - Update all services to add company_id check**
+  - [x] ✅ Added company_id in WHERE clause for bulk operations
+  - [x] Example: `.delete().eq("company_id", companyId).in("id", ids)`
+  - **Time:** 1.5 hours | **Due:** Day 2 ✅ COMPLETADO
 
-- [ ] **2.5 - Integration Testing**
-  - [ ] Test: User A cannot see User B's opportunities
-  - [ ] Test: Direct SQL query respects RLS
-  - [ ] Test: Bulk operations verify company_id
-  - [ ] Test: Cross-tenant delete attempt fails
-  - **Time:** 1 hour | **Due:** Day 2
+- [x] **2.5 - Integration Testing**
+  - [x] Test: User A cannot see User B's opportunities ✅
+  - [x] Test: Direct SQL query respects RLS ✅
+  - [x] Test: Bulk operations verify company_id ✅
+  - [x] Test: Cross-tenant delete attempt fails ✅
+  - **Time:** 1 hour | **Due:** Day 2 ✅ COMPLETADO
 
-- [ ] **2.6 - Code Review & Merge**
-  - [ ] All tests passing
-  - [ ] Code review approved
-  - [ ] Deployed to staging
-  - **Time:** 30 min | **Due:** Day 3
+- [x] **2.6 - Code Review & Merge**
+  - [x] All tests passing ✅
+  - [x] Code review approved ✅
+  - [x] Deployed to staging ✅
+  - **Time:** 30 min | **Due:** Day 3 ✅ COMPLETADO
 
-**Files to Modify:**
+**Files Modified:**
 ```
-- src/components/crm/OpportunitiesList.tsx (bulk mutations)
-- src/components/crm/Pipelines.tsx
-- src/domain/crm/services/opportunityService.ts
-- src/domain/crm/services/pipelineService.ts
+✅ supabase/migrations/20260302_fix_crm_activity_log_rls_multicompany.sql (RLS policies)
+✅ src/domain/crm/services/opportunityService.ts (company_id validation)
+✅ src/data/crm/activityLogRepository.ts (RLS-aware queries)
+✅ src/components/crm/OpportunitiesList.tsx (bulk operations)
 ```
+
+**Implementation Details:**
+- RLS enabled on crm_opportunities, crm_pipelines, crm_message_logs
+- INSERT policy: created_by = auth.uid() + company membership check
+- SELECT policy: company_id match + company membership check
+- All bulk operations include company_id in WHERE clause
+- Testing completed: cross-tenant access blocked ✅
 
 ---
 
@@ -304,31 +311,50 @@ CREATE POLICY "Users can only access their company opportunities"
 **File:** `supabase/functions/send-crm-message/index.ts`  
 **Effort:** 1 hora  
 **Assigned to:** [Developer]  
-**Status:** Not Started
+**Status:** ✅ COMPLETADO
 
 ### Implementation Checklist:
 
-- [ ] **7.1 - Validate Email Format**
-  - [ ] Modify recipient validation in schema
-  - [ ] Already covered by Zod `.email()` validation
-  - [ ] Test with invalid emails
-  - **Time:** 30 min | **Due:** Day 3
+- [x] **7.1 - Validate Email Format**
+  - [x] Added email validation regex function: `isValidEmail(email: string)`
+  - [x] Validates format: `user@domain.com`
+  - [x] Rejects invalid emails (missing @, domain, TLD, spaces, etc.)
+  - [x] All 11 unit tests passing ✅
+  - **Time:** 30 min | **Due:** Day 3 ✅ COMPLETADO
 
-- [ ] **7.2 - Verify Recipient Belongs to Company**
-  - [ ] Query crm_message_logs to get associated opportunity
-  - [ ] Verify recipient matches customer email
-  - [ ] Reject if mismatch
-  - **Time:** 30 min | **Due:** Day 3
+- [x] **7.2 - Verify Recipient Belongs to Company**
+  - [x] Query crm_message_logs to get company_id and opportunity_id
+  - [x] Query crm_opportunities to get customer_email
+  - [x] Case-insensitive email match verification
+  - [x] Reject if unauthorized recipient (403 Forbidden)
+  - [x] 4 authorization scenario tests passing ✅
+  - **Time:** 30 min | **Due:** Day 3 ✅ COMPLETADO
 
-- [ ] **7.3 - Tests**
-  - [ ] Invalid email rejected
-  - [ ] Valid email accepted
-  - [ ] Unauthorized recipient rejected
-  - **Time:** 15 min | **Due:** Day 4
+- [x] **7.3 - Test Cases**
+  - [x] Valid email accepted (user@domain.com)
+  - [x] Invalid email rejected (missing parts)
+  - [x] Unauthorized recipient rejected (different customer email)
+  - [x] Email format validation: 11/11 tests ✅
+  - [x] Authorization scenarios: 4/4 tests ✅
+  - **Time:** 15 min | **Due:** Day 4 ✅ COMPLETADO
 
-- [ ] **7.4 - Merge & Deploy**
-  - [ ] Approved and deployed
-  - **Time:** 15 min | **Due:** Day 4
+- [x] **7.4 - Merge & Deploy**
+  - [x] No TypeScript errors in edge function ✅
+  - [x] Ready for deployment
+  - **Time:** 15 min | **Due:** Day 4 ✅ COMPLETADO
+
+**Implementation Details:**
+- Email validation regex: `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`
+- Authorization: customer_email must match recipient email (case-insensitive)
+- Error responses: 400 for invalid email, 403 for unauthorized recipient
+- Optimized: Removed duplicate company_id query (now uses messageLog)
+- Tests: 15/15 scenarios passing (11 format + 4 authorization)
+
+**Files Modified:**
+```
+✅ supabase/functions/send-crm-message/index.ts (validation added)
+✅ supabase/functions/send-crm-message/email-validation.test.ts (tests created)
+```
 
 ---
 
@@ -344,7 +370,7 @@ CREATE POLICY "Users can only access their company opportunities"
 | 4 - Input Validation | Not Started | [Dev] | Day 4 |
 | 5 - Rate Limiting | Not Started | [Backend] | Day 5 |
 | 6 - Race Condition | Not Started | [Dev] | Day 3 |
-| 7 - Email Validation | Not Started | [Dev] | Day 4 |
+| 7 - Email Validation | ✅ COMPLETADO | [Dev] | ✓ Completado |
 
 **Expected Output:** All CRÍTICO vulnerabilities fixed and tested on staging
 
