@@ -15,12 +15,14 @@ ADD COLUMN IF NOT EXISTS phone_number_encrypted BYTEA,
 ADD COLUMN IF NOT EXISTS encrypted_at TIMESTAMP DEFAULT NULL,
 ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN DEFAULT FALSE;
 
--- Step 3: Encryption key comes from Supabase Vault
--- Set via: supabase secrets set ENCRYPTION_KEY "your-secret-key"
--- PostgreSQL reads it from app.settings.encryption_key configuration
+-- Step 3: About encryption key
+-- IMPORTANT: PostgreSQL CANNOT read Supabase Secrets directly
+-- Supabase Secrets (Vault) are ONLY accessible from Edge Functions via Deno.env.get()
+-- PostgreSQL functions receive the key as a parameter from edge functions
+-- Set encryption key via: supabase secrets set ENCRYPTION_KEY "your-secret-key-min-32-chars"
 
 -- Step 4: Create encryption function
--- Encryption key must be set via: supabase secrets set ENCRYPTION_KEY "your-key"
+-- Takes encryption_key as parameter (passed from edge function)
 CREATE OR REPLACE FUNCTION encrypt_credential(plaintext TEXT, encryption_key TEXT)
 RETURNS BYTEA AS $$
 BEGIN
@@ -102,23 +104,20 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Step 8: Migrate existing data (encrypt all unencrypted credentials)
--- NOTE: This will encrypt with a default key if ENCRYPTION_KEY env var is not set
--- For production, run this AFTER setting: supabase secrets set ENCRYPTION_KEY "your-key"
+-- NOTE: This uses a TEMPORARY dev key since PostgreSQL cannot read Supabase Secrets
+-- For production: After deployment, re-encrypt via edge function with real key from Vault
+-- Or run: SELECT encrypt_whatsapp_credentials(id, 'your-real-key') for each credential
 DO $$
 DECLARE
   v_record RECORD;
   v_encryption_key TEXT;
   v_count INTEGER := 0;
 BEGIN
-  -- Try to get encryption key from environment variable
-  -- This works when deploying via Supabase CLI with secrets set
-  v_encryption_key := current_setting('app.settings.encryption_key', true);
+  -- Use temporary development key for initial migration
+  -- PostgreSQL CANNOT read Supabase Secrets - this is a migration-only key
+  v_encryption_key := 'temp-migration-key-12345678901234567890';
   
-  -- If not set, use a temporary development key (CHANGE IN PRODUCTION)
-  IF v_encryption_key IS NULL OR v_encryption_key = '' THEN
-    v_encryption_key := 'temp-dev-key-12345678901234567890';
-    RAISE WARNING 'Using temporary development encryption key. Set ENCRYPTION_KEY in Supabase Secrets for production.';
-  END IF;
+  RAISE WARNING 'Migrating with temporary key. Re-encrypt in production with: SELECT encrypt_whatsapp_credentials(id, real_key)';
 
   -- Encrypt all unencrypted records
   FOR v_record IN
@@ -193,45 +192,33 @@ AFTER UPDATE ON crm_whatsapp_credentials
 FOR EACH ROW
 EXECUTE FUNCTION audit_credential_access();
 
--- Step 11.5: Auto-encrypt on INSERT/UPDATE
--- When companies add credentials via UI, they get encrypted automatically
-CREATE OR REPLACE FUNCTION auto_encrypt_credentials()
-RETURNS TRIGGER AS $$
-DECLARE
-  v_encryption_key TEXT;
-BEGIN
-  -- Get encryption key from Supabase configuration
-  v_encryption_key := current_setting('app.settings.encryption_key', true);
-  
-  -- If not set in database config, skip encryption (will be encrypted by edge function)
-  IF v_encryption_key IS NULL OR v_encryption_key = '' THEN
-    RETURN NEW;
-  END IF;
-  
-  -- Only encrypt if credentials are provided and not already encrypted
-  IF (NEW.account_sid IS NOT NULL AND NEW.account_sid_encrypted IS NULL) OR
-     (NEW.auth_token IS NOT NULL AND NEW.auth_token_encrypted IS NULL) OR
-     (NEW.phone_number IS NOT NULL AND NEW.phone_number_encrypted IS NULL) THEN
-    
-    NEW.account_sid_encrypted := encrypt_credential(NEW.account_sid, v_encryption_key);
-    NEW.auth_token_encrypted := encrypt_credential(NEW.auth_token, v_encryption_key);
-    NEW.phone_number_encrypted := encrypt_credential(NEW.phone_number, v_encryption_key);
-    NEW.encrypted_at := NOW();
-    NEW.is_encrypted := TRUE;
-  END IF;
-  
-  RETURN NEW;
-EXCEPTION WHEN OTHERS THEN
-  -- If encryption fails, log but don't block operation
-  RAISE WARNING 'Auto-encryption failed: %. Credentials stored unencrypted.', SQLERRM;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trigger_auto_encrypt_credentials
-BEFORE INSERT OR UPDATE ON crm_whatsapp_credentials
-FOR EACH ROW
-EXECUTE FUNCTION auto_encrypt_credentials();
+-- Step 11.5: Encryption workflow for new credentials
+-- IMPORTANT: Credentials are NOT auto-encrypted on INSERT
+-- Reason: PostgreSQL cannot read Supabase Secrets (encryption key)
+-- 
+-- Encryption happens in two ways:
+-- 1. When sending messages: Edge function decrypts with key from Deno.env.get('ENCRYPTION_KEY')
+-- 2. When adding credentials: Frontend calls edge function that encrypts before INSERT
+--
+-- Example edge function for encrypting new credentials:
+-- 
+-- export default async (req: Request) => {
+--   const { company_id, account_sid, auth_token, phone_number } = await req.json();
+--   const ENCRYPTION_KEY = Deno.env.get("ENCRYPTION_KEY");
+--   
+--   // Insert plaintext first
+--   const { data: newCred } = await supabase
+--     .from('crm_whatsapp_credentials')
+--     .insert({ company_id, account_sid, auth_token, phone_number })
+--     .select('id')
+--     .single();
+--   
+--   // Then encrypt it
+--   await supabase.rpc('encrypt_whatsapp_credentials', {
+--     row_id: newCred.id,
+--     encryption_key: ENCRYPTION_KEY
+--   });
+-- }
 
 -- Step 12: Grant permissions (RLS should handle this)
 -- Ensure users can only decrypt their own company's credentials
@@ -251,15 +238,24 @@ USING (
 -- Summary of changes:
 -- ✅ pgcrypto extension enabled
 -- ✅ Encrypted columns added (account_sid_encrypted, auth_token_encrypted, phone_number_encrypted)
--- ✅ Encryption/decryption functions created
--- ✅ Existing data migration (auto-encrypt all records)
+-- ✅ Encryption/decryption functions created (require encryption_key parameter)
+-- ✅ Existing data migration (encrypted with temp key - re-encrypt in production)
 -- ✅ Audit trail for encryption events
 -- ✅ RLS policies to restrict access
 -- ✅ Index on is_encrypted for performance
+-- ❌ NO auto-encryption on INSERT (PostgreSQL cannot read Supabase Secrets)
 
 -- Next steps:
 -- 1. Set ENCRYPTION_KEY in Supabase Secrets: supabase secrets set ENCRYPTION_KEY "your-secret-key-min-32-chars"
 -- 2. Deploy this migration: supabase db push
--- 3. Verify encryption: SELECT * FROM decrypt_whatsapp_credentials('credential-uuid', 'your-key');
--- 4. Edge function already reads ENCRYPTION_KEY from Deno.env.get() and passes to decrypt function
--- 5. Companies can now add their Twilio credentials via Settings UI (will auto-encrypt on INSERT)
+-- 3. Deploy edge function: supabase functions deploy send-crm-message
+-- 4. Edge function send-crm-message already:
+--    - Reads ENCRYPTION_KEY from Deno.env.get()
+--    - Calls decrypt_whatsapp_credentials(row_id, encryption_key)
+--    - Uses decrypted credentials to send WhatsApp messages
+-- 5. For NEW credentials: Create edge function to encrypt before storing
+--    - Frontend calls edge function with plaintext credentials
+--    - Edge function inserts + calls encrypt_whatsapp_credentials(row_id, ENCRYPTION_KEY)
+-- 6. Re-encrypt existing credentials with production key:
+--    - Call encrypt_whatsapp_credentials(credential_id, real_encryption_key) for each
+--    - Or create migration edge function to batch re-encrypt
