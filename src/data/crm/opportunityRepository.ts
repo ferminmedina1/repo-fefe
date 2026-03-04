@@ -111,6 +111,22 @@ export const opportunityRepository = {
     return toOpportunityDTO(row);
   },
 
+  async updateWithOptimisticLocking(id: string, values: OpportunityUpdate, expectedUpdatedAt: string) {
+    const { data, error } = await supabase
+      .from("crm_opportunities")
+      .update(values)
+      .eq("id", id)
+      .eq("updated_at", expectedUpdatedAt)
+      .select("*");
+    if (error) throw error;
+    const row = data?.[0];
+    if (!row) {
+      // Returns null to indicate concurrent update detected
+      return null;
+    }
+    return toOpportunityDTO(row);
+  },
+
   async updateSilently(id: string, values: OpportunityUpdate) {
     const { error } = await supabase
       .from("crm_opportunities")

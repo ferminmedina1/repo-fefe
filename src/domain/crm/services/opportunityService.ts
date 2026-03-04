@@ -32,10 +32,53 @@ const applyScoringForOpportunity = async (opportunity: OpportunityDTO) => {
   }
 
   const now = new Date().toISOString();
+  
+  // Use optimistic locking with retry logic
+  let maxRetries = 3;
+  let retryCount = 0;
+  let updated = null;
+
+  while (retryCount < maxRetries) {
+    updated = await opportunityRepository.updateWithOptimisticLocking(opportunity.id, {
+      score_total: total,
+      score_updated_at: now,
+    }, opportunity.updatedAt);
+
+    if (updated !== null) {
+      // Update succeeded
+      return { ...updated, scoreTotal: total, scoreUpdatedAt: now };
+    }
+
+    // Concurrent update detected, retry with fresh data
+    retryCount++;
+    if (retryCount < maxRetries) {
+      const fresh = await opportunityRepository.getById(opportunity.id);
+      opportunity = fresh;
+      // Re-compute score with fresh data
+      const freshTotal = rules.length
+        ? scoringRuleService.computeScore(
+            fresh,
+            rules.map((rule) => ({
+              field: rule.field,
+              operator: rule.operator,
+              value: rule.value,
+              points: rule.points,
+            }))
+          )
+        : 0;
+
+      if (fresh.scoreTotal === freshTotal && fresh.scoreUpdatedAt) {
+        return fresh;
+      }
+    }
+  }
+
+  // After max retries, do a final silent update without optimistic locking
   await opportunityRepository.updateSilently(opportunity.id, {
     score_total: total,
     score_updated_at: now,
   });
+  
   return { ...opportunity, scoreTotal: total, scoreUpdatedAt: now };
 };
 
@@ -82,9 +125,33 @@ export const opportunityService = {
   },
 
   async update(id: string, values: OpportunityUpdate) {
-    // Fetch current state before updating to detect changes
-    const before = await opportunityRepository.getById(id);
-    const updated = await opportunityRepository.update(id, values);
+    // Use optimistic locking with retry mechanism
+    const maxRetries = 3;
+    let retryCount = 0;
+    let before = await opportunityRepository.getById(id);
+    let updated = null;
+
+    while (retryCount < maxRetries) {
+      updated = await opportunityRepository.updateWithOptimisticLocking(id, values, before.updatedAt);
+      
+      if (updated !== null) {
+        // Update succeeded, break retry loop
+        break;
+      }
+
+      // Concurrent update detected, retry with fresh data
+      retryCount++;
+      if (retryCount < maxRetries) {
+        before = await opportunityRepository.getById(id);
+      }
+    }
+
+    // If all retries failed, do one final attempt without optimistic locking
+    if (updated === null) {
+      updated = await opportunityRepository.update(id, values);
+    }
+
+    before = before || (await opportunityRepository.getById(id));
 
     // Detect changed fields and build activity log entries
     const logEntries: Array<{ action: string; payload: Record<string, unknown> }> = [];
