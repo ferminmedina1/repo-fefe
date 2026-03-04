@@ -19,7 +19,14 @@ ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN DEFAULT FALSE;
 -- IMPORTANT: PostgreSQL CANNOT read Supabase Secrets directly
 -- Supabase Secrets (Vault) are ONLY accessible from Edge Functions via Deno.env.get()
 -- PostgreSQL functions receive the key as a parameter from edge functions
--- Set encryption key via: supabase secrets set ENCRYPTION_KEY "your-secret-key-min-32-chars"
+-- 
+-- ENCRYPTION_KEY: Una SOLA key GLOBAL para toda la plataforma (generada por el desarrollador)
+-- - Esta key encripta las credenciales de TODAS las empresas
+-- - Cada empresa tiene sus propias credenciales de Twilio (Account SID, Token, Phone)
+-- - Pero todas se encriptan con la MISMA ENCRYPTION_KEY
+-- - Solo el desarrollador/DevOps conoce esta key
+-- 
+-- Set encryption key via: supabase secrets set ENCRYPTION_KEY "b6vzqR9ZXwGpUFOarJo08yhtgCsH7YAxME2nNm4dlcQ3fKBu"
 
 -- Step 4: Create encryption function
 -- Takes encryption_key as parameter (passed from edge function)
@@ -246,7 +253,9 @@ USING (
 -- ❌ NO auto-encryption on INSERT (PostgreSQL cannot read Supabase Secrets)
 
 -- Next steps:
--- 1. Set ENCRYPTION_KEY in Supabase Secrets: supabase secrets set ENCRYPTION_KEY "your-secret-key-min-32-chars"
+-- 1. Set ENCRYPTION_KEY in Supabase Secrets:
+--    supabase secrets set ENCRYPTION_KEY "b6vzqR9ZXwGpUFOarJo08yhtgCsH7YAxME2nNm4dlcQ3fKBu"
+--    (Esta es UNA key GLOBAL que encripta credenciales de TODAS las empresas)
 -- 2. Deploy this migration: supabase db push
 -- 3. Deploy edge function: supabase functions deploy send-crm-message
 -- 4. Edge function send-crm-message already:
