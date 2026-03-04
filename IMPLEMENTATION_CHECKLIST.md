@@ -152,13 +152,16 @@ CREATE POLICY "Users can only access their company opportunities"
   - [x] Setup guide: CREDENTIALS_ENCRYPTION_OPTION_3_2.md
   - **Status:** SELECTED as primary ✅ COMPLETADO
 
-- [x] **3.3 - Update Edge Function**
+- [x] **3.3 - Update Edge Function + Production Fix**
   - [x] Refactor to read from encrypted DB
   - [x] Get company_id from message log
   - [x] Call decrypt_whatsapp_credentials() RPC
   - [x] Use plaintext in-memory only
+  - [x] **PRODUCTION FIX:** Removed invalid Deno.env() from SQL functions
+  - [x] Pass encryption_key as explicit parameter from edge function
+  - [x] Added auto-encryption trigger for INSERT/UPDATE
   - [x] Verified no errors
-  - **Time:** 0.5 hours | **Due:** Today ✅ COMPLETADO
+  - **Time:** 1 hour | **Due:** Today ✅ COMPLETADO
 
 - [x] **3.4 - Create Company Setup Guide**
   - [x] COMPANY_TWILIO_SETUP.md (for end users)
@@ -337,7 +340,7 @@ CREATE POLICY "Users can only access their company opportunities"
 |------|--------|----------|-----|
 | 1 - XSS Fix | ✅ COMPLETADO | [Dev] | ✓ Completado |
 | 2 - RLS Policies | ✅ COMPLETADO | [Dev] | ✓ Completado |
-| 3 - Credentials Encrypt | Not Started | [DevOps] | Day 3 |
+| 3 - Credentials Encrypt | 🔄 Code Complete (Deploy Pending) | [DevOps] | ✓ Day 3 |
 | 4 - Input Validation | Not Started | [Dev] | Day 4 |
 | 5 - Rate Limiting | Not Started | [Backend] | Day 5 |
 | 6 - Race Condition | Not Started | [Dev] | Day 3 |
