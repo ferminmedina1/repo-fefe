@@ -6,10 +6,41 @@ import DOMPurify from "https://esm.sh/dompurify@3.0.6";
 import { z } from "https://esm.sh/zod@3.22.4";
 import { Ratelimit } from "https://deno.land/x/upstash_ratelimit@1.0.0/mod.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// 9.1 - CORS Restrictive Policy: Allowed origins from environment
+const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+  .split(",")
+  .map(origin => origin.trim())
+  .filter(origin => origin.length > 0);
+
+// Fallback to localhost for development if no origins configured
+const DEFAULT_DEV_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:3000",
+];
+
+// 9.2 - Get CORS headers based on request origin
+function getCorsHeaders(requestOrigin: string | null): Record<string, string> {
+  const allowedOrigins = ALLOWED_ORIGINS.length > 0 
+    ? ALLOWED_ORIGINS 
+    : DEFAULT_DEV_ORIGINS;
+
+  // Check if request origin is in allowed list
+  const isAllowed = requestOrigin && allowedOrigins.some(
+    allowed => allowed === requestOrigin || allowed === "*"
+  );
+
+  // If origin is allowed, return specific origin; otherwise, reject
+  const origin = isAllowed ? requestOrigin : allowedOrigins[0] || "null";
+
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Max-Age": "86400", // 24 hours
+  };
+}
 
 // Email validation regex (RFC 5322 simplified)
 function isValidEmail(email: string): boolean {
@@ -72,6 +103,10 @@ interface CRMMessageRequest {
 }
 
 serve(async (req: Request) => {
+  // 9.2 - Get request origin and validate against allowlist
+  const requestOrigin = req.headers.get("Origin");
+  const corsHeaders = getCorsHeaders(requestOrigin);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
