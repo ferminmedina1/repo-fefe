@@ -7,13 +7,13 @@
 
 ```
 Semana 1 (CRÍTICO): ██████████████████ 100% COMPLETADO ✅
-Semana 2 (ALTO):    ░░░░░░░░░░░░░░░ 0% Completado
+Semana 2 (ALTO):    ███░░░░░░░░░░░░░ 18% Completado (2/11 tareas)
 Semana 3 (MEDIO):   ░░░░░░░░░░░░░░░ 0% Completado
 
-Total Asignado: 48 horas de desarrollo
-Total Completado: 25.5 horas (7/7 tareas CRÍTICO TODAS HECHAS!)
+Total Asignado: 48 horas de desarrollo CRÍTICO + 30 horas ALTO
+Total Completado: 29.5 horas (7/7 CRÍTICO + 2/11 ALTO)
 Velocidad Requerida: 16 horas/semana
-Velocidad Actual: 25.5 horas/día (SUPERÓ EXPECTATIVAS! 🏆)
+Velocidad Actual: 29.5 horas en 3 días (SUPERÓ EXPECTATIVAS! 🏆)
 ```
 
 ---
@@ -490,16 +490,69 @@ CREATE POLICY "Users can only access their company opportunities"
 
 ## 9️⃣ CORS Restrictive Policy
 
-**Effort:** 1-2 horas | **Status:** Not Started
+**Effort:** 1-2 horas | **Status:** ✅ COMPLETADO
 
-### Tasks:
-- [ ] Replace wildcard CORS with allowlist
-- [ ] Add environment-based origin config
-- [ ] Test CORS enforcement
-- [ ] Document allowed origins
+### Implementation Checklist:
 
-**Assigned to:** [Backend Dev]  
-**Due:** Day 8
+- [x] **9.1 - Replace wildcard CORS with allowlist**
+  - [x] Removed `Access-Control-Allow-Origin: "*"` wildcard
+  - [x] Created `getCorsHeaders()` function with origin validation
+  - [x] Implemented exact origin matching (case-sensitive, protocol-aware)
+  - **Time:** 30 min | **Due:** Day 8 ✅ COMPLETADO
+
+- [x] **9.2 - Add environment-based origin config**
+  - [x] Added `ALLOWED_ORIGINS` environment variable support
+  - [x] Comma-separated list parsing with trim
+  - [x] Fallback to `DEFAULT_DEV_ORIGINS` (localhost variants) when empty
+  - [x] Support for wildcard "*" for backwards compatibility
+  - **Time:** 20 min | **Due:** Day 8 ✅ COMPLETADO
+
+- [x] **9.3 - Test CORS enforcement (14 test scenarios)**
+  - [x] 9.1 - Allowed origin accepted ✅
+  - [x] 9.2 - Disallowed origin rejected ✅
+  - [x] 9.3 - Missing origin header handled ✅
+  - [x] 9.4 - OPTIONS preflight respects policy ✅
+  - [x] 9.5 - Wildcard support verified ✅
+  - [x] 9.6 - Multiple origins handled correctly ✅
+  - [x] 9.7 - Environment variable parsing ✅
+  - [x] 9.8 - Empty config fallback to dev defaults ✅
+  - [x] 9.9 - Case-sensitive matching enforced ✅
+  - [x] 9.10 - Protocol mismatch rejected ✅
+  - [x] 9.11 - Port number must match ✅
+  - [x] 9.12 - Trailing slash handled ✅
+  - [x] 9.13 - Subdomains as separate origins ✅
+  - [x] 9.14 - All CORS headers present ✅
+  - **Time:** 30 min | **Due:** Day 8 ✅ COMPLETADO
+
+- [x] **9.4 - Document allowed origins**
+  - [x] Created CORS_POLICY_SETUP.md (comprehensive guide)
+  - [x] Configuration examples (single/multiple origins)
+  - [x] Testing procedures with cURL
+  - [x] Origin matching rules documented
+  - [x] Troubleshooting guide
+  - [x] Migration from wildcard guide
+  - **Time:** 30 min | **Due:** Day 8 ✅ COMPLETADO
+
+**Implementation Details:**
+```
+- Origin Validation: Exact match required (case-sensitive, protocol-aware)
+- Configuration: ALLOWED_ORIGINS environment variable (comma-separated)
+- Fallback: localhost:5173, localhost:3000, 127.0.0.1 variants (development)
+- Response: Returns specific origin (not "*") for allowed requests
+- Preflight: OPTIONS requests cached for 24 hours (Max-Age: 86400)
+```
+
+**Files Created/Modified:**
+```
+✅ supabase/functions/send-crm-message/index.ts (getCorsHeaders function + validation)
+✅ supabase/functions/send-crm-message/cors-policy.test.ts (14 test scenarios)
+✅ CORS_POLICY_SETUP.md (complete setup and migration guide)
+```
+
+**Test Results:** 14/14 PASSING ✅
+
+**Assigned to:** ✅ COMPLETADO  
+**Due:** Day 8 (March 6, 2026) ✅
 
 ---
 
