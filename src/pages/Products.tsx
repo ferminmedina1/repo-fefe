@@ -27,6 +27,10 @@ import { compressImage, isValidImage, formatFileSize } from "@/lib/imageUtils";
 import { ComboComponentsDialog } from "@/components/products/ComboComponentsDialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { auditLogger, AuditActionType } from "@/lib/auditLog";
+import { validateProductUniqueness, validateStockConsistency, validateWarehouseDistribution, validateBulkUpdateData, validatePriceChange } from "@/lib/dataIntegrity";
+import { batchInsertWithValidation, batchUpdateWithValidation, softDeleteBatch, createTransactionContext, upsertWithConflictHandling } from "@/lib/transactionService";
+import { createAppError, classifyError, getUserFriendlyError } from "@/lib/errorHandler";
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -52,6 +56,9 @@ const productSchema = z.object({
   location: z.string().max(100, "La ubicación debe tener máximo 100 caracteres").optional(),
   batch_number: z.string().max(50, "El número de lote debe tener máximo 50 caracteres").optional(),
   expiration_date: z.string().optional(),
+}).refine((data) => !data.cost || data.cost <= data.price, {
+  message: "El costo no puede ser mayor que el precio",
+  path: ["cost"],
 });
 
 export default function Products() {
@@ -162,7 +169,7 @@ export default function Products() {
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
-      let query = supabase.from("products").select("*").eq("company_id", currentCompany.id).order("created_at", { ascending: false });
+      let query = supabase.from("products").select("*").eq("company_id", currentCompany.id).eq("active", true).order("created_at", { ascending: false });
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -318,10 +325,23 @@ export default function Products() {
 
   const createProductMutation = useMutation({
     mutationFn: async (data: any) => {
-      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
-      if (!canCreate) throw new Error('No tienes permiso para crear productos en esta empresa');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+      if (!currentCompany?.id) throw new Error('COMPANY_NOT_SELECTED');
+      if (!canCreate) throw new Error('PERMISSION_DENIED');
       
-      // Forzar company_id correcto
+      // Validar unicidad de SKU y Barcode
+      const uniquenessValidation = await validateProductUniqueness(currentCompany.id, {
+        sku: data.sku,
+        barcode: data.barcode,
+      });
+      
+      if (!uniquenessValidation.isValid) {
+        const error = new Error(uniquenessValidation.errors.join('; '));
+        (error as any).code = uniquenessValidation.errors[0].includes('SKU') ? 'INVALID_SKU' : 'INVALID_BARCODE';
+        throw error;
+      }
+
       const payload = { ...data, company_id: currentCompany.id };
       const { data: product, error } = await supabase
         .from("products")
@@ -331,13 +351,28 @@ export default function Products() {
       
       if (error) throw error;
       
+      // Log creación en auditoría
+      await auditLogger.log({
+        action: AuditActionType.CREATE,
+        resourceType: 'product',
+        resourceId: product.id,
+        userId: user.id,
+        companyId: currentCompany.id,
+        metadata: {
+          productName: product.name,
+          sku: product.sku,
+          barcode: product.barcode,
+          price: product.price,
+        },
+        status: 'success',
+      });
+      
       // Upload image if provided
       if (imageFile) {
         try {
           setUploadingImage(true);
           const imageUrl = await uploadProductImage(imageFile, product.id);
           
-          // Update product with image URL
           const { error: updateError } = await supabase
             .from("products")
             .update({ image_url: imageUrl })
@@ -348,13 +383,19 @@ export default function Products() {
         } catch (imgError) {
           console.error('Error uploading image:', imgError);
           toast.error('Producto creado pero falló la subida de imagen');
+          // No lanzamos error para no romper la creación del producto
         } finally {
           setUploadingImage(false);
         }
       }
       
-      // Create warehouse stock entries if distribution was configured
+      // Create warehouse stock entries with batch operation
       if (warehouses && warehouseStockData["new"] && Object.keys(warehouseStockData["new"]).length > 0) {
+        const distribution = validateWarehouseDistribution(data.stock, warehouseStockData["new"]);
+        if (!distribution.isValid) {
+          throw new Error(distribution.error || 'Warehouse distribution invalid');
+        }
+
         const warehouseStockEntries = Object.entries(warehouseStockData["new"]).map(([warehouseId, stock]) => ({
           warehouse_id: warehouseId,
           product_id: product.id,
@@ -363,11 +404,16 @@ export default function Products() {
           company_id: currentCompany!.id,
         }));
         
-        const { error: stockError } = await supabase
-          .from("warehouse_stock")
-          .insert(warehouseStockEntries);
+        const txContext = createTransactionContext(user.id, currentCompany.id);
+        const stockResult = await batchInsertWithValidation(
+          'warehouse_stock',
+          warehouseStockEntries,
+          txContext
+        );
         
-        if (stockError) throw stockError;
+        if (!stockResult.success) {
+          throw new Error(stockResult.error || 'Failed to create warehouse stock entries');
+        }
       }
       
       return product;
@@ -381,32 +427,56 @@ export default function Products() {
       setWarehouseStockData({});
     },
     onError: (error: any) => {
-      const msg = error?.message || '';
-      if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('policy')) {
-        toast.error("No tienes permisos para crear productos en esta empresa.");
-        console.error('RLS error creating product', { currentCompany, canCreate, error });
-      } else if (msg.includes('No tienes permiso') || msg.includes('Empresa no seleccionada')) {
-        toast.error(msg);
-      } else {
-        toast.error(error.message || "Error al crear producto");
-      }
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error creating product:`, error);
     },
   });
 
   const updateProductMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
-      if (!canEdit) throw new Error('No tienes permiso para editar productos en esta empresa');
+    mutationFn: async ({ id, data: updateData, oldData }: { id: string; data: any; oldData?: any }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+      if (!currentCompany?.id) throw new Error('COMPANY_NOT_SELECTED');
+      if (!canEdit) throw new Error('PERMISSION_DENIED');
+      
+      // Validar unicidad de SKU y Barcode (excluyendo el producto actual)
+      if (updateData.sku || updateData.barcode) {
+        const uniquenessValidation = await validateProductUniqueness(
+          currentCompany.id,
+          {
+            sku: updateData.sku,
+            barcode: updateData.barcode,
+          },
+          id
+        );
+        
+        if (!uniquenessValidation.isValid) {
+          const error = new Error(uniquenessValidation.errors.join('; '));
+          (error as any).code = uniquenessValidation.errors[0].includes('SKU') ? 'INVALID_SKU' : 'INVALID_BARCODE';
+          throw error;
+        }
+      }
+
+      // Validar cambios de precio (prevenir cambios radicales)
+      if (updateData.price && oldData?.price) {
+        const priceValidation = validatePriceChange(oldData.price, updateData.price);
+        if (!priceValidation.isValid) {
+          throw new Error(priceValidation.error);
+        }
+      }
       
       // Upload new image if provided
       if (imageFile) {
         try {
           setUploadingImage(true);
           const imageUrl = await uploadProductImage(imageFile, id);
-          data.image_url = imageUrl;
+          updateData.image_url = imageUrl;
         } catch (imgError) {
           console.error('Error uploading image:', imgError);
           toast.error('Error al subir la imagen');
+          throw imgError;
         } finally {
           setUploadingImage(false);
         }
@@ -414,41 +484,65 @@ export default function Products() {
       
       const { error } = await supabase
         .from("products")
-        .update(data)
+        .update(updateData)
         .eq("id", id)
         .eq("company_id", currentCompany.id);
       
       if (error) throw error;
       
-      // Update warehouse stock if provided (batch upsert instead of N queries)
+      // Log cambios en auditoría
+      if (oldData) {
+        await auditLogger.logChanges(
+          AuditActionType.UPDATE,
+          id,
+          'product',
+          oldData,
+          updateData,
+          currentCompany.id
+        );
+      }
+      
+      // Update warehouse stock if provided
       if (warehouses && warehouseStockData[id] && Object.keys(warehouseStockData[id]).length > 0) {
+        const distribution = validateWarehouseDistribution(updateData.stock || oldData?.stock, warehouseStockData[id]);
+        if (!distribution.isValid) {
+          throw new Error(distribution.error);
+        }
+
         const upsertEntries = Object.entries(warehouseStockData[id])
           .map(([warehouseId, stock]) => ({
             warehouse_id: warehouseId,
             product_id: id,
             stock: stock || 0,
-            min_stock: data.min_stock || 0,
+            min_stock: updateData.min_stock || oldData?.min_stock || 0,
             company_id: currentCompany.id,
           }));
 
         if (upsertEntries.length > 0) {
-          await supabase
-            .from("warehouse_stock")
-            .upsert(upsertEntries, { onConflict: 'warehouse_id,product_id' });
+          const txContext = createTransactionContext(user.id, currentCompany.id);
+          const result = await upsertWithConflictHandling(
+            'warehouse_stock',
+            upsertEntries,
+            ['warehouse_id', 'product_id'],
+            txContext
+          );
+
+          if (!result.success) {
+            throw new Error(result.error);
+          }
         }
         
-        // Recalculate total stock
-        const { data: allStocks } = await supabase
-          .from("warehouse_stock")
-          .select("stock")
-          .eq("product_id", id);
-        
-        const totalStock = allStocks?.reduce((sum, s) => sum + s.stock, 0) || 0;
-        
-        await supabase
-          .from("products")
-          .update({ stock: totalStock })
-          .eq("id", id);
+        // Validar consistencia de stock
+        const consistency = await validateStockConsistency(
+          id,
+          updateData.stock || oldData?.stock || 0,
+          currentCompany.id
+        );
+
+        if (!consistency.isConsistent) {
+          console.warn('Stock inconsistency detected:', consistency);
+          // Log pero no lanzo error para no afectar la actualización
+        }
       }
     },
     onSuccess: () => {
@@ -462,45 +556,56 @@ export default function Products() {
       setWarehouseStockData({});
     },
     onError: (error: any) => {
-      const msg = error?.message || '';
-      if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('policy')) {
-        toast.error("No tienes permisos para editar productos en esta empresa.");
-        console.error('RLS error updating product', { currentCompany, canEdit, error });
-      } else if (msg.includes('No tienes permiso') || msg.includes('Empresa no seleccionada')) {
-        toast.error(msg);
-      } else {
-        toast.error(error.message || "Error al actualizar producto");
-      }
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error updating product:`, error);
     },
   });
 
   const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {
-      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
-      if (!canDelete) throw new Error('No tienes permiso para eliminar productos en esta empresa');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+      if (!currentCompany?.id) throw new Error('COMPANY_NOT_SELECTED');
+      if (!canDelete) throw new Error('PERMISSION_DENIED');
       
+      // Soft delete: marcar como inactivo y archivado
       const { error } = await supabase
         .from("products")
-        .delete()
+        .update({ 
+          active: false,
+          updated_at: new Date().toISOString()
+        })
         .eq("id", id)
         .eq("company_id", currentCompany.id);
       
       if (error) throw error;
+
+      // Log eliminación en auditoría
+      await auditLogger.log({
+        action: AuditActionType.DELETE,
+        resourceType: 'product',
+        resourceId: id,
+        userId: user.id,
+        companyId: currentCompany.id,
+        metadata: {
+          deleteType: 'soft_delete',
+          markedInactive: true,
+          timestamp: new Date().toISOString(),
+        },
+        status: 'success',
+      });
     },
     onSuccess: () => {
       toast.success("Producto eliminado exitosamente");
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
     onError: (error: any) => {
-      const msg = error?.message || '';
-      if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('policy')) {
-        toast.error("No tienes permisos para eliminar productos en esta empresa.");
-        console.error('RLS error deleting product', { currentCompany, canDelete, error });
-      } else if (msg.includes('No tienes permiso') || msg.includes('Empresa no seleccionada')) {
-        toast.error(msg);
-      } else {
-        toast.error(error.message || "Error al eliminar producto");
-      }
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error deleting product:`, error);
     },
   });
 
@@ -529,37 +634,25 @@ export default function Products() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('=== SUBMIT INICIADO ===');
-    console.log('formData:', formData);
-    console.log('currentCompany:', currentCompany);
-    console.log('imageFile:', imageFile);
-    
     try {
       if (!currentCompany?.id) {
-        console.error('No hay empresa seleccionada');
-        toast.error("No hay empresa seleccionada. Selecciona una empresa antes de crear productos.");
-        return;
+        throw new Error('COMPANY_NOT_SELECTED');
       }
       
       // Validate required fields
       if (!formData.name || !formData.price || !formData.stock) {
-        console.error('Faltan campos requeridos:', { name: formData.name, price: formData.price, stock: formData.stock });
-        toast.error("Por favor completa todos los campos requeridos: Nombre, Precio y Stock");
-        return;
+        throw new Error('VALIDATION_ERROR: Nombre, Precio y Stock son obligatorios');
       }
       
       // Validate warehouse distribution if provided
       if (warehouseStockData["new"]) {
-        const totalDistributed = Object.values(warehouseStockData["new"]).reduce((sum, val) => sum + (val || 0), 0);
         const totalStock = parseInt(formData.stock);
-        
-        if (totalDistributed > 0 && totalDistributed !== totalStock) {
-          toast.error(`La distribución (${totalDistributed}) debe coincidir con el stock total (${totalStock})`);
-          return;
+        const distribution = validateWarehouseDistribution(totalStock, warehouseStockData["new"]);
+        if (!distribution.isValid) {
+          throw new Error(distribution.error);
         }
       }
 
-      console.log('Validando con Zod...');
       const validatedData = productSchema.parse({
         name: formData.name,
         price: parseFloat(formData.price),
@@ -573,8 +666,6 @@ export default function Products() {
         batch_number: formData.batch_number || undefined,
         expiration_date: formData.expiration_date || undefined,
       });
-      
-      console.log('Validación exitosa:', validatedData);
 
       const productData = {
         name: validatedData.name,
@@ -596,62 +687,71 @@ export default function Products() {
         company_id: currentCompany.id,
       };
 
-      console.log('Ejecutando mutación con:', productData);
       if (editingProduct) {
-        updateProductMutation.mutate({ id: editingProduct.id, data: productData });
+        updateProductMutation.mutate({ 
+          id: editingProduct.id, 
+          data: productData,
+          oldData: editingProduct 
+        });
       } else {
         createProductMutation.mutate(productData);
       }
     } catch (error) {
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
       console.error('Error en handleSubmit:', error);
-      if (error instanceof z.ZodError) {
-        const firstError = error.errors[0];
-        console.error('Error de validación Zod:', firstError);
-        toast.error(firstError.message);
-      } else {
-        toast.error("Error al validar el producto");
-      }
     }
   };
 
   const handleEdit = async (product: any) => {
-    setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      barcode: product.barcode || "",
-      sku: product.sku || "",
-      price: product.price.toString(),
-      cost: product.cost?.toString() || "",
-      stock: product.stock.toString(),
-      min_stock: product.min_stock?.toString() || "",
-      category: product.category || "",
-      location: product.location || "",
-      batch_number: product.batch_number || "",
-      expiration_date: product.expiration_date || "",
-      is_combo: product.is_combo || false,
-      currency: product.currency || "ARS",
-    });
-    setImagePreview(product.image_url || "");
-    setImageFile(null);
-    
-    // Load warehouse stock data for this product
-    if (warehouses) {
-      const { data: warehouseStockData } = await supabase
-        .from("warehouse_stock")
-        .select("warehouse_id, stock")
-        .eq("product_id", product.id);
-      
-      const stockByWarehouse: Record<string, number> = {};
-      warehouseStockData?.forEach(ws => {
-        stockByWarehouse[ws.warehouse_id] = ws.stock;
+    try {
+      setEditingProduct(product);
+      setFormData({
+        name: product.name,
+        barcode: product.barcode || "",
+        sku: product.sku || "",
+        price: product.price.toString(),
+        cost: product.cost?.toString() || "",
+        stock: product.stock.toString(),
+        min_stock: product.min_stock?.toString() || "",
+        category: product.category || "",
+        location: product.location || "",
+        batch_number: product.batch_number || "",
+        expiration_date: product.expiration_date || "",
+        is_combo: product.is_combo || false,
+        currency: product.currency || "ARS",
       });
+      setImagePreview(product.image_url || "");
+      setImageFile(null);
       
-      setWarehouseStockData({
-        [product.id]: stockByWarehouse
-      });
+      // Load warehouse stock data for this product
+      if (warehouses) {
+        const { data: warehouseStockData, error } = await supabase
+          .from("warehouse_stock")
+          .select("warehouse_id, stock")
+          .eq("product_id", product.id);
+        
+        if (error) {
+          console.error('Error loading warehouse stock:', error);
+          toast.error("Error al cargar datos de warehouse");
+          return;
+        }
+        
+        const stockByWarehouse: Record<string, number> = {};
+        warehouseStockData?.forEach(ws => {
+          stockByWarehouse[ws.warehouse_id] = ws.stock;
+        });
+        
+        setWarehouseStockData({
+          [product.id]: stockByWarehouse
+        });
+      }
+      
+      setIsDialogOpen(true);
+    } catch (error) {
+      console.error('Error in handleEdit:', error);
+      toast.error('Error al editar producto');
     }
-    
-    setIsDialogOpen(true);
   };
   
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -775,12 +875,22 @@ export default function Products() {
     if (!adjustingProduct) return;
 
     try {
-      // Batch upsert instead of N SELECT+INSERT/UPDATE queries
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
       const upsertEntries = Object.entries(stockAdjustments)
         .filter(([_, newStockValue]) => newStockValue !== '' && newStockValue !== undefined)
         .map(([warehouseId, newStockValue]) => {
-          const newStock = parseInt(newStockValue);
+          // Validar que sea número entero válido (no "abc", no decimales)
+          const stockStr = newStockValue.toString().trim();
+          if (!/^\d+$/.test(stockStr)) {
+            console.warn(`Invalid stock value for warehouse ${warehouseId}: ${stockStr}`);
+            return null;
+          }
+          
+          const newStock = parseInt(stockStr, 10);
           if (isNaN(newStock) || newStock < 0) return null;
+          
           return {
             warehouse_id: warehouseId,
             product_id: adjustingProduct.id,
@@ -792,24 +902,60 @@ export default function Products() {
         .filter(Boolean);
 
       if (upsertEntries.length > 0) {
-        const { error } = await supabase
-          .from("warehouse_stock")
-          .upsert(upsertEntries, { onConflict: 'warehouse_id,product_id' });
-        if (error) throw error;
+        const txContext = createTransactionContext(user.id, currentCompany!.id);
+        const result = await upsertWithConflictHandling(
+          'warehouse_stock',
+          upsertEntries,
+          ['warehouse_id', 'product_id'],
+          txContext
+        );
+
+        if (!result.success) {
+          throw new Error(result.error);
+        }
       }
 
-      // Recalculate total stock
-      const { data: allStocks } = await supabase
+      // Validar y recalcular stock total
+      const { data: allStocks, error: fetchError } = await supabase
         .from("warehouse_stock")
         .select("stock")
         .eq("product_id", adjustingProduct.id);
 
-      const totalStock = allStocks?.reduce((sum, s) => sum + s.stock, 0) || 0;
+      if (fetchError) throw fetchError;
 
-      await supabase
+      const totalStock = (allStocks || []).reduce((sum, s) => sum + (s.stock || 0), 0);
+      const consistency = await validateStockConsistency(
+        adjustingProduct.id,
+        totalStock,
+        currentCompany!.id
+      );
+
+      if (!consistency.isConsistent) {
+        console.warn('Stock inconsistency detected after adjustment:', consistency);
+      }
+
+      // Actualizar el stock total del producto
+      const { error: updateError } = await supabase
         .from("products")
-        .update({ stock: totalStock })
+        .update({ stock: totalStock, updated_at: new Date().toISOString() })
         .eq("id", adjustingProduct.id);
+
+      if (updateError) throw updateError;
+
+      // Log auditoría
+      await auditLogger.log({
+        action: AuditActionType.ADJUST_STOCK,
+        resourceType: 'product',
+        resourceId: adjustingProduct.id,
+        userId: user.id,
+        companyId: currentCompany!.id,
+        metadata: {
+          productName: adjustingProduct.name,
+          totalStockAfter: totalStock,
+          adjustmentCount: upsertEntries.length,
+        },
+        status: 'success',
+      });
 
       toast.success("Stock ajustado exitosamente");
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -818,7 +964,10 @@ export default function Products() {
       setIsStockAdjustDialogOpen(false);
       setStockAdjustments({});
     } catch (error: any) {
-      toast.error(error.message || "Error al ajustar stock");
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error adjusting stock:`, error);
     }
   };
 
@@ -840,41 +989,66 @@ export default function Products() {
     setSelectedProducts(newSelected);
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!products || products.length === 0) {
       toast.error("No hay productos para exportar");
       return;
     }
 
-    const csvData = products.map(p => {
-      const row: any = {
-        nombre: p.name,
-        categoria: p.category || "",
-        codigo_barras: p.barcode || "",
-        sku: p.sku || "",
-        precio: p.price,
-        costo: p.cost || "",
-        stock: p.stock,
-        stock_minimo: p.min_stock || "",
-      };
-
-      // Add warehouse columns if warehouses exist
-      if (warehouses) {
-        warehouses.forEach(w => {
-          row[`deposito_${w.code}`] = 0;
-        });
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) {
+        throw new Error('Usuario no autenticado');
       }
+      const user = authData.user;
 
-      return row;
-    });
+      const csvData = products.map(p => {
+        const row: any = {
+          nombre: p.name,
+          categoria: p.category || "",
+          codigo_barras: p.barcode || "",
+          sku: p.sku || "",
+          precio: p.price,
+          costo: p.cost || "",
+          stock: p.stock,
+          stock_minimo: p.min_stock || "",
+        };
 
-    const csv = Papa.unparse(csvData);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `productos_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    toast.success("Productos exportados exitosamente");
+        if (warehouses) {
+          warehouses.forEach(w => {
+            row[`deposito_${w.code}`] = 0;
+          });
+        }
+
+        return row;
+      });
+
+      const csv = Papa.unparse(csvData);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `productos_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+
+      // Log auditoría de exportación
+      await auditLogger.log({
+        action: AuditActionType.EXPORT,
+        resourceType: 'product',
+        resourceId: 'batch-export',
+        userId: user.id,
+        companyId: currentCompany!.id,
+        metadata: {
+          totalExported: products.length,
+          exportDate: new Date().toISOString(),
+        },
+        status: 'success',
+      });
+
+      toast.success("Productos exportados exitosamente");
+    } catch (error) {
+      console.error('Error exporting products:', error);
+      toast.error("Error al exportar productos");
+    }
   };
 
   const handleImportCSV = () => {
@@ -902,10 +1076,16 @@ export default function Products() {
           return;
         }
 
-        // Validate all rows first, then batch insert (instead of N individual inserts)
-        const validProducts: any[] = [];
-        const rowWarehouseData: Map<number, { row: any; validated: any }> = new Map();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          toast.error("Usuario no autenticado");
+          return;
+        }
 
+        const validProducts: any[] = [];
+        const productRowMapping: Map<string, { row: any; validated: any }> = new Map();
+
+        // Validar todos los rows primero
         for (let i = 0; i < data.length; i++) {
           const row = data[i];
           try {
@@ -925,6 +1105,8 @@ export default function Products() {
               sku: row.sku?.trim() || undefined,
             });
 
+            const productKey = `${validatedData.barcode || ''}_${validatedData.sku || ''}_${validatedData.name}`;
+            
             validProducts.push({
               name: validatedData.name,
               barcode: validatedData.barcode || null,
@@ -936,7 +1118,7 @@ export default function Products() {
               category: validatedData.category || null,
               company_id: currentCompany?.id,
             });
-            rowWarehouseData.set(validProducts.length - 1, { row, validated: validatedData });
+            productRowMapping.set(productKey, { row, validated: validatedData });
           } catch (error: any) {
             errorCount++;
             const errorMsg = error instanceof z.ZodError
@@ -946,25 +1128,45 @@ export default function Products() {
           }
         }
 
-        // Batch insert all valid products in one query
+        // Batch insert todas los productos válidos con transacción
         if (validProducts.length > 0) {
-          const { data: insertedProducts, error: insertError } = await supabase
-            .from("products")
-            .insert(validProducts)
-            .select();
+          const txContext = createTransactionContext(user.id, currentCompany!.id);
+          
+          // Validator para chequear unicidad
+          const validator = async (product: any) => {
+            const uniqueness = await validateProductUniqueness(currentCompany!.id, {
+              sku: product.sku,
+              barcode: product.barcode,
+            });
+            return {
+              valid: uniqueness.isValid,
+              error: uniqueness.errors.length > 0 ? uniqueness.errors[0] : undefined,
+            };
+          };
 
-          if (insertError) {
-            errors.push(`Error al insertar productos: ${insertError.message}`);
-            errorCount += validProducts.length;
-          } else {
-            successCount = insertedProducts?.length || 0;
+          const insertResult = await batchInsertWithValidation(
+            'products',
+            validProducts,
+            txContext,
+            (product) => {
+              // Validación básica en lote
+              if (!product.name || product.price <= 0) {
+                return { valid: false, error: 'Nombre y precio requeridos' };
+              }
+              return { valid: true };
+            }
+          );
 
-            // Batch insert all warehouse stock entries in one query
-            if (warehouses && insertedProducts) {
+          if (insertResult.success && insertResult.data) {
+            successCount = insertResult.itemsProcessed || 0;
+            
+            // Batch insert warehouse stock entries
+            if (warehouses && insertResult.data.length > 0) {
               const allWarehouseEntries: any[] = [];
 
-              insertedProducts.forEach((product, idx) => {
-                const warehouseInfo = rowWarehouseData.get(idx);
+              insertResult.data.forEach((product: any) => {
+                const productKey = `${product.barcode || ''}_${product.sku || ''}_${product.name}`;
+                const warehouseInfo = productRowMapping.get(productKey);
                 if (!warehouseInfo) return;
                 const { row, validated } = warehouseInfo;
 
@@ -985,10 +1187,39 @@ export default function Products() {
               });
 
               if (allWarehouseEntries.length > 0) {
-                await supabase.from("warehouse_stock").insert(allWarehouseEntries);
+                const warehouseResult = await batchInsertWithValidation(
+                  'warehouse_stock',
+                  allWarehouseEntries,
+                  txContext
+                );
+                
+                if (!warehouseResult.success) {
+                  console.warn('Some warehouse stock entries failed:', warehouseResult.error);
+                }
               }
             }
+          } else {
+            errors.push(`Error al insertar productos: ${insertResult.error}`);
+            errorCount += validProducts.length;
           }
+        }
+
+        // Log auditoría de importación
+        if (successCount > 0) {
+          await auditLogger.log({
+            action: AuditActionType.IMPORT,
+            resourceType: 'product',
+            resourceId: 'batch-import',
+            userId: user.id,
+            companyId: currentCompany!.id,
+            metadata: {
+              totalRows: data.length,
+              successCount,
+              errorCount,
+              fileName: importFile.name,
+            },
+            status: successCount > 0 ? 'success' : 'error',
+          });
         }
 
         queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -1027,14 +1258,44 @@ export default function Products() {
       return;
     }
 
+    // Validar los datos antes de actualizar
+    const validationResult = validateBulkUpdateData(updates);
+    if (!validationResult.isValid) {
+      toast.error(`Error de validación: ${validationResult.errors.join(', ')}`);
+      return;
+    }
+
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
       const productIds = Array.from(selectedProducts);
+      const txContext = createTransactionContext(user.id, currentCompany!.id);
+      
+      // Actualizar en la base de datos
       const { error } = await supabase
         .from("products")
-        .update(updates)
-        .in("id", productIds);
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .in("id", productIds)
+        .eq("company_id", currentCompany!.id);
 
       if (error) throw error;
+
+      // Log auditoría de actualización masiva
+      await auditLogger.log({
+        action: AuditActionType.BULK_UPDATE,
+        resourceType: 'product',
+        resourceId: productIds.join(','),
+        userId: user.id,
+        companyId: currentCompany!.id,
+        changes: updates,
+        metadata: {
+          transactionId: txContext.transactionId,
+          totalUpdated: productIds.length,
+          fields: Object.keys(updates),
+        },
+        status: 'success',
+      });
 
       toast.success(`${productIds.length} productos actualizados exitosamente`);
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -1042,7 +1303,10 @@ export default function Products() {
       setMassEditData({ price: "", cost: "", stock: "", category: "" });
       setSelectedProducts(new Set());
     } catch (error: any) {
-      toast.error(error.message || "Error al actualizar productos");
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error in mass edit:`, error);
     }
   };
 
@@ -1053,20 +1317,28 @@ export default function Products() {
     }
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
       const productIds = Array.from(selectedProducts);
-      const { error } = await supabase
-        .from("products")
-        .delete()
-        .in("id", productIds);
+      const txContext = createTransactionContext(user.id, currentCompany!.id);
+      
+      // Usar soft delete para mantener integridad histórica
+      const result = await softDeleteBatch('products', productIds, txContext);
 
-      if (error) throw error;
+      if (!result.success) {
+        throw new Error(result.error);
+      }
 
-      toast.success(`${productIds.length} productos eliminados exitosamente`);
+      toast.success(`${result.itemsProcessed} productos eliminados exitosamente`);
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setIsDeleteDialogOpen(false);
       setSelectedProducts(new Set());
     } catch (error: any) {
-      toast.error(error.message || "Error al eliminar productos");
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error in mass delete:`, error);
     }
   };
 
@@ -1079,6 +1351,12 @@ export default function Products() {
     const percentage = parseFloat(adjustmentPercentage);
     if (isNaN(percentage)) {
       toast.error("Porcentaje inválido");
+      return;
+    }
+
+    // Validar que el porcentaje esté en un rango razonable (-99 a 10000)
+    if (percentage < -99 || percentage > 10000) {
+      toast.error("El porcentaje debe estar entre -99% y 10000%");
       return;
     }
 
@@ -1124,31 +1402,89 @@ export default function Products() {
     setIsApplyingAdjustments(true);
     
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const txContext = createTransactionContext(user.id, currentCompany!.id);
       let successCount = 0;
       let errorCount = 0;
       const errors: string[] = [];
+      const auditChanges: Record<string, any> = {};
       
-      // Parallel updates instead of sequential N queries
-      const now = new Date().toISOString();
-      const results = await Promise.all(
-        previewAdjustments.map(adjustment =>
-          supabase
-            .from("products")
-            .update({ price: adjustment.newPrice, updated_at: now })
-            .eq("id", adjustment.id)
-            .eq("company_id", currentCompany?.id)
-            .then(({ error }) => ({ adjustment, error }))
-        )
-      );
-
-      for (const { adjustment, error } of results) {
-        if (error) {
-          console.error(`Error actualizando producto ${adjustment.name}:`, error);
-          errors.push(`${adjustment.name}: ${error.message}`);
-          errorCount++;
-        } else {
-          successCount++;
+      // Validar cambios de precio antes de aplicar
+      for (const adjustment of previewAdjustments) {
+        const oldProduct = products?.find(p => p.id === adjustment.id);
+        if (oldProduct) {
+          const validation = validatePriceChange(oldProduct.price, adjustment.newPrice);
+          if (!validation.isValid) {
+            errors.push(`${adjustment.name}: ${validation.error}`);
+            errorCount++;
+            continue;
+          }
         }
+      }
+
+      if (errorCount > 0) {
+        throw new Error(`${errorCount} productos tienen cambios de precio inválidos`);
+      }
+
+      // Actualizar precios en paralelo (con límite de concurrencia)
+      const maxConcurrency = 10;
+      const now = new Date().toISOString();
+      
+      for (let i = 0; i < previewAdjustments.length; i += maxConcurrency) {
+        const batch = previewAdjustments.slice(i, i + maxConcurrency);
+        const results = await Promise.all(
+          batch.map(adjustment =>
+            supabase
+              .from("products")
+              .update({ price: adjustment.newPrice, updated_at: now })
+              .eq("id", adjustment.id)
+              .eq("company_id", currentCompany!.id)
+              .select()
+              .then(({ data, error }) => ({ adjustment, data, error }))
+          )
+        );
+
+        for (const { adjustment, data, error } of results) {
+          if (error) {
+            console.error(`Error updating ${adjustment.name}:`, error);
+            errors.push(`${adjustment.name}: ${error.message}`);
+            errorCount++;
+          } else {
+            successCount++;
+            const oldProduct = products?.find(p => p.id === adjustment.id);
+            if (oldProduct) {
+              auditChanges[adjustment.id] = {
+                oldPrice: oldProduct.price,
+                newPrice: adjustment.newPrice,
+                percentageChange: ((adjustment.newPrice - oldProduct.price) / oldProduct.price) * 100,
+                currency: adjustmentCurrency,
+              };
+            }
+          }
+        }
+      }
+
+      // Log auditoría de ajuste masivo de precios
+      if (successCount > 0) {
+        await auditLogger.log({
+          action: AuditActionType.ADJUST_PRICE,
+          resourceType: 'product',
+          resourceId: Object.keys(auditChanges).join(','),
+          userId: user.id,
+          companyId: currentCompany!.id,
+          changes: auditChanges,
+          metadata: {
+            transactionId: txContext.transactionId,
+            totalAttempted: previewAdjustments.length,
+            successCount,
+            failCount: errorCount,
+            percentageApplied: parseFloat(adjustmentPercentage),
+            currencyAdjusted: adjustmentCurrency,
+          },
+          status: errorCount === 0 ? 'success' : 'error',
+        });
       }
 
       if (successCount > 0) {
@@ -1156,7 +1492,7 @@ export default function Products() {
       }
       if (errorCount > 0) {
         console.error("Errores detallados:", errors);
-        toast.error(`❌ ${errorCount} productos no pudieron actualizarse. Revisa la consola.`);
+        toast.error(`❌ ${errorCount} productos no pudieron actualizarse`);
       }
       
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -1167,8 +1503,10 @@ export default function Products() {
         setAdjustmentPercentage('');
       }
     } catch (error: any) {
-      console.error("Error en applyPriceAdjustments:", error);
-      toast.error(error.message || "Error al ajustar precios");
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error applying price adjustments:`, error);
     } finally {
       setIsApplyingAdjustments(false);
     }

@@ -10,8 +10,6 @@ import { User, Session } from "@supabase/supabase-js";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
 import { usePermissions } from "@/hooks/usePermissions";
-import { OnboardingProvider } from "@/contexts/OnboardingContext";
-import { OnboardingGate } from "@/components/onboarding/OnboardingGate";
 
 // Lazy load all page components
 const Landing = lazy(() => import("./pages/Landing"));
@@ -164,9 +162,9 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <OnboardingProvider>
-      <OnboardingGate>{children}</OnboardingGate>
-    </OnboardingProvider>
+    <>
+      {children}
+    </>
   );
 }
 

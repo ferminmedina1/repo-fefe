@@ -32,6 +32,7 @@ export default function Warehouses() {
   const { currentCompany } = useCompany();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
@@ -320,106 +321,95 @@ export default function Warehouses() {
           </div>
         </div>
 
-        <Card className="p-2 sm:p-6 overflow-x-auto">
+        <Card className="p-6">
           {isLoading ? (
-            <div className="text-center py-8">Cargando...</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[100px]">Código</TableHead>
-                    <TableHead className="min-w-[120px]">Nombre</TableHead>
-                    <TableHead className="hidden md:table-cell">Dirección</TableHead>
-                    <TableHead className="hidden lg:table-cell">Encargado</TableHead>
-                    <TableHead className="hidden lg:table-cell">Teléfono</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-              <TableBody>
-                {warehouses?.map((warehouse, index) => (
-                  <TableRow key={warehouse.id} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                          <code className="font-mono text-sm font-semibold text-primary">{warehouse.code}</code>
-                        {warehouse.is_main && (
-                            <Badge variant="default" className="animate-pulse-subtle gap-1 bg-primary">
-                              <Building2 className="h-3 w-3" />
-                              Principal
-                            </Badge>
+            <div className="text-center py-8">
+              <div className="inline-block animate-spin"><Building2 className="h-6 w-6" /></div>
+              <p className="mt-2 text-muted-foreground">Cargando depósitos...</p>
+            </div>
+          ) : warehouses && warehouses.length > 0 ? (
+            <>
+              {/* Contenedor Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {warehouses.map((warehouse, index) => (
+                  <div key={warehouse.id} className="animate-fade-in group rounded-lg border p-4 hover:border-primary hover:shadow-md transition-all duration-200" style={{ animationDelay: `${index * 50}ms` }}>
+                    <div className="space-y-3">
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <code className="text-sm font-mono font-bold text-primary px-2 py-1 bg-primary/10 rounded">
+                              {warehouse.code}
+                            </code>
+                            {warehouse.is_main && (
+                              <Badge className="bg-emerald-500 hover:bg-emerald-600 gap-1">
+                                <Building2 className="h-3 w-3" />
+                                Principal
+                              </Badge>
+                            )}
+                          </div>
+                          <h3 className="text-lg font-semibold mt-2">{warehouse.name}</h3>
+                        </div>
+                        <Badge variant={warehouse.active ? "default" : "secondary"} className={warehouse.active ? "bg-green-500 hover:bg-green-600" : ""}>
+                          {warehouse.active ? "Activo" : "Inactivo"}
+                        </Badge>
+                      </div>
+
+                      {/* Info */}
+                      <div className="space-y-2 text-sm">
+                        {warehouse.address && (
+                          <div className="flex items-start gap-2 text-muted-foreground">
+                            <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                            <span className="line-clamp-2">{warehouse.address}</span>
+                          </div>
+                        )}
+                        {warehouse.phone && (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Phone className="h-4 w-4" />
+                            <span>{warehouse.phone}</span>
+                          </div>
+                        )}
+                        {warehouse.manager_name && (
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <User className="h-4 w-4" />
+                            <span>{warehouse.manager_name}</span>
+                          </div>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{warehouse.name}</TableCell>
-                    <TableCell>{warehouse.address || "-"}</TableCell>
-                    <TableCell>{warehouse.manager_name || "-"}</TableCell>
-                    <TableCell>{warehouse.phone || "-"}</TableCell>
-                    <TableCell>
-                        <Badge 
-                          variant={warehouse.active ? "default" : "secondary"}
-                          className={warehouse.active ? "gap-1 bg-green-500 hover:bg-green-600" : "gap-1"}
+
+                      {/* Actions */}
+                      <div className="flex gap-2 pt-3 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleEdit(warehouse)}
                         >
-                          {warehouse.active ? (
-                            <>
-                              <CheckCircle2 className="h-3 w-3" />
-                              Activo
-                            </>
-                          ) : (
-                            <>
-                              <AlertCircle className="h-3 w-3" />
-                              Inactivo
-                            </>
-                          )}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEdit(warehouse);
-                                  }}
-                                  className="hover:scale-110 transition-transform"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Editar depósito</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Editar
+                        </Button>
                         {!warehouse.is_main && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedWarehouse(warehouse);
-                                      setDeleteDialogOpen(true);
-                                    }}
-                                    className="hover:scale-110 transition-transform"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Eliminar depósito</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedWarehouse(warehouse);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         )}
                       </div>
-                    </TableCell>
-                  </TableRow>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+              <p className="text-muted-foreground">No hay depósitos configurados</p>
             </div>
           )}
         </Card>

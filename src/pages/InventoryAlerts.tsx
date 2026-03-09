@@ -120,9 +120,11 @@ export default function InventoryAlerts() {
       const alerts: any[] = [];
       const THRESHOLD_PERCENTAGE = 5; // Alert if change > 5%
       
-      currentRates?.forEach(current => {
+      if (!currentRates || currentRates.length === 0) return alerts;
+      
+      currentRates.forEach(current => {
         const previous = previousRates?.find(p => p.currency === current.currency);
-        if (previous) {
+        if (previous && previous.rate > 0 && current.rate > 0) {
           const variation = ((current.rate - previous.rate) / previous.rate) * 100;
           if (Math.abs(variation) >= THRESHOLD_PERCENTAGE) {
             alerts.push({

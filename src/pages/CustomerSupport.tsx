@@ -29,13 +29,11 @@ import {
   Send,
   Settings,
   BookOpen,
-  FileText,
-  GraduationCap
+  FileText
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
-import { useOnboarding } from "@/contexts/OnboardingContext";
 import { ArticleSuggestions } from "@/components/support/ArticleSuggestions";
 import { SLAIndicator } from "@/components/support/SLAIndicator";
 import { ResponseTemplatesManager } from "@/components/support/ResponseTemplatesManager";
@@ -44,7 +42,6 @@ export default function CustomerSupport() {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { isCompleted: isOnboardingCompleted } = useOnboarding();
   const [searchQuery, setSearchQuery] = useState("");
   const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
@@ -254,23 +251,6 @@ export default function CustomerSupport() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (!isOnboardingCompleted) {
-                  toast.info('Completa el onboarding inicial antes de acceder a los tutoriales de módulo.');
-                  return;
-                }
-                sessionStorage.setItem(
-                  'pending_module_tutorials',
-                  JSON.stringify(['customer_support']),
-                );
-                window.dispatchEvent(new Event('start-module-tutorial'));
-              }}
-            >
-              <GraduationCap className="h-4 w-4 mr-2" />
-              Tutorial
-            </Button>
             <Button variant="outline" onClick={() => navigate("/customer-support/knowledge-base")}>
               <BookOpen className="h-4 w-4 mr-2" />
               Base de Conocimiento
@@ -386,7 +366,7 @@ export default function CustomerSupport() {
         </div>
 
         {/* Stats Cards */}
-        <div data-tutorial-section="stats" className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">Abiertos</CardTitle>
@@ -426,7 +406,7 @@ export default function CustomerSupport() {
         </div>
 
         {/* Main Content */}
-        <div data-tutorial-section="tickets" className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-3 gap-6">
           {/* Tickets List */}
           <Card className="md:col-span-1">
             <CardHeader>

@@ -229,6 +229,11 @@ export default function WarehouseTransfers() {
   };
 
   const handleSubmit = () => {
+    if (!currentCompany?.id) {
+      toast.error("Empresa no seleccionada");
+      return;
+    }
+
     if (!fromWarehouse || !toWarehouse) {
       toast.error("Seleccione depósito origen y destino");
       return;
@@ -244,7 +249,39 @@ export default function WarehouseTransfers() {
       return;
     }
 
-    createTransfer.mutate();
+    // Validate stock availability before creating transfer
+    validateAndCreateTransfer();
+  };
+
+  const validateAndCreateTransfer = async () => {
+    try {
+      // Get current warehouse stock for validation
+      const { data: warehouseStock, error: stockError } = await supabase
+        .from("warehouse_stock")
+        .select("product_id, stock")
+        .eq("warehouse_id", fromWarehouse);
+
+      if (stockError) throw stockError;
+
+      // Check if all products have sufficient stock
+      const stockMap = new Map((warehouseStock || []).map(s => [s.product_id, s.stock]));
+      
+      for (const item of items) {
+        const availableStock = stockMap.get(item.product_id) || 0;
+        if (availableStock < item.quantity) {
+          toast.error(
+            `Stock insuficiente para ${item.product_name}. ` +
+            `Disponible: ${availableStock}, Solicitado: ${item.quantity}`
+          );
+          return;
+        }
+      }
+
+      // If all validations pass, create the transfer
+      createTransfer.mutate();
+    } catch (error: any) {
+      toast.error("Error validando stock: " + error.message);
+    }
   };
 
   const getStatusBadge = (status: string) => {

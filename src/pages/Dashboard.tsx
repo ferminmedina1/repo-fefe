@@ -10,7 +10,6 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Badge } from "@/components/ui/badge";
 import { BusinessHealthPanel } from "@/components/dashboard/BusinessHealthPanel";
-import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
 
 export default function Dashboard() {
   const { currentCompany } = useCompany();
@@ -449,16 +448,13 @@ export default function Dashboard() {
           <p className="text-xs md:text-base text-muted-foreground">Panel de control y salud del negocio</p>
         </div>
 
-        {/* Onboarding Checklist */}
-        <OnboardingChecklist />
-
         {/* Business Health Panel */}
         {currentCompany?.id && (
           <BusinessHealthPanel companyId={currentCompany.id} />
         )}
 
         {canViewSales && (
-          <div data-tutorial-section="kpis" className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-4">
             <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-blue-500/30">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
                 <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">

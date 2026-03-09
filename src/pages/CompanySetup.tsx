@@ -179,9 +179,6 @@ export default function CompanySetup() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Esto personaliza tu tutorial de bienvenida.
-              </p>
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
