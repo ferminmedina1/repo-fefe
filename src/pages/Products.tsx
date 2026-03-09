@@ -123,6 +123,8 @@ export default function Products() {
     expiration_date: "",
     is_combo: false,
     currency: "ARS",
+    tags: [] as string[],
+    custom_fields: {} as Record<string, any>,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -152,6 +154,10 @@ export default function Products() {
   const [adjustmentPercentage, setAdjustmentPercentage] = useState<string>('');
   const [previewAdjustments, setPreviewAdjustments] = useState<any[]>([]);
   const [isApplyingAdjustments, setIsApplyingAdjustments] = useState(false);
+  const [tagInput, setTagInput] = useState<string>("");
+  const [isCustomFieldsDialogOpen, setIsCustomFieldsDialogOpen] = useState(false);
+  const [customFields, setCustomFields] = useState<Array<{id: string, name: string, type: "text" | "number" | "textarea" | "select" | "checkbox" | "date", options?: string[], required?: boolean}>>([]);
+  const [newCustomField, setNewCustomField] = useState<any>({name: "", type: "text", options: ""});
 
   // Función para convertir precio a ARS
   const convertToARS = (price: number, currency: string) => {
@@ -160,6 +166,30 @@ export default function Products() {
     if (!rate) return null;
     return price * rate.rate;
   };
+
+  // Función para generar SKU automáticamente
+  const generateSKU = (productName: string, category?: string): string => {
+    // Obtener las primeras 3 letras del nombre o categoría (en mayúsculas, sin acentos)
+    const baseText = productName.trim() || category?.trim() || 'PRD';
+    
+    // Remover acentos
+    const normalized = baseText
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase();
+    
+    // Tomar primeras 3 letras, si no hay suficientes, rellenar con 'X'
+    const prefix = (normalized.substring(0, 3) + 'XXX').substring(0, 3);
+    
+    // Generar un identificador único basado en timestamp + random
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    const suffix = (timestamp + random).toString().slice(-6);
+    
+    return `${prefix}${suffix}`;
+  };
+
   const [isComboDialogOpen, setIsComboDialogOpen] = useState(false);
   const [comboProduct, setComboProduct] = useState<any>(null);
   const queryClient = useQueryClient();
@@ -321,6 +351,37 @@ export default function Products() {
       .getPublicUrl(fileName);
     
     return publicUrl;
+  };
+
+  // Funciones para manejar múltiples precios
+  const getPriceRangeForProduct = (product: any) => {
+    const prices: number[] = [product.price];
+    
+    // Agregar precios de listas si existen
+    productPrices?.forEach((pp: any) => {
+      if (pp.product_id === product.id && pp.price) {
+        prices.push(pp.price);
+      }
+    });
+    
+    if (prices.length <= 1) return null;
+    
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    
+    return { min, max, count: prices.length };
+  };
+
+  const hasMultiplePrices = (product: any) => {
+    return (productPrices?.filter((pp: any) => pp.product_id === product.id).length || 0) > 0;
+  };
+
+  const formatPriceDisplay = (product: any) => {
+    const range = getPriceRangeForProduct(product);
+    if (range && range.min !== range.max) {
+      return `$${Number(range.min).toFixed(0)} - $${Number(range.max).toFixed(0)}`;
+    }
+    return `$${Number(product.price).toFixed(0)}`;
   };
 
   const createProductMutation = useMutation({
@@ -625,10 +686,54 @@ export default function Products() {
       expiration_date: "",
       is_combo: false,
       currency: "ARS",
+      tags: [],
+      custom_fields: {},
     });
     setEditingProduct(null);
     setImageFile(null);
     setImagePreview("");
+    setTagInput("");
+    setCustomFields([]);
+    setNewCustomField({ name: "", type: "text", options: "" });
+  };
+
+  // Funciones para manejar tags
+  const addTag = (tag: string) => {
+    const trimmedTag = tag.trim();
+    if (trimmedTag && !formData.tags.includes(trimmedTag)) {
+      setFormData({...formData, tags: [...formData.tags, trimmedTag]});
+      setTagInput("");
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    setFormData({...formData, tags: formData.tags.filter(t => t !== tag)});
+  };
+
+  // Funciones para campos personalizados
+  const addCustomField = () => {
+    if (!newCustomField.name.trim()) {
+      toast.error("El nombre del campo es requerido");
+      return;
+    }
+    const field = {
+      id: `field_${Date.now()}`,
+      name: newCustomField.name,
+      type: newCustomField.type,
+      options: (newCustomField.type === "select") ? newCustomField.options.split(",").map(o => o.trim()) : undefined,
+    };
+    setCustomFields([...customFields, field]);
+    setNewCustomField({name: "", type: "text", options: ""});
+    toast.success(`Campo "${newCustomField.name}" agregado`);
+  };
+
+  const removeCustomField = (fieldId: string) => {
+    const field = customFields.find(f => f.id === fieldId);
+    setCustomFields(customFields.filter(f => f.id !== fieldId));
+    const newCustom = {...formData.custom_fields};
+    delete newCustom[fieldId];
+    setFormData({...formData, custom_fields: newCustom});
+    toast.success(`Campo eliminado`);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -653,6 +758,9 @@ export default function Products() {
         }
       }
 
+      // Generar SKU automáticamente si no está proporcionado (para mejorar UX)
+      const skuValue = formData.sku?.trim() || generateSKU(formData.name, formData.category);
+
       const validatedData = productSchema.parse({
         name: formData.name,
         price: parseFloat(formData.price),
@@ -661,7 +769,7 @@ export default function Products() {
         min_stock: formData.min_stock ? parseInt(formData.min_stock) : undefined,
         category: formData.category || undefined,
         barcode: formData.barcode || undefined,
-        sku: formData.sku || undefined,
+        sku: skuValue || undefined,
         location: formData.location || undefined,
         batch_number: formData.batch_number || undefined,
         expiration_date: formData.expiration_date || undefined,
@@ -683,6 +791,9 @@ export default function Products() {
         expiration_date: validatedData.expiration_date || null,
         is_combo: formData.is_combo,
         currency: formData.currency || 'ARS',
+        tags: formData.tags,
+        custom_fields: formData.custom_fields,
+        custom_field_definitions: customFields,
         last_restock_date: editingProduct ? undefined : new Date().toISOString(),
         company_id: currentCompany.id,
       };
@@ -720,9 +831,19 @@ export default function Products() {
         expiration_date: product.expiration_date || "",
         is_combo: product.is_combo || false,
         currency: product.currency || "ARS",
+        tags: product.tags || [],
+        custom_fields: product.custom_fields || {},
       });
       setImagePreview(product.image_url || "");
       setImageFile(null);
+      
+      // Load custom field definitions if they exist
+      if (product.custom_field_definitions && Array.isArray(product.custom_field_definitions)) {
+        setCustomFields(product.custom_field_definitions);
+      } else {
+        // If no definitions stored, clear custom fields
+        setCustomFields([]);
+      }
       
       // Load warehouse stock data for this product
       if (warehouses) {
@@ -1107,15 +1228,20 @@ export default function Products() {
 
             const productKey = `${validatedData.barcode || ''}_${validatedData.sku || ''}_${validatedData.name}`;
             
+            // Generar SKU automáticamente si no se proporciona
+            const skuForProduct = validatedData.sku || generateSKU(validatedData.name, validatedData.category);
+            
             validProducts.push({
               name: validatedData.name,
               barcode: validatedData.barcode || null,
-              sku: validatedData.sku || null,
+              sku: skuForProduct,
               price: validatedData.price,
               cost: validatedData.cost ?? 0,
               stock: validatedData.stock,
               min_stock: validatedData.min_stock ?? 0,
               category: validatedData.category || null,
+              tags: [],
+              custom_fields: {},
               company_id: currentCompany?.id,
             });
             productRowMapping.set(productKey, { row, validated: validatedData });
@@ -1657,13 +1783,122 @@ export default function Products() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sku">SKU (Código Interno)</Label>
-                    <Input
-                      id="sku"
-                      value={formData.sku}
-                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                      placeholder="Código único del producto"
-                    />
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="sku" className="flex items-center gap-2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex items-center gap-1">
+                                SKU (Código Interno)
+                                <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Código único para identificar el producto.</p>
+                              <p className="text-xs mt-1">Si dejas vacío, se genera automáticamente.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </Label>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        id="sku"
+                        value={formData.sku}
+                        onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                        placeholder="Dejar vacío para generar automáticamente"
+                        className="flex-1"
+                      />
+                      {formData.name && !formData.sku && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const generated = generateSKU(formData.name, formData.category);
+                            setFormData({ ...formData, sku: generated });
+                            toast.success(`SKU generado: ${generated}`);
+                          }}
+                          className="whitespace-nowrap"
+                        >
+                          Generar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Etiquetas */}
+                  <div className="space-y-2">
+                    <Label htmlFor="tags" className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">Tag</Badge>
+                      Etiquetas
+                    </Label>
+                    <div className="space-y-2">
+                      {formData.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 p-2 bg-muted/30 rounded-lg min-h-[2.5rem]">
+                          {formData.tags.map((tag) => {
+                            const colors = [
+                              "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200",
+                              "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200",
+                              "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-200",
+                              "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200",
+                              "bg-pink-100 text-pink-800 dark:bg-pink-950 dark:text-pink-200",
+                              "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200",
+                            ];
+                            const color = colors[formData.tags.indexOf(tag) % colors.length];
+                            return (
+                              <Badge key={tag} variant="secondary" className={`${color} gap-1 px-2 py-1`}>
+                                {tag}
+                                <button
+                                  type="button"
+                                  onClick={() => removeTag(tag)}
+                                  className="ml-1 hover:opacity-70"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Input
+                          id="tags"
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addTag(tagInput);
+                            }
+                          }}
+                          placeholder="Escribe una etiqueta y presiona Enter"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addTag(tagInput)}
+                          className="whitespace-nowrap"
+                        >
+                          Agregar
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Campos Personalizados */}
+                  <div className="space-y-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsCustomFieldsDialogOpen(true)}
+                      className="w-full gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Gestionar Campos Personalizados ({customFields.length})
+                    </Button>
                   </div>
                   </div>
                   
@@ -1838,6 +2073,102 @@ export default function Products() {
                       Información Adicional <span className="text-xs text-muted-foreground font-normal">(Opcional)</span>
                     </h3>
                   </div>
+
+                  {/* Campos Personalizados Dinámicos */}
+                  {customFields.length > 0 && (
+                    <div className="bg-muted/30 p-4 rounded-lg space-y-3 border border-dashed">
+                      <p className="text-sm font-medium">Campos Personalizados</p>
+                      <div className="space-y-3">
+                        {customFields.map((field) => (
+                          <div key={field.id} className="space-y-2">
+                            <Label htmlFor={field.id}>{field.name}</Label>
+                            {field.type === "text" && (
+                              <Input
+                                id={field.id}
+                                type="text"
+                                value={formData.custom_fields[field.id] || ""}
+                                onChange={(e) => setFormData({
+                                  ...formData,
+                                  custom_fields: {...formData.custom_fields, [field.id]: e.target.value}
+                                })}
+                                placeholder={field.name}
+                              />
+                            )}
+                            {field.type === "number" && (
+                              <Input
+                                id={field.id}
+                                type="number"
+                                value={formData.custom_fields[field.id] || ""}
+                                onChange={(e) => setFormData({
+                                  ...formData,
+                                  custom_fields: {...formData.custom_fields, [field.id]: e.target.value}
+                                })}
+                                placeholder={field.name}
+                              />
+                            )}
+                            {field.type === "textarea" && (
+                              <textarea
+                                id={field.id}
+                                value={formData.custom_fields[field.id] || ""}
+                                onChange={(e) => setFormData({
+                                  ...formData,
+                                  custom_fields: {...formData.custom_fields, [field.id]: e.target.value}
+                                })}
+                                placeholder={field.name}
+                                className="w-full px-3 py-2 text-sm border rounded-md border-input bg-background"
+                                rows={3}
+                              />
+                            )}
+                            {field.type === "select" && (
+                              <Select
+                                value={formData.custom_fields[field.id] || ""}
+                                onValueChange={(value) => setFormData({
+                                  ...formData,
+                                  custom_fields: {...formData.custom_fields, [field.id]: value}
+                                })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={`Selecciona ${field.name}`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {field.options?.map((option) => (
+                                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                            {field.type === "checkbox" && (
+                              <div className="flex items-center gap-2 p-2 border rounded">
+                                <input
+                                  id={field.id}
+                                  type="checkbox"
+                                  checked={formData.custom_fields[field.id] === true}
+                                  onChange={(e) => setFormData({
+                                    ...formData,
+                                    custom_fields: {...formData.custom_fields, [field.id]: e.target.checked}
+                                  })}
+                                  className="rounded"
+                                />
+                                <Label htmlFor={field.id} className="m-0 cursor-pointer">{field.name}</Label>
+                              </div>
+                            )}
+                            {field.type === "date" && (
+                              <Input
+                                id={field.id}
+                                type="date"
+                                value={formData.custom_fields[field.id] || ""}
+                                onChange={(e) => setFormData({
+                                  ...formData,
+                                  custom_fields: {...formData.custom_fields, [field.id]: e.target.value}
+                                })}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="location">Ubicación/Almacén</Label>
@@ -2203,10 +2534,45 @@ export default function Products() {
                           <span className="text-muted-foreground text-xs sm:text-sm">{product.category || "—"}</span>
                         </TableCell>
                         <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-green-600 dark:text-green-500 text-xs sm:text-sm">
-                              ${Number(product.price).toFixed(0)}
-                            </span>
+                          <div className="flex flex-col gap-1">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-2 cursor-help">
+                                    <span className="font-semibold text-green-600 dark:text-green-500 text-xs sm:text-sm">
+                                      {formatPriceDisplay(product)}
+                                    </span>
+                                    {hasMultiplePrices(product) && (
+                                      <Badge variant="secondary" className="text-xs gap-1">
+                                        <DollarSign className="h-2.5 w-2.5" />
+                                        Listas
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent className="w-64">
+                                  <div className="space-y-2">
+                                    <p className="font-semibold">Precio Base</p>
+                                    <p className="text-lg">${Number(product.price).toFixed(2)}</p>
+                                    {productPrices && productPrices.filter((pp: any) => pp.product_id === product.id).length > 0 && (
+                                      <div className="pt-2 border-t border-slate-600">
+                                        <p className="font-semibold mb-2">Listas de Precios</p>
+                                        <div className="space-y-1 text-xs">
+                                          {productPrices
+                                            .filter((pp: any) => pp.product_id === product.id)
+                                            .map((pp: any) => (
+                                              <div key={pp.id} className="flex justify-between gap-2">
+                                                <span className="text-slate-300">{pp.price_lists?.name}:</span>
+                                                <span className="font-medium">${Number(pp.price).toFixed(2)}</span>
+                                              </div>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
@@ -2347,24 +2713,64 @@ export default function Products() {
                           </div>
                         </TableCell>
                       </TableRow>
-                      {isExpanded && productWarehouseStock.length > 0 && (
+                      {isExpanded && (
                         <TableRow>
                           <TableCell colSpan={8} className="bg-muted/30">
-                            <div className="p-4 space-y-2">
-                              <h4 className="font-semibold text-sm">Stock por Depósito</h4>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {productWarehouseStock.map((ws: any) => (
-                                  <div key={ws.id} className="flex items-center justify-between p-2 bg-background rounded border">
-                                    <div>
-                                      <div className="font-medium text-sm">{ws.warehouses.code}</div>
-                                      <div className="text-xs text-muted-foreground">{ws.warehouses.name}</div>
-                                    </div>
-                                    <Badge variant={getStockBadgeColor(ws.stock, ws.min_stock)}>
-                                      {ws.stock}
-                                    </Badge>
+                            <div className="p-4 space-y-6">
+                              {/* Stock por Depósito */}
+                              {productWarehouseStock.length > 0 && (
+                                <div className="space-y-3">
+                                  <h4 className="font-semibold text-sm flex items-center gap-2">
+                                    <Package className="h-4 w-4" />
+                                    Stock por Depósito
+                                  </h4>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {productWarehouseStock.map((ws: any) => (
+                                      <div key={ws.id} className="flex items-center justify-between p-2 bg-background rounded border hover:border-primary/50 transition-colors">
+                                        <div>
+                                          <div className="font-medium text-sm">{ws.warehouses.code}</div>
+                                          <div className="text-xs text-muted-foreground">{ws.warehouses.name}</div>
+                                        </div>
+                                        <Badge variant={getStockBadgeColor(ws.stock, ws.min_stock)}>
+                                          {ws.stock}
+                                        </Badge>
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
-                              </div>
+                                </div>
+                              )}
+
+                              {/* Precios por Lista */}
+                              {productPrices && productPrices.filter((pp: any) => pp.product_id === product.id).length > 0 && (
+                                <div className="space-y-3 pt-4 border-t">
+                                  <h4 className="font-semibold text-sm flex items-center gap-2">
+                                    <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                    Precios Especiales
+                                  </h4>
+                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    <div className="p-3 bg-background rounded border border-green-200 dark:border-green-900/50">
+                                      <div className="text-xs text-muted-foreground">Precio Base</div>
+                                      <div className="text-xl font-bold text-green-600 dark:text-green-500">
+                                        ${Number(product.price).toFixed(2)}
+                                      </div>
+                                    </div>
+                                    {productPrices
+                                      .filter((pp: any) => pp.product_id === product.id)
+                                      .map((pp: any) => {
+                                        const diff = ((pp.price - product.price) / product.price * 100).toFixed(0);
+                                        return (
+                                          <div key={pp.id} className="p-3 bg-background rounded border hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
+                                            <div className="text-xs text-muted-foreground">{pp.price_lists?.name}</div>
+                                            <div className="text-lg font-bold">${Number(pp.price).toFixed(2)}</div>
+                                            <div className={`text-xs font-medium mt-1 ${parseInt(diff) < 0 ? 'text-orange-600 dark:text-orange-500' : 'text-green-600 dark:text-green-500'}`}>
+                                              {parseInt(diff) < 0 ? '↓' : '↑'} {Math.abs(parseInt(diff))}%
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -2430,68 +2836,284 @@ export default function Products() {
 
         {/* Diálogo de Precios por Lista */}
         <Dialog open={isPriceListDialogOpen} onOpenChange={setIsPriceListDialogOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Precios por Lista - {priceListProduct?.name}</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-blue-600" />
+                Gestionar Precios - {priceListProduct?.name}
+              </DialogTitle>
               <DialogDescription>
-                Define precios específicos para cada lista de precios. El precio base del producto es ${priceListProduct?.price}
+                Configura el precio base y precios especiales para cada lista de precios
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="border rounded-lg p-4 bg-muted/30">
-                <p className="text-sm font-medium mb-2">Precio Base (por defecto)</p>
-                <p className="text-2xl font-bold">${priceListProduct?.price}</p>
+            <div className="space-y-6">
+              {/* Guía Rápida */}
+              <div className="bg-amber-50/50 dark:bg-amber-950/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800 text-sm">
+                <div className="flex gap-2">
+                  <Info className="h-4 w-4 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-amber-900 dark:text-amber-100 text-xs">
+                    <p className="font-medium">💡 Tip:</p>
+                    <p>El precio base se usa por defecto. Las listas de precios son útiles para clientes mayoristas, promociones o distribuidores con precios especiales.</p>
+                  </div>
+                </div>
               </div>
 
+              {/* Precio Base */}
+              <div className="bg-gradient-to-r from-blue-50 to-blue-50/50 dark:from-blue-950/30 dark:to-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Precio Base (Por defecto)</p>
+                      <p className="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-2">
+                        ${Number(priceListProduct?.price).toFixed(2)}
+                      </p>
+                    </div>
+                    <Info className="h-5 w-5 text-blue-500 opacity-50" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Este precio se usa cuando no hay una lista específica configurada
+                  </p>
+                </div>
+              </div>
+
+              {/* Listas de Precios */}
               {priceLists && priceLists.length > 0 ? (
                 <div className="space-y-3">
-                  <Label className="text-base font-semibold">Precios por Lista</Label>
-                  {priceLists.map((priceList: any) => {
-                    const existingPrice = productPrices?.find((pp: any) => pp.price_list_id === priceList.id);
-                    return (
-                      <div key={priceList.id} className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          {priceList.name}
-                          {priceList.is_default && <Badge variant="secondary">Por defecto</Badge>}
-                          {existingPrice && (
-                            <span className="text-sm text-muted-foreground">
-                              (Actual: ${existingPrice.price})
-                            </span>
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <Badge variant="outline">
+                      <DollarSign className="h-3 w-3 mr-1" />
+                      {productPrices?.filter((pp: any) => pp.product_id === priceListProduct.id).length || 0} Listas Configuradas
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid gap-3">
+                    {priceLists.map((priceList: any) => {
+                      const existingPrice = productPrices?.find((pp: any) => pp.product_id === priceListProduct.id && pp.price_list_id === priceList.id);
+                      const inputValue = priceListPrices[priceList.id];
+                      const displayPrice = inputValue ? parseFloat(inputValue) : existingPrice?.price;
+                      const percentDiff = displayPrice && priceListProduct?.price 
+                        ? (((displayPrice - priceListProduct.price) / priceListProduct.price) * 100).toFixed(1)
+                        : null;
+                      
+                      return (
+                        <div key={priceList.id} className="border rounded-lg p-4 space-y-3 hover:bg-muted/40 transition-colors dark:hover:bg-muted/20">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <Label className="text-base font-semibold flex items-center gap-2">
+                                {priceList.name}
+                                {priceList.is_default && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Por defecto
+                                  </Badge>
+                                )}
+                              </Label>
+                              {existingPrice && !inputValue && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Precio actual: ${Number(existingPrice.price).toFixed(2)}
+                                </p>
+                              )}
+                            </div>
+                            {displayPrice && percentDiff && (
+                              <div className={`text-right text-sm font-medium ${
+                                parseFloat(percentDiff) < 0 
+                                  ? 'text-orange-600 dark:text-orange-500' 
+                                  : 'text-green-600 dark:text-green-500'
+                              }`}>
+                                {parseFloat(percentDiff) < 0 ? '↓' : '↑'} {Math.abs(parseFloat(percentDiff))}%
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex items-end gap-3">
+                            <div className="flex-1">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder={existingPrice ? String(existingPrice.price) : "Ingresa el precio"}
+                                value={priceListPrices[priceList.id] || ""}
+                                onChange={(e) => setPriceListPrices({
+                                  ...priceListPrices,
+                                  [priceList.id]: e.target.value
+                                })}
+                                className="text-lg font-semibold"
+                              />
+                            </div>
+                            {displayPrice && (
+                              <div className="px-3 py-2 bg-muted rounded text-center">
+                                <p className="text-xs text-muted-foreground">Total</p>
+                                <p className="text-lg font-bold">${Number(displayPrice).toFixed(2)}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {displayPrice && priceListProduct?.cost && displayPrice > priceListProduct.cost && (
+                            <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-500 bg-green-50 dark:bg-green-950/30 px-3 py-2 rounded">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Margen: {((((displayPrice - priceListProduct.cost) / displayPrice) * 100)).toFixed(1)}%
+                            </div>
                           )}
-                        </Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder={existingPrice ? String(existingPrice.price) : "Precio en esta lista"}
-                          value={priceListPrices[priceList.id] || ""}
-                          onChange={(e) => setPriceListPrices({
-                            ...priceListPrices,
-                            [priceList.id]: e.target.value
-                          })}
-                        />
-                      </div>
-                    );
-                  })}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  <DollarSign className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No hay listas de precios configuradas</p>
-                  <p className="text-sm">Crea listas de precios en Configuración</p>
+                <div className="text-center py-10 text-muted-foreground bg-muted/30 rounded-lg">
+                  <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-25" />
+                  <p className="font-medium">No hay listas de precios configuradas</p>
+                  <p className="text-sm mt-1">Crea listas de precios en Configuración para gestionar precios diferentes</p>
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => {
-                  setIsPriceListDialogOpen(false);
-                  setPriceListPrices({});
-                }}>
-                  Cancelar
-                </Button>
-                <Button onClick={submitPriceListUpdates}>
-                  Guardar Precios
-                </Button>
+              {/* Resumen */}
+              {priceLists && priceLists.length > 0 && (
+                <div className="bg-muted/50 p-4 rounded-lg border space-y-2">
+                  <p className="text-sm font-semibold">📊 Resumen de Precios</p>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Precio Base</p>
+                      <p className="font-semibold">${Number(priceListProduct?.price).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Costo del Producto</p>
+                      <p className="font-semibold">${Number(priceListProduct?.cost || 0).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Margen Base</p>
+                      <p className="font-semibold text-green-600 dark:text-green-500">
+                        {priceListProduct?.cost && priceListProduct.price > priceListProduct.cost
+                          ? `${(((priceListProduct.price - priceListProduct.cost) / priceListProduct.price) * 100).toFixed(1)}%`
+                          : '—'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button variant="outline" onClick={() => {
+                setIsPriceListDialogOpen(false);
+                setPriceListPrices({});
+              }}>
+                Cancelar
+              </Button>
+              <Button onClick={submitPriceListUpdates} className="gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                Guardar Precios
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Custom Fields Management Dialog */}
+        <Dialog open={isCustomFieldsDialogOpen} onOpenChange={setIsCustomFieldsDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                Gestionar Campos Personalizados
+              </DialogTitle>
+              <DialogDescription>
+                Crea campos adicionales para almacenar información personalizada de tus productos
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6">
+              {/* Crear Nuevo Campo */}
+              <div className="space-y-4 p-4 border-2 border-dashed rounded-lg bg-muted/30">
+                <h4 className="font-semibold text-sm">➕ Crear Nuevo Campo</h4>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="field-name">Nombre del Campo</Label>
+                    <Input
+                      id="field-name"
+                      value={newCustomField.name}
+                      onChange={(e) => setNewCustomField({...newCustomField, name: e.target.value})}
+                      placeholder="Ej: Proveedore, Color, Tamaño"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="field-type">Tipo de Campo</Label>
+                    <Select value={newCustomField.type} onValueChange={(value) => setNewCustomField({...newCustomField, type: value as any})}>
+                      <SelectTrigger id="field-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="text">📝 Texto</SelectItem>
+                        <SelectItem value="number">🔢 Número</SelectItem>
+                        <SelectItem value="textarea">📄 Texto Largo</SelectItem>
+                        <SelectItem value="select">📋 Selección (Dropdown)</SelectItem>
+                        <SelectItem value="checkbox">☑️ Checkbox</SelectItem>
+                        <SelectItem value="date">📅 Fecha</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {(newCustomField.type === "select") && (
+                    <div className="space-y-2">
+                      <Label htmlFor="field-options">Opciones (separadas por comas)</Label>
+                      <Input
+                        id="field-options"
+                        value={newCustomField.options}
+                        onChange={(e) => setNewCustomField({...newCustomField, options: e.target.value})}
+                        placeholder="Ej: Rojo, Azul, Verde"
+                      />
+                      <p className="text-xs text-muted-foreground">Ingresa las opciones separadas por comas</p>
+                    </div>
+                  )}
+                  <Button onClick={addCustomField} className="w-full gap-2">
+                    <Plus className="h-4 w-4" />
+                    Agregar Campo
+                  </Button>
+                </div>
               </div>
+
+              {/* Campos Existentes */}
+              {customFields.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm">📊 Campos Existentes ({customFields.length})</h4>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {customFields.map((field) => (
+                      <div key={field.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{field.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Tipo: {field.type === "text" && "Texto"}
+                            {field.type === "number" && "Número"}
+                            {field.type === "textarea" && "Texto Largo"}
+                            {field.type === "select" && `Selección (${field.options?.length || 0} opciones)`}
+                            {field.type === "checkbox" && "Checkbox"}
+                            {field.type === "date" && "Fecha"}
+                          </p>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removeCustomField(field.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {customFields.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-2 opacity-25" />
+                  <p className="font-medium">No hay campos personalizados aún</p>
+                  <p className="text-sm">Crea uno para empezar</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsCustomFieldsDialogOpen(false)}>
+                Cerrar
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
