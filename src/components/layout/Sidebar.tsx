@@ -53,7 +53,7 @@ import { useActiveModules } from "@/hooks/useActiveModules";
 import { usePermissions, Module } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useCompany } from "@/contexts/CompanyContext";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
