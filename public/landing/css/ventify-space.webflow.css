@@ -1412,7 +1412,7 @@ figure {
 .footer-legal-link {
   color: var(--_colors---text--soft-400);
   transition: color .2s;
-  display: none;
+  display: inline-block;
 }
 
 .footer-legal-link:hover {
