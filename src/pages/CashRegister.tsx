@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+// M-1: Removed unused `useEffect` import
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,18 +28,24 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
   Clock,
   Plus,
-  Minus
+  Loader2,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
+
+// B-4: Strong status type instead of plain string
+type RegisterStatus = "open" | "closed";
+
+// C-2: Roles authorized to operate the cash register
+const CASH_ROLES = ["admin", "manager", "cashier", "platform_admin"];
 
 interface CashRegister {
   id: string;
@@ -48,7 +55,7 @@ interface CashRegister {
   closing_amount: number | null;
   expected_amount: number | null;
   difference: number | null;
-  status: string;
+  status: RegisterStatus;
   notes: string | null;
 }
 
@@ -62,8 +69,16 @@ interface CashMovement {
 }
 
 export default function CashRegister() {
-  const { currentCompany } = useCompany();
+  const { currentCompany, currentCompanyRole } = useCompany();
   const queryClient = useQueryClient();
+
+  // C-2: Only cashier, admin, manager, platform_admin can operate
+  const canOperate =
+    !!currentCompanyRole && CASH_ROLES.includes(currentCompanyRole);
+
+  // M-3: Use company currency instead of hardcoded "$"
+  const currency = currentCompany?.currency || "$";
+
   const [openDialog, setOpenDialog] = useState(false);
   const [closeDialog, setCloseDialog] = useState(false);
   const [movementDialog, setMovementDialog] = useState(false);
@@ -77,30 +92,37 @@ export default function CashRegister() {
   const [movementCategory, setMovementCategory] = useState("");
   const [movementDescription, setMovementDescription] = useState("");
 
-  // Query for current register
+  // C-1: Filter by company_id to prevent cross-company data leak
   const { data: currentRegister, isLoading: loading } = useQuery({
-    queryKey: ["cash-register"],
+    queryKey: ["cash-register", currentCompany?.id],
     queryFn: async () => {
       const { data: register, error: registerError } = await supabase
         .from("cash_registers")
         .select("*")
         .eq("status", "open")
+        // C-1: Scope to current company — prevents cross-tenant data exposure
+        .eq("company_id", currentCompany!.id)
         .order("opening_date", { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (registerError) throw registerError;
-      return register;
+      return register as CashRegister | null;
     },
-    refetchInterval: 5000, // Refetch every 5 seconds
+    // C-1 + M-6: Only run when company is loaded
+    enabled: !!currentCompany?.id,
+    refetchInterval: 5000,
   });
 
-  // Query for movements
-  const { data: movements = [] } = useQuery({
+  // A-4: Expose refetch to force fresh data before closing register
+  const {
+    data: movements = [],
+    refetch: refetchMovements,
+  } = useQuery({
     queryKey: ["cash-movements", currentRegister?.id],
     queryFn: async () => {
       if (!currentRegister?.id) return [];
-      
+
       const { data: movementsData, error: movementsError } = await supabase
         .from("cash_movements")
         .select("*")
@@ -108,43 +130,67 @@ export default function CashRegister() {
         .order("created_at", { ascending: false });
 
       if (movementsError) throw movementsError;
-      return movementsData || [];
+      return (movementsData || []) as CashMovement[];
     },
     enabled: !!currentRegister?.id,
-    refetchInterval: 5000, // Refetch every 5 seconds
+    // M-6: Only poll when there is an open register
+    refetchInterval: currentRegister ? 5000 : false,
   });
 
-  const handleOpenRegister = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
+  // A-1: useMutation for open register — enables isPending for double-submit prevention
+  const openRegisterMutation = useMutation({
+    mutationFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
+      // A-2: Guard against null company on insert
+      if (!currentCompany) throw new Error("No hay empresa seleccionada");
 
-      const { error } = await supabase
-        .from("cash_registers")
-        .insert({
-          user_id: user.id,
-          opening_amount: parseFloat(openingAmount) || 0,
-          status: "open",
-          company_id: currentCompany?.id,
-        });
+      const { error } = await supabase.from("cash_registers").insert({
+        user_id: user.id,
+        opening_amount: parseFloat(openingAmount) || 0,
+        // B-4: Typed status value
+        status: "open" as RegisterStatus,
+        // A-2: Use non-optional company_id
+        company_id: currentCompany.id,
+      });
 
       if (error) throw error;
-
+    },
+    onSuccess: () => {
       toast.success("Caja abierta exitosamente");
       setOpenDialog(false);
       setOpeningAmount("");
-      queryClient.invalidateQueries({ queryKey: ["cash-register"] });
-    } catch (error: any) {
+      queryClient.invalidateQueries({
+        queryKey: ["cash-register", currentCompany?.id],
+      });
+    },
+    onError: (error: Error) => {
       toast.error("Error al abrir caja: " + error.message);
-    }
-  };
+    },
+  });
 
-  const handleCloseRegister = async () => {
-    if (!currentRegister) return;
+  // A-1: useMutation for close register
+  const closeRegisterMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentRegister) throw new Error("No hay caja abierta");
 
-    try {
+      // A-4: Force-refetch movements for accurate expected amount at close time
+      const { data: freshMovements } = await refetchMovements();
+      const latestMovements = freshMovements ?? [];
+
+      // M-4: No redundant double conversion — amount is already a number
+      const income = latestMovements
+        .filter((m) => m.type === "income" || m.type === "deposit")
+        .reduce((sum, m) => sum + m.amount, 0);
+
+      const expense = latestMovements
+        .filter((m) => m.type === "expense" || m.type === "withdrawal")
+        .reduce((sum, m) => sum + m.amount, 0);
+
+      const expected = currentRegister.opening_amount + income - expense;
       const closing = parseFloat(closingAmount) || 0;
-      const expected = calculateExpectedAmount();
       const difference = closing - expected;
 
       const { error } = await supabase
@@ -154,109 +200,142 @@ export default function CashRegister() {
           closing_amount: closing,
           expected_amount: expected,
           difference: difference,
-          status: "closed",
+          status: "closed" as RegisterStatus,
           notes: closingNotes || null,
         })
         .eq("id", currentRegister.id);
 
       if (error) throw error;
-
+    },
+    onSuccess: () => {
       toast.success("Caja cerrada exitosamente");
       setCloseDialog(false);
       setClosingAmount("");
       setClosingNotes("");
-      queryClient.invalidateQueries({ queryKey: ["cash-register"] });
-    } catch (error: any) {
+      queryClient.invalidateQueries({
+        queryKey: ["cash-register", currentCompany?.id],
+      });
+    },
+    onError: (error: Error) => {
       toast.error("Error al cerrar caja: " + error.message);
-    }
-  };
+    },
+  });
 
-  const handleAddMovement = async () => {
-    if (!currentRegister) return;
+  // A-1: useMutation for add movement
+  const addMovementMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentRegister) throw new Error("No hay caja abierta");
+      // A-2: Guard against null company on insert
+      if (!currentCompany) throw new Error("No hay empresa seleccionada");
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      const { error } = await supabase
-        .from("cash_movements")
-        .insert({
-          cash_register_id: currentRegister.id,
-          user_id: user.id,
-          type: movementType,
-          amount: parseFloat(movementAmount) || 0,
-          category: movementCategory,
-          description: movementDescription || null,
-          company_id: currentCompany?.id,
-        });
+      // A-3: Validate amount is a positive number
+      const amount = parseFloat(movementAmount);
+      if (!movementAmount || isNaN(amount) || amount <= 0) {
+        throw new Error("El monto debe ser un número mayor a 0");
+      }
+
+      // A-3: Validate category is not empty
+      if (!movementCategory.trim()) {
+        throw new Error("La categoría es requerida");
+      }
+
+      const { error } = await supabase.from("cash_movements").insert({
+        cash_register_id: currentRegister.id,
+        user_id: user.id,
+        type: movementType,
+        amount: amount,
+        category: movementCategory.trim(),
+        description: movementDescription || null,
+        // A-2: Use non-optional company_id
+        company_id: currentCompany.id,
+      });
 
       if (error) throw error;
-
+    },
+    onSuccess: () => {
       toast.success("Movimiento registrado exitosamente");
       setMovementDialog(false);
       setMovementAmount("");
       setMovementCategory("");
       setMovementDescription("");
-      queryClient.invalidateQueries({ queryKey: ["cash-register"] });
-      queryClient.invalidateQueries({ queryKey: ["cash-movements"] });
-    } catch (error: any) {
+      setMovementType("income");
+      // M-2: Use full queryKey with register ID — not a broad invalidation
+      queryClient.invalidateQueries({
+        queryKey: ["cash-movements", currentRegister?.id],
+      });
+    },
+    onError: (error: Error) => {
       toast.error("Error al registrar movimiento: " + error.message);
-    }
-  };
+    },
+  });
 
-  const calculateExpectedAmount = () => {
-    if (!currentRegister) return 0;
-    
-    const income = movements
-      .filter(m => m.type === "income" || m.type === "deposit")
-      .reduce((sum, m) => sum + parseFloat(m.amount.toString()), 0);
-    
-    const expense = movements
-      .filter(m => m.type === "expense" || m.type === "withdrawal")
-      .reduce((sum, m) => sum + parseFloat(m.amount.toString()), 0);
-    
-    return parseFloat(currentRegister.opening_amount.toString()) + income - expense;
-  };
-
+  // M-4: Direct sum — no redundant string conversion needed
   const totalIncome = movements
-    .filter(m => m.type === "income" || m.type === "deposit")
-    .reduce((sum, m) => sum + parseFloat(m.amount.toString()), 0);
+    .filter((m) => m.type === "income" || m.type === "deposit")
+    .reduce((sum, m) => sum + m.amount, 0);
 
   const totalExpense = movements
-    .filter(m => m.type === "expense" || m.type === "withdrawal")
-    .reduce((sum, m) => sum + parseFloat(m.amount.toString()), 0);
+    .filter((m) => m.type === "expense" || m.type === "withdrawal")
+    .reduce((sum, m) => sum + m.amount, 0);
 
-  const currentAmount = currentRegister ? calculateExpectedAmount() : 0;
+  const currentAmount = currentRegister
+    ? currentRegister.opening_amount + totalIncome - totalExpense
+    : 0;
 
   return (
     <Layout>
       <div className="space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Gestión de Caja</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              Gestión de Caja
+            </h1>
             <p className="text-sm md:text-base text-muted-foreground mt-1">
               Control de apertura, cierre y movimientos
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {!currentRegister ? (
-              <Button onClick={() => setOpenDialog(true)} className="w-full sm:w-auto">
-                <Clock className="mr-2 h-4 w-4" />
-                Abrir Caja
-              </Button>
-            ) : (
-              <>
-                <Button variant="outline" onClick={() => setMovementDialog(true)} size="sm" className="flex-1 sm:flex-none">
-                  <Plus className="mr-1 sm:mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Registrar </span>Movimiento
+          {/* C-2: Action buttons only for authorized roles */}
+          {canOperate && (
+            <div className="flex flex-wrap gap-2">
+              {!currentRegister ? (
+                <Button
+                  onClick={() => setOpenDialog(true)}
+                  className="w-full sm:w-auto"
+                  disabled={loading}
+                >
+                  <Clock className="mr-2 h-4 w-4" />
+                  Abrir Caja
                 </Button>
-                <Button variant="destructive" onClick={() => setCloseDialog(true)} size="sm" className="flex-1 sm:flex-none">
-                  <Clock className="mr-1 sm:mr-2 h-4 w-4" />
-                  Cerrar Caja
-                </Button>
-              </>
-            )}
-          </div>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setMovementDialog(true)}
+                    size="sm"
+                    className="flex-1 sm:flex-none"
+                  >
+                    <Plus className="mr-1 sm:mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">Registrar </span>
+                    Movimiento
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setCloseDialog(true)}
+                    size="sm"
+                    className="flex-1 sm:flex-none"
+                  >
+                    <Clock className="mr-1 sm:mr-2 h-4 w-4" />
+                    Cerrar Caja
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {currentRegister ? (
@@ -264,24 +343,30 @@ export default function CashRegister() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Monto Inicial</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Monto Inicial
+                  </CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
+                  {/* B-1: Use company currency */}
                   <div className="text-2xl font-bold">
-                    ${parseFloat(currentRegister.opening_amount.toString()).toFixed(2)}
+                    {currency}{" "}
+                    {currentRegister.opening_amount.toFixed(2)}
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Ingresos</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Ingresos
+                  </CardTitle>
                   <TrendingUp className="h-4 w-4 text-green-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">
-                    +${totalIncome.toFixed(2)}
+                    +{currency} {totalIncome.toFixed(2)}
                   </div>
                 </CardContent>
               </Card>
@@ -293,19 +378,21 @@ export default function CashRegister() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">
-                    -${totalExpense.toFixed(2)}
+                    -{currency} {totalExpense.toFixed(2)}
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Saldo Actual</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Saldo Actual
+                  </CardTitle>
                   <DollarSign className="h-4 w-4 text-blue-500" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-blue-600">
-                    ${currentAmount.toFixed(2)}
+                    {currency} {currentAmount.toFixed(2)}
                   </div>
                 </CardContent>
               </Card>
@@ -321,9 +408,13 @@ export default function CashRegister() {
                     <TableRow>
                       <TableHead className="min-w-[80px]">Tipo</TableHead>
                       <TableHead className="min-w-[100px]">Categoría</TableHead>
-                      <TableHead className="hidden sm:table-cell">Descripción</TableHead>
+                      <TableHead className="hidden sm:table-cell">
+                        Descripción
+                      </TableHead>
                       <TableHead className="min-w-[90px]">Monto</TableHead>
-                      <TableHead className="hidden md:table-cell">Hora</TableHead>
+                      <TableHead className="hidden md:table-cell">
+                        Hora
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -339,7 +430,8 @@ export default function CashRegister() {
                           <TableCell>
                             <Badge
                               className={
-                                movement.type === "income" || movement.type === "deposit"
+                                movement.type === "income" ||
+                                movement.type === "deposit"
                                   ? "bg-green-500"
                                   : "bg-red-500"
                               }
@@ -351,19 +443,30 @@ export default function CashRegister() {
                             </Badge>
                           </TableCell>
                           <TableCell>{movement.category}</TableCell>
-                          <TableCell>{movement.description || "-"}</TableCell>
+                          <TableCell>
+                            {movement.description || "-"}
+                          </TableCell>
                           <TableCell
                             className={
-                              movement.type === "income" || movement.type === "deposit"
+                              movement.type === "income" ||
+                              movement.type === "deposit"
                                 ? "text-green-600 font-semibold"
                                 : "text-red-600 font-semibold"
                             }
                           >
-                            {movement.type === "income" || movement.type === "deposit" ? "+" : "-"}
-                            ${parseFloat(movement.amount.toString()).toFixed(2)}
+                            {movement.type === "income" ||
+                            movement.type === "deposit"
+                              ? "+"
+                              : "-"}
+                            {/* B-1: Company currency */}
+                            {currency} {movement.amount.toFixed(2)}
                           </TableCell>
                           <TableCell>
-                            {new Date(movement.created_at).toLocaleTimeString()}
+                            {/* B-2: Explicit locale for consistent formatting */}
+                            {new Date(movement.created_at).toLocaleTimeString(
+                              "es",
+                              { hour: "2-digit", minute: "2-digit" }
+                            )}
                           </TableCell>
                         </TableRow>
                       ))
@@ -377,11 +480,15 @@ export default function CashRegister() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Clock className="h-16 w-16 text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No hay caja abierta</h3>
+              <h3 className="text-xl font-semibold mb-2">
+                No hay caja abierta
+              </h3>
               <p className="text-muted-foreground mb-4">
                 Debes abrir la caja para comenzar a registrar movimientos
               </p>
-              <Button onClick={() => setOpenDialog(true)}>Abrir Caja</Button>
+              {canOperate && (
+                <Button onClick={() => setOpenDialog(true)}>Abrir Caja</Button>
+              )}
             </CardContent>
           </Card>
         )}
@@ -406,10 +513,23 @@ export default function CashRegister() {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpenDialog(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setOpenDialog(false)}
+                disabled={openRegisterMutation.isPending}
+              >
                 Cancelar
               </Button>
-              <Button onClick={handleOpenRegister}>Abrir Caja</Button>
+              {/* A-1: Disabled during pending to prevent double-submit */}
+              <Button
+                onClick={() => openRegisterMutation.mutate()}
+                disabled={openRegisterMutation.isPending}
+              >
+                {openRegisterMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Abrir Caja
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -425,11 +545,16 @@ export default function CashRegister() {
             <div className="p-4 bg-muted rounded-lg">
               <div className="flex justify-between mb-2">
                 <span className="text-sm">Monto esperado:</span>
-                <span className="text-sm font-bold">${currentAmount.toFixed(2)}</span>
+                {/* B-1: Company currency */}
+                <span className="text-sm font-bold">
+                  {currency} {currentAmount.toFixed(2)}
+                </span>
               </div>
             </div>
             <div>
-              <Label htmlFor="closing-amount">Monto Final (conteo físico)</Label>
+              <Label htmlFor="closing-amount">
+                Monto Final (conteo físico)
+              </Label>
               <Input
                 id="closing-amount"
                 type="number"
@@ -450,7 +575,9 @@ export default function CashRegister() {
                         : "text-red-600"
                     }`}
                   >
-                    ${(parseFloat(closingAmount) - currentAmount).toFixed(2)}
+                    {/* B-1: Company currency */}
+                    {currency}{" "}
+                    {(parseFloat(closingAmount) - currentAmount).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -465,17 +592,42 @@ export default function CashRegister() {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setCloseDialog(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setCloseDialog(false)}
+                disabled={closeRegisterMutation.isPending}
+              >
                 Cancelar
               </Button>
-              <Button onClick={handleCloseRegister}>Cerrar Caja</Button>
+              {/* A-1: Disabled during pending to prevent double-submit */}
+              <Button
+                onClick={() => closeRegisterMutation.mutate()}
+                disabled={closeRegisterMutation.isPending}
+              >
+                {closeRegisterMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Cerrar Caja
+              </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Movement Dialog */}
-      <Dialog open={movementDialog} onOpenChange={setMovementDialog}>
+      <Dialog
+        open={movementDialog}
+        onOpenChange={(open) => {
+          // M-5: Reset all fields including movementType on dialog close
+          if (!open) {
+            setMovementType("income");
+            setMovementAmount("");
+            setMovementCategory("");
+            setMovementDescription("");
+          }
+          setMovementDialog(open);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Registrar Movimiento</DialogTitle>
@@ -501,13 +653,16 @@ export default function CashRegister() {
                 id="movement-amount"
                 type="number"
                 step="0.01"
+                min="0.01"
                 placeholder="0.00"
                 value={movementAmount}
                 onChange={(e) => setMovementAmount(e.target.value)}
               />
             </div>
             <div>
-              <Label htmlFor="movement-category">Categoría</Label>
+              <Label htmlFor="movement-category">
+                Categoría <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="movement-category"
                 placeholder="Ej: Venta, Gasto operativo, etc."
@@ -516,7 +671,9 @@ export default function CashRegister() {
               />
             </div>
             <div>
-              <Label htmlFor="movement-description">Descripción (opcional)</Label>
+              <Label htmlFor="movement-description">
+                Descripción (opcional)
+              </Label>
               <Textarea
                 id="movement-description"
                 placeholder="Detalles del movimiento..."
@@ -525,10 +682,23 @@ export default function CashRegister() {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setMovementDialog(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setMovementDialog(false)}
+                disabled={addMovementMutation.isPending}
+              >
                 Cancelar
               </Button>
-              <Button onClick={handleAddMovement}>Registrar</Button>
+              {/* A-1: Disabled during pending to prevent double-submit */}
+              <Button
+                onClick={() => addMovementMutation.mutate()}
+                disabled={addMovementMutation.isPending}
+              >
+                {addMovementMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Registrar
+              </Button>
             </div>
           </div>
         </DialogContent>

@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { HealthIndicator } from "./HealthIndicator";
-import { Package, TrendingUp, Users, AlertTriangle, DollarSign, Clock } from "lucide-react";
+import { Package, TrendingUp, Users, AlertTriangle, DollarSign, Clock, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,7 @@ interface BusinessHealthPanelProps {
 
 export function BusinessHealthPanel({ companyId }: BusinessHealthPanelProps) {
   const navigate = useNavigate();
+  const [isAlertsOpen, setIsAlertsOpen] = useState(true);
 
   // Stock crítico
   const { data: stockHealth } = useQuery({
@@ -190,63 +192,86 @@ export function BusinessHealthPanel({ companyId }: BusinessHealthPanelProps) {
       {/* Priority Alerts */}
       {recentAlerts && recentAlerts.length > 0 && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-orange-500" />
-              <CardTitle>Alertas Prioritarias</CardTitle>
+          <CardHeader
+            className="flex flex-row items-center justify-between cursor-pointer select-none p-4 md:p-6"
+            onClick={() => setIsAlertsOpen((v) => !v)}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0" />
+              <CardTitle className="text-base md:text-lg">Alertas Prioritarias</CardTitle>
+              <Badge variant="secondary" className="text-xs shrink-0">
+                {recentAlerts.length}
+              </Badge>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/inventory-alerts")}
-            >
-              Ver todas
-            </Button>
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-8 px-2 md:px-3"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate("/inventory-alerts");
+                }}
+              >
+                Ver todas
+              </Button>
+              <ChevronDown
+                className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                  isAlertsOpen ? "rotate-0" : "-rotate-90"
+                }`}
+              />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentAlerts.slice(0, 5).map((alert) => (
-                <div
-                  key={alert.id}
-                  className="flex items-start justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted cursor-pointer transition-colors"
-                  onClick={() => navigate("/inventory-alerts")}
-                >
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={
-                          alertPriority(alert.type) === "critical"
-                            ? "destructive"
-                            : alertPriority(alert.type) === "warning"
-                            ? "default"
-                            : "outline"
-                        }
-                      >
-                        {alert.type === "low_stock"
-                          ? "Stock Bajo"
-                          : alert.type === "overdue_invoice"
-                          ? "Vencida"
-                          : alert.type === "expiring_product"
-                          ? "Por Vencer"
-                          : alert.type === "expiring_check"
-                          ? "Cheque"
-                          : "Alerta"}
-                      </Badge>
-                      <span className="text-sm font-medium">{alert.title}</span>
+
+          {isAlertsOpen && (
+            <CardContent className="pt-0 px-4 pb-4 md:px-6 md:pb-6">
+              <div className="space-y-2">
+                {recentAlerts.slice(0, 5).map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="flex flex-col gap-1.5 p-3 rounded-lg bg-muted/50 hover:bg-muted cursor-pointer transition-colors sm:flex-row sm:items-start sm:justify-between sm:gap-3"
+                    onClick={() => navigate("/inventory-alerts")}
+                  >
+                    <div className="flex-1 space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge
+                          variant={
+                            alertPriority(alert.type) === "critical"
+                              ? "destructive"
+                              : alertPriority(alert.type) === "warning"
+                              ? "default"
+                              : "outline"
+                          }
+                          className="text-xs shrink-0"
+                        >
+                          {alert.type === "low_stock"
+                            ? "Stock Bajo"
+                            : alert.type === "overdue_invoice"
+                            ? "Vencida"
+                            : alert.type === "expiring_product"
+                            ? "Por Vencer"
+                            : alert.type === "expiring_check"
+                            ? "Cheque"
+                            : "Alerta"}
+                        </Badge>
+                        <span className="text-sm font-medium truncate">{alert.title}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{alert.message}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground">{alert.message}</p>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0 self-end sm:self-start sm:pt-0.5">
+                      <Clock className="h-3 w-3 shrink-0" />
+                      <span className="whitespace-nowrap">
+                        {formatDistanceToNow(new Date(alert.created_at), {
+                          addSuffix: true,
+                          locale: es,
+                        })}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    {formatDistanceToNow(new Date(alert.created_at), {
-                      addSuffix: true,
-                      locale: es,
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
+                ))}
+              </div>
+            </CardContent>
+          )}
         </Card>
       )}
     </div>

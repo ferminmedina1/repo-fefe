@@ -142,7 +142,7 @@ export default function CrmReports() {
     setScheduleRecipients((schedule.recipients || []).join(", "));
     setPayloadMode(schedule.payload_mode || "full");
   }, [reportSchedule]);
-  
+
   const [companyName, setCompanyName] = useState<string>("");
   if (!currentCompany?.id) throw new Error("Empresa inválida");
       useEffect(() => {
@@ -335,16 +335,16 @@ export default function CrmReports() {
         (opp) => opp.pipeline_id === pipeline.id
       );
       const funnel = (pipeline.stages || []).map((stage: string) => {
-  const normalizedStage = (stage ?? "").trim().toLowerCase();
-  const stageOpps = pipelineOpportunities.filter(
-    (opp) => (opp.stage ?? "").trim().toLowerCase() === normalizedStage
-  );
-  return {
-    stage,
-    count: stageOpps.length,
-    value: stageOpps.reduce((sum, opp) => sum + (Number(opp.value) || 0), 0),
-  };
-});
+        const normalizedStage = (stage ?? "").trim().toLowerCase();
+        const stageOpps = pipelineOpportunities.filter(
+          (opp) => (opp.stage ?? "").trim().toLowerCase() === normalizedStage
+        );
+        return {
+          stage,
+          count: stageOpps.length,
+          value: stageOpps.reduce((sum, opp) => sum + (Number(opp.value) || 0), 0),
+        };
+      });
       return {
         id: pipeline.id,
         name: pipeline.name,

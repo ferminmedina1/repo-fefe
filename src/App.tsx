@@ -81,6 +81,11 @@ const Opportunities = lazy(() => import("./pages/Opportunities"));
 const Pipelines = lazy(() => import("./pages/Pipelines"));
 const CrmReports = lazy(() => import("./pages/CrmReports"));
 const CrmRoles = lazy(() => import("./pages/CrmRoles"));
+const MonthlySalesAnalytics = lazy(() => import("./pages/analytics/MonthlySalesAnalytics"));
+const GrossMarginAnalytics = lazy(() => import("./pages/analytics/GrossMarginAnalytics"));
+const ReceivablesAnalytics = lazy(() => import("./pages/analytics/ReceivablesAnalytics"));
+const DailySalesAnalytics = lazy(() => import("./pages/analytics/DailySalesAnalytics"));
+const IndicadoresComerciales = lazy(() => import("./pages/analytics/IndicadoresComerciales"));
 
 const queryClient = new QueryClient();
 
@@ -329,6 +334,11 @@ const App = () => (
             <Route path="/products" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="products"><Products /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/customers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customers"><Customers /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/sales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><Sales /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/analytics/indicadores-comerciales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><IndicadoresComerciales /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/analytics/monthly-sales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><MonthlySalesAnalytics /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/analytics/gross-margin" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><GrossMarginAnalytics /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/analytics/accounts-receivable" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><ReceivablesAnalytics /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/analytics/daily-sales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><DailySalesAnalytics /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="settings"><Settings /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/settings/email" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="settings"><EmailConfig /></ModuleProtectedRoute></ProtectedRoute>} />
             

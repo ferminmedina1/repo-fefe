@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Package, ShoppingCart, TrendingUp, Users, AlertTriangle, BarChart3, Activity, ArrowUpRight, ArrowDownRight, TrendingDown, Calendar } from "lucide-react";
+import { DollarSign, Package, ShoppingCart, TrendingUp, Users, AlertTriangle, BarChart3, Activity, ArrowUpRight, ArrowDownRight, TrendingDown, Calendar, ChevronRight } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
+import { useNavigate } from "react-router-dom";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { format, subDays, startOfDay, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
@@ -15,6 +16,7 @@ import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist
 export default function Dashboard() {
   const { currentCompany } = useCompany();
   const { hasPermission, loading } = usePermissions();
+  const navigate = useNavigate();
   const canViewSales = hasPermission("sales", "view");
   const canViewProducts = hasPermission("products", "view");
   const canViewCustomers = hasPermission("customers", "view");
@@ -459,13 +461,16 @@ export default function Dashboard() {
 
         {canViewSales && (
           <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-4">
-            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-blue-500/30">
+            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-blue-500/30 cursor-pointer" onClick={() => navigate("/analytics/indicadores-comerciales")}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
                 <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Ventas del Mes
                 </CardTitle>
-                <div className="p-1.5 md:p-2.5 rounded-lg bg-blue-500/10">
-                  <Calendar className="h-4 w-4 md:h-5 md:w-5 text-blue-600 dark:text-blue-500" />
+                <div className="flex items-center gap-1">
+                  <div className="p-1.5 md:p-2.5 rounded-lg bg-blue-500/10">
+                    <Calendar className="h-4 w-4 md:h-5 md:w-5 text-blue-600 dark:text-blue-500" />
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
@@ -497,13 +502,16 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-green-500/30">
+            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-green-500/30 cursor-pointer" onClick={() => navigate("/analytics/indicadores-comerciales")}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
                 <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Margen Bruto
                 </CardTitle>
-                <div className="p-1.5 md:p-2.5 rounded-lg bg-green-500/10">
-                  <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-green-600 dark:text-green-500" />
+                <div className="flex items-center gap-1">
+                  <div className="p-1.5 md:p-2.5 rounded-lg bg-green-500/10">
+                    <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-green-600 dark:text-green-500" />
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
@@ -521,13 +529,16 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-orange-500/30">
+            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-orange-500/30 cursor-pointer" onClick={() => navigate("/analytics/indicadores-comerciales")}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
                 <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Por Cobrar
                 </CardTitle>
-                <div className="p-1.5 md:p-2.5 rounded-lg bg-orange-500/10">
-                  <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-orange-600 dark:text-orange-500" />
+                <div className="flex items-center gap-1">
+                  <div className="p-1.5 md:p-2.5 rounded-lg bg-orange-500/10">
+                    <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-orange-600 dark:text-orange-500" />
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
@@ -547,13 +558,16 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-purple-500/30">
+            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-purple-500/30 cursor-pointer" onClick={() => navigate("/analytics/indicadores-comerciales")}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
                 <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Ventas Hoy
                 </CardTitle>
-                <div className="p-1.5 md:p-2.5 rounded-lg bg-purple-500/10">
-                  <Activity className="h-4 w-4 md:h-5 md:w-5 text-purple-600 dark:text-purple-500" />
+                <div className="flex items-center gap-1">
+                  <div className="p-1.5 md:p-2.5 rounded-lg bg-purple-500/10">
+                    <Activity className="h-4 w-4 md:h-5 md:w-5 text-purple-600 dark:text-purple-500" />
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
