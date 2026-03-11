@@ -94,6 +94,13 @@ export default function Products() {
   const customFieldsSectionRef = useRef<HTMLDivElement>(null);
   const [digitalPriceTier, setDigitalPriceTier] = useState({name: "", price: ""});
   
+  // Sorting & Filtering States
+  const [sortBy, setSortBy] = useState<"name" | "price" | "stock" | "category" | "created_at">("created_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [filterType, setFilterType] = useState<"all" | "digital" | "combo" | "physical">("all");
+  const [filterStockStatus, setFilterStockStatus] = useState<"all" | "low" | "out">("all");
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
+  
   // Cargar parámetro de búsqueda desde URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -172,7 +179,7 @@ export default function Products() {
       if (!currentCompany?.id) return [];
       try {
         const { data, error } = await supabase
-          .from("product_categories")
+          .from("product_categories" as any)
           .select("*")
           .eq("company_id", currentCompany.id)
           .order("name");
@@ -195,7 +202,7 @@ export default function Products() {
       if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
       try {
         const { data, error } = await supabase
-          .from("product_categories")
+          .from("product_categories" as any)
           .insert({ company_id: currentCompany.id, name: name.trim() })
           .select()
           .single();
@@ -208,10 +215,12 @@ export default function Products() {
         throw err;
       }
     },
-    onSuccess: (newCategory) => {
-      toast.success(`Categoría "${newCategory.name}" creada exitosamente`);
+    onSuccess: (newCategory: any) => {
+      toast.success(`Categoría "${newCategory?.name || 'Nueva'}" creada exitosamente`);
       queryClient.invalidateQueries({ queryKey: ["product-categories"] });
-      setFormData({ ...formData, category_id: newCategory.id });
+      if (newCategory?.id) {
+        setFormData({ ...formData, category_id: newCategory.id });
+      }
       setIsAddCategoryDialogOpen(false);
       setNewCategoryName("");
     },
@@ -256,11 +265,11 @@ export default function Products() {
   const queryClient = useQueryClient();
 
   const { data: products, isLoading } = useQuery({
-    queryKey: ["products", searchQuery, categoryFilter, currentCompany?.id],
+    queryKey: ["products", searchQuery, categoryFilter, sortBy, sortDirection, filterType, filterStockStatus, priceRange, currentCompany?.id],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
-      let query = supabase.from("products").select("*").eq("company_id", currentCompany.id).eq("active", true).order("created_at", { ascending: false });
+      let query = supabase.from("products").select("*").eq("company_id", currentCompany.id).eq("active", true);
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -273,9 +282,39 @@ export default function Products() {
         query = query.eq("category_id", categoryFilter);
       }
       
+      // Apply price range filter
+      query = query.gte("price", priceRange[0]).lte("price", priceRange[1]);
+      
+      // Apply sorting
+      let orderColumn = sortBy;
+      if (sortBy === "created_at") {
+        orderColumn = "created_at";
+      }
+      query = query.order(orderColumn, { ascending: sortDirection === "asc" });
+      
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      
+      // Apply client-side filters
+      let filtered = (data || []) as any[];
+      
+      // Filter by type (digital/combo/physical)
+      if (filterType === "digital") {
+        filtered = filtered.filter(p => p.is_digital === true);
+      } else if (filterType === "combo") {
+        filtered = filtered.filter(p => p.is_combo === true);
+      } else if (filterType === "physical") {
+        filtered = filtered.filter(p => p.is_digital !== true && p.is_combo !== true);
+      }
+      
+      // Filter by stock status
+      if (filterStockStatus === "low") {
+        filtered = filtered.filter(p => p.stock > 0 && p.stock <= (p.min_stock || 5));
+      } else if (filterStockStatus === "out") {
+        filtered = filtered.filter(p => p.stock === 0);
+      }
+      
+      return filtered;
     },
     enabled: !!currentCompany?.id,
   });
@@ -1193,18 +1232,18 @@ export default function Products() {
       const user = authData.user;
 
       // Fetch category names for all products
-      const categoryIds = [...new Set(products.map(p => p.category_id).filter(Boolean))];
+      const categoryIds = [...new Set((products as any[]).map(p => p.category_id).filter(Boolean))];
       let categoryMap: Record<string, string> = {};
       
       if (categoryIds.length > 0) {
         try {
           const { data: categories, error: catError } = await supabase
-            .from("product_categories")
+            .from("product_categories" as any)
             .select("id, name")
             .in("id", categoryIds);
           
           if (!catError && categories) {
-            categories.forEach(cat => {
+            (categories as any[]).forEach(cat => {
               categoryMap[cat.id] = cat.name;
             });
           }
@@ -1213,7 +1252,7 @@ export default function Products() {
         }
       }
 
-      const csvData = products.map(p => {
+      const csvData = (products as any[]).map(p => {
         const row: any = {
           nombre: p.name,
           categoria: p.category_id ? (categoryMap[p.category_id] || "") : "",
@@ -1319,7 +1358,7 @@ export default function Products() {
             const productKey = `${validatedData.barcode || ''}_${validatedData.sku || ''}_${validatedData.name}`;
             
             // Generar SKU automáticamente si no se proporciona
-            const skuForProduct = validatedData.sku || generateSKU(validatedData.name, validatedData.category);
+            const skuForProduct = validatedData.sku || generateSKU(validatedData.name, "");
             
             validProducts.push({
               name: validatedData.name,
@@ -1329,7 +1368,7 @@ export default function Products() {
               cost: validatedData.cost ?? 0,
               stock: validatedData.stock,
               min_stock: validatedData.min_stock ?? 0,
-              category: validatedData.category || null,
+              category_id: validatedData.category_id || null,
               tags: [],
               custom_fields: {},
               company_id: currentCompany?.id,
@@ -1467,7 +1506,7 @@ export default function Products() {
     if (massEditData.price) updates.price = parseFloat(massEditData.price);
     if (massEditData.cost) updates.cost = parseFloat(massEditData.cost);
     if (massEditData.stock) updates.stock = parseInt(massEditData.stock);
-    if (massEditData.category) updates.category = massEditData.category;
+    if (massEditData.category_id) updates.category_id = massEditData.category_id;
 
     if (Object.keys(updates).length === 0) {
       toast.error("Ingresa al menos un campo para actualizar");
@@ -1516,7 +1555,7 @@ export default function Products() {
       toast.success(`${productIds.length} productos actualizados exitosamente`);
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setIsMassEditDialogOpen(false);
-      setMassEditData({ price: "", cost: "", stock: "", category: "" });
+      setMassEditData({ price: "", cost: "", stock: "", category_id: "" });
       setSelectedProducts(new Set());
     } catch (error: any) {
       const errorCode = classifyError(error);
@@ -1752,11 +1791,11 @@ export default function Products() {
               <span className="hidden sm:inline">Ver Reportes</span>
             </Button>
             {canEdit && (
-              <Button 
+              <Button
                 variant="outline" 
                 size="sm"
                 onClick={() => setIsCurrencyAdjustDialogOpen(true)}
-                className="border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+                className="border-blue-500/50 text-blue-600 hover:bg-blue-700 hover:text-white dark:hover:bg-blue-700 dark:hover:text-white"
               >
                 <DollarSign className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Ajustar Cotización</span>
@@ -1932,7 +1971,7 @@ export default function Products() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            const generated = generateSKU(formData.name, formData.category);
+                            const generated = generateSKU(formData.name, "");
                             setFormData({ ...formData, sku: generated });
                             toast.success(`SKU generado: ${generated}`);
                           }}
@@ -2653,12 +2692,19 @@ export default function Products() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="mass-category">Categoría</Label>
-                          <Input
-                            id="mass-category"
-                            placeholder="Dejar vacío para no modificar"
-                            value={massEditData.category}
-                            onChange={(e) => setMassEditData({ ...massEditData, category: e.target.value })}
-                          />
+                          <Select value={massEditData.category_id || ""} onValueChange={(value) => setMassEditData({ ...massEditData, category_id: value })}>
+                            <SelectTrigger id="mass-category">
+                              <SelectValue placeholder="Dejar vacío para no modificar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">Sin categoría</SelectItem>
+                              {categories?.map((cat: any) => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  {cat.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" onClick={() => setIsMassEditDialogOpen(false)}>
@@ -2704,29 +2750,103 @@ export default function Products() {
 
         <Card className="shadow-soft">
           <CardHeader>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar productos..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+            <div className="flex flex-col gap-3">
+              {/* Búsqueda y Categoría */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar productos..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Select value={categoryFilter || "ALL"} onValueChange={(value) => setCategoryFilter(value === "ALL" ? "" : value)}>
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                    <SelectValue placeholder="Todas las categorías" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todas las categorías</SelectItem>
+                    {categories?.map((cat: any) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <Select value={categoryFilter || "ALL"} onValueChange={(value) => setCategoryFilter(value === "ALL" ? "" : value)}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="Todas las categorías" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todas las categorías</SelectItem>
-                  {products && Array.from(new Set(products.filter(p => p.category).map(p => p.category))).sort().map(category => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+              {/* Filtros Rápidos */}
+              <div className="flex flex-wrap gap-2">
+                <div className="text-xs font-medium text-muted-foreground pt-1">Tipo:</div>
+                {["all", "physical", "digital", "combo"].map((type) => (
+                  <Button
+                    key={type}
+                    variant={filterType === type ? "default" : "outline"}
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => setFilterType(type as any)}
+                  >
+                    {type === "all" && "Todos"}
+                    {type === "physical" && "📦 Físicos"}
+                    {type === "digital" && "💻 Digitales"}
+                    {type === "combo" && "🎁 Combos"}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Filtro de Stock */}
+              <div className="flex flex-wrap gap-2">
+                <div className="text-xs font-medium text-muted-foreground pt-1">Stock:</div>
+                {[
+                  { value: "all", label: "Todos" },
+                  { value: "low", label: "⚠️ Bajo" },
+                  { value: "out", label: "💔 Agotado" }
+                ].map((status) => (
+                  <Button
+                    key={status.value}
+                    variant={filterStockStatus === status.value ? "default" : "outline"}
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => setFilterStockStatus(status.value as any)}
+                  >
+                    {status.label}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Rango de Precios */}
+              <div className="flex flex-col gap-2">
+                <div className="text-xs font-medium text-muted-foreground">Rango de Precios: ${priceRange[0]} - ${priceRange[1]}</div>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    type="number"
+                    placeholder="Min"
+                    value={priceRange[0]}
+                    onChange={(e) => setPriceRange([parseInt(e.target.value) || 0, priceRange[1]])}
+                    className="w-24 text-xs"
+                    min="0"
+                  />
+                  <span className="text-muted-foreground">-</span>
+                  <Input
+                    type="number"
+                    placeholder="Max"
+                    value={priceRange[1]}
+                    onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value) || 10000])}
+                    className="w-24 text-xs"
+                    min="0"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPriceRange([0, 10000])}
+                    className="text-xs"
+                  >
+                    Reset
+                  </Button>
+                </div>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-2 sm:p-6 overflow-x-auto">
@@ -2740,10 +2860,61 @@ export default function Products() {
                     />
                   </TableHead>
                   <TableHead className="w-8 sm:w-12 hidden sm:table-cell"></TableHead>
-                  <TableHead className="min-w-[120px]">Nombre</TableHead>
+                  <TableHead 
+                    className="min-w-[120px] cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => {
+                      if (sortBy === "name") {
+                        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortBy("name");
+                        setSortDirection("asc");
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      Nombre
+                      {sortBy === "name" && (
+                        <span className="text-xs">{sortDirection === "asc" ? "▲" : "▼"}</span>
+                      )}
+                    </div>
+                  </TableHead>
                   <TableHead className="hidden md:table-cell">Categoría</TableHead>
-                  <TableHead className="min-w-[80px]">Precio</TableHead>
-                  <TableHead className="hidden sm:table-cell">Stock</TableHead>
+                  <TableHead 
+                    className="min-w-[80px] cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => {
+                      if (sortBy === "price") {
+                        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortBy("price");
+                        setSortDirection("asc");
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      Precio
+                      {sortBy === "price" && (
+                        <span className="text-xs">{sortDirection === "asc" ? "▲" : "▼"}</span>
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="hidden sm:table-cell cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => {
+                      if (sortBy === "stock") {
+                        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortBy("stock");
+                        setSortDirection("asc");
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      Stock
+                      {sortBy === "stock" && (
+                        <span className="text-xs">{sortDirection === "asc" ? "▲" : "▼"}</span>
+                      )}
+                    </div>
+                  </TableHead>
                   <TableHead className="hidden lg:table-cell">Estado</TableHead>
                   <TableHead className="text-right min-w-[80px]">Acc.</TableHead>
                 </TableRow>

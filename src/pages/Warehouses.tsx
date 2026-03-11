@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Building2, Plus, Pencil, Trash2, Package, ArrowLeftRight, Info, MapPin, Phone, User, CheckCircle2, AlertCircle } from "lucide-react";
+import { Building2, Plus, Pencil, Trash2, Package, ArrowLeftRight, Info, MapPin, Phone, User, CheckCircle2, AlertCircle, Image, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { useNavigate } from "react-router-dom";
@@ -26,6 +26,7 @@ interface Warehouse {
   manager_name?: string;
   is_main: boolean;
   active: boolean;
+  image_url?: string;
 }
 
 export default function Warehouses() {
@@ -36,6 +37,9 @@ export default function Warehouses() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     code: "",
@@ -44,6 +48,7 @@ export default function Warehouses() {
     manager_name: "",
     is_main: false,
     active: true,
+    image_url: "",
   });
 
   const { data: warehouses, isLoading } = useQuery({
@@ -62,10 +67,35 @@ export default function Warehouses() {
 
   const createWarehouse = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from("warehouses").insert([{
-        ...data,
-        company_id: currentCompany?.id,
-      }]);
+      let payload: any = { ...data, company_id: currentCompany?.id };
+      
+      // Upload image if provided
+      if (imageFile) {
+        setUploadingImage(true);
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('Usuario no autenticado');
+          
+          const fileExt = 'webp';
+          const fileName = `warehouses/${user.id}/${Date.now()}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('warehouse-images')
+            .upload(fileName, imageFile, { contentType: 'image/webp', upsert: true });
+          
+          if (uploadError) throw uploadError;
+          
+          const { data: { publicUrl } } = supabase.storage
+            .from('warehouse-images')
+            .getPublicUrl(fileName);
+          
+          payload.image_url = publicUrl;
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+      
+      const { error } = await supabase.from("warehouses").insert([payload]);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -81,7 +111,35 @@ export default function Warehouses() {
 
   const updateWarehouse = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
-      const { error } = await supabase.from("warehouses").update(data).eq("id", id);
+      let payload: any = { ...data };
+      
+      // Upload new image if provided
+      if (imageFile) {
+        setUploadingImage(true);
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('Usuario no autenticado');
+          
+          const fileExt = 'webp';
+          const fileName = `warehouses/${user.id}/${id}_${Date.now()}.${fileExt}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('warehouse-images')
+            .upload(fileName, imageFile, { contentType: 'image/webp', upsert: true });
+          
+          if (uploadError) throw uploadError;
+          
+          const { data: { publicUrl } } = supabase.storage
+            .from('warehouse-images')
+            .getPublicUrl(fileName);
+          
+          payload.image_url = publicUrl;
+        } finally {
+          setUploadingImage(false);
+        }
+      }
+      
+      const { error } = await supabase.from("warehouses").update(payload).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -119,8 +177,11 @@ export default function Warehouses() {
       manager_name: "",
       is_main: false,
       active: true,
+      image_url: "",
     });
     setSelectedWarehouse(null);
+    setImageFile(null);
+    setImagePreview("");
   };
 
   const handleEdit = (warehouse: Warehouse) => {
@@ -133,7 +194,10 @@ export default function Warehouses() {
       manager_name: warehouse.manager_name || "",
       is_main: warehouse.is_main,
       active: warehouse.active,
+      image_url: warehouse.image_url || "",
     });
+    setImagePreview(warehouse.image_url || "");
+    setImageFile(null);
     setDialogOpen(true);
   };
 
@@ -148,6 +212,38 @@ export default function Warehouses() {
     } else {
       createWarehouse.mutate(formData);
     }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Por favor selecciona una imagen válida (JPG, PNG o WebP)');
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen debe ser menor a 5MB');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+    
+    setImageFile(file);
+    toast.success(`Imagen cargada (${(file.size / 1024).toFixed(0)}KB)`);
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview("");
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
   };
 
   return (
@@ -200,6 +296,40 @@ export default function Warehouses() {
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-6">
+                  {/* Sección Imagen */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b">
+                      <div className="p-2 bg-blue-500/10 rounded-lg">
+                        <Image className="h-4 w-4 text-blue-600 dark:text-blue-500" />
+                      </div>
+                      <h3 className="text-sm font-semibold">Imagen del Depósito</h3>
+                    </div>
+                    {imagePreview && (
+                      <div className="relative w-full h-56 bg-muted rounded-lg overflow-hidden border border-primary/20">
+                        <img src={imagePreview} alt="Depósito" className="w-full h-full object-cover" />
+                        <button
+                          onClick={removeImage}
+                          className="absolute top-3 right-3 p-2 bg-red-500/90 hover:bg-red-600 rounded-full text-white transition shadow-lg"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="warehouse-image" className="cursor-pointer border-2 border-dashed border-muted-foreground/20 rounded-lg p-4 hover:border-primary/40 transition text-center">
+                        <Image className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Haz clic para subir imagen</span>
+                      </Label>
+                      <input
+                        id="warehouse-image"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+
                   {/* Sección Información Básica */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 pb-2 border-b">
@@ -332,8 +462,19 @@ export default function Warehouses() {
               {/* Contenedor Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {warehouses.map((warehouse, index) => (
-                  <div key={warehouse.id} className="animate-fade-in group rounded-lg border p-4 hover:border-primary hover:shadow-md transition-all duration-200" style={{ animationDelay: `${index * 50}ms` }}>
+                  <div key={warehouse.id} className="animate-fade-in group rounded-lg border p-4 hover:border-primary hover:shadow-md transition-all duration-200 overflow-hidden" style={{ animationDelay: `${index * 50}ms` }}>
                     <div className="space-y-3">
+                      {/* Imagen */}
+                      <div className="w-full h-40 bg-muted rounded-lg overflow-hidden mb-3 border border-border/50">
+                        {warehouse.image_url ? (
+                          <img src={warehouse.image_url} alt={warehouse.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50">
+                            <Building2 className="h-8 w-8 text-muted-foreground/30" />
+                          </div>
+                        )}
+                      </div>
+                      
                       {/* Header */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
