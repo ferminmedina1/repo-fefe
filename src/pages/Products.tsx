@@ -167,13 +167,21 @@ export default function Products() {
     queryKey: ["product-categories", currentCompany?.id],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
-      const { data, error } = await supabase
-        .from("product_categories")
-        .select("*")
-        .eq("company_id", currentCompany.id)
-        .order("name");
-      if (error) throw error;
-      return data || [];
+      try {
+        const { data, error } = await supabase
+          .from("product_categories")
+          .select("*")
+          .eq("company_id", currentCompany.id)
+          .order("name");
+        if (error) {
+          console.warn("Error fetching categories:", error);
+          return [];
+        }
+        return data || [];
+      } catch (err) {
+        console.warn("Error in categories query:", err);
+        return [];
+      }
     },
     enabled: !!currentCompany?.id,
   });
@@ -182,13 +190,20 @@ export default function Products() {
   const createCategoryMutation = useMutation({
     mutationFn: async (name: string) => {
       if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
-      const { data, error } = await supabase
-        .from("product_categories")
-        .insert({ company_id: currentCompany.id, name: name.trim() })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      try {
+        const { data, error } = await supabase
+          .from("product_categories")
+          .insert({ company_id: currentCompany.id, name: name.trim() })
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      } catch (err: any) {
+        if (err.message?.includes("404") || err.message?.includes("not found")) {
+          throw new Error("La tabla de categorías no está disponible. Contacta al administrador.");
+        }
+        throw err;
+      }
     },
     onSuccess: (newCategory) => {
       toast.success(`Categoría "${newCategory.name}" creada exitosamente`);
@@ -1172,16 +1187,20 @@ export default function Products() {
       let categoryMap: Record<string, string> = {};
       
       if (categoryIds.length > 0) {
-        const { data: categories, error: catError } = await supabase
-          .from("product_categories")
-          .select("id, name")
-          .in("id", categoryIds);
-        
-        if (catError) throw catError;
-        
-        categories?.forEach(cat => {
-          categoryMap[cat.id] = cat.name;
-        });
+        try {
+          const { data: categories, error: catError } = await supabase
+            .from("product_categories")
+            .select("id, name")
+            .in("id", categoryIds);
+          
+          if (!catError && categories) {
+            categories.forEach(cat => {
+              categoryMap[cat.id] = cat.name;
+            });
+          }
+        } catch (err) {
+          console.warn("Error fetching categories for export:", err);
+        }
       }
 
       const csvData = products.map(p => {
@@ -1838,12 +1857,11 @@ export default function Products() {
                   <div className="space-y-2">
                     <Label htmlFor="category">Categoría</Label>
                     <div className="flex gap-2">
-                      <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
+                      <Select value={formData.category_id || ""} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
                         <SelectTrigger className="flex-1">
                           <SelectValue placeholder="Selecciona una categoría" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Sin categoría</SelectItem>
                           {categories?.map((category: any) => (
                             <SelectItem key={category.id} value={category.id}>
                               {category.name}
