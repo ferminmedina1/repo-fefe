@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
-import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight, DollarSign, AlertCircle, CheckCircle2, Info, Image as ImageIcon, BarChart3, ShoppingCart, PackageOpen } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight, DollarSign, AlertCircle, CheckCircle2, Info, Image as ImageIcon, BarChart3, ShoppingCart, PackageOpen, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -50,7 +50,7 @@ const productSchema = z.object({
     .nonnegative("El stock mínimo no puede ser negativo")
     .max(10000000, "El stock mínimo debe ser menor a 10,000,000")
     .optional(),
-  category: z.string().max(100, "La categoría debe tener máximo 100 caracteres").optional(),
+  category_id: z.string().uuid("La categoría debe ser un ID válido").optional(),
   barcode: z.string().max(50, "El código de barras debe tener máximo 50 caracteres").optional(),
   sku: z.string().max(50, "El SKU debe tener máximo 50 caracteres").optional(),
   location: z.string().max(100, "La ubicación debe tener máximo 100 caracteres").optional(),
@@ -89,6 +89,9 @@ export default function Products() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const customFieldsSectionRef = useRef<HTMLDivElement>(null);
   
   // Cargar parámetro de búsqueda desde URL
   useEffect(() => {
@@ -117,7 +120,7 @@ export default function Products() {
     cost: "",
     stock: "",
     min_stock: "",
-    category: "",
+    category_id: "",
     location: "",
     batch_number: "",
     expiration_date: "",
@@ -138,7 +141,7 @@ export default function Products() {
     price: "",
     cost: "",
     stock: "",
-    category: "",
+    category_id: "",
   });
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
@@ -158,6 +161,46 @@ export default function Products() {
   const [isCustomFieldsDialogOpen, setIsCustomFieldsDialogOpen] = useState(false);
   const [customFields, setCustomFields] = useState<Array<{id: string, name: string, type: "text" | "number" | "textarea" | "select" | "checkbox" | "date", options?: string[], required?: boolean}>>([]);
   const [newCustomField, setNewCustomField] = useState<any>({name: "", type: "text", options: ""});
+
+  // Fetch categories
+  const { data: categories } = useQuery({
+    queryKey: ["product-categories", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const { data, error } = await supabase
+        .from("product_categories")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Create category mutation
+  const createCategoryMutation = useMutation({
+    mutationFn: async (name: string) => {
+      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
+      const { data, error } = await supabase
+        .from("product_categories")
+        .insert({ company_id: currentCompany.id, name: name.trim() })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (newCategory) => {
+      toast.success(`Categoría "${newCategory.name}" creada exitosamente`);
+      queryClient.invalidateQueries({ queryKey: ["product-categories"] });
+      setFormData({ ...formData, category_id: newCategory.id });
+      setIsAddCategoryDialogOpen(false);
+      setNewCategoryName("");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al crear la categoría");
+    },
+  });
 
   // Función para convertir precio a ARS
   const convertToARS = (price: number, currency: string) => {
@@ -209,7 +252,7 @@ export default function Products() {
       }
       
       if (categoryFilter) {
-        query = query.eq("category", categoryFilter);
+        query = query.eq("category_id", categoryFilter);
       }
       
       const { data, error } = await query;
@@ -680,7 +723,7 @@ export default function Products() {
       cost: "",
       stock: "",
       min_stock: "",
-      category: "",
+      category_id: "",
       location: "",
       batch_number: "",
       expiration_date: "",
@@ -759,21 +802,22 @@ export default function Products() {
       }
 
       // Generar SKU automáticamente si no está proporcionado (para mejorar UX)
-      const skuValue = formData.sku?.trim() || generateSKU(formData.name, formData.category);
+      const skuValue = formData.sku?.trim() || generateSKU(formData.name);
 
-      const validatedData = productSchema.parse({
-        name: formData.name,
+      const validatedData = {
+        name: formData.name?.trim() || "",
         price: parseFloat(formData.price),
         cost: formData.cost ? parseFloat(formData.cost) : undefined,
         stock: parseInt(formData.stock),
         min_stock: formData.min_stock ? parseInt(formData.min_stock) : undefined,
-        category: formData.category || undefined,
+        category_id: formData.category_id || undefined,
         barcode: formData.barcode || undefined,
         sku: skuValue || undefined,
         location: formData.location || undefined,
         batch_number: formData.batch_number || undefined,
         expiration_date: formData.expiration_date || undefined,
-      });
+      };
+      productSchema.parse(validatedData);
 
       const productData = {
         name: validatedData.name,
@@ -785,7 +829,7 @@ export default function Products() {
         stock_physical: validatedData.stock,
         stock_reserved: 0,
         min_stock: validatedData.min_stock ?? 0,
-        category: validatedData.category || null,
+        category_id: validatedData.category_id || null,
         location: validatedData.location || null,
         batch_number: validatedData.batch_number || null,
         expiration_date: validatedData.expiration_date || null,
@@ -825,7 +869,7 @@ export default function Products() {
         cost: product.cost?.toString() || "",
         stock: product.stock.toString(),
         min_stock: product.min_stock?.toString() || "",
-        category: product.category || "",
+        category_id: product.category_id || "",
         location: product.location || "",
         batch_number: product.batch_number || "",
         expiration_date: product.expiration_date || "",
@@ -1123,10 +1167,27 @@ export default function Products() {
       }
       const user = authData.user;
 
+      // Fetch category names for all products
+      const categoryIds = [...new Set(products.map(p => p.category_id).filter(Boolean))];
+      let categoryMap: Record<string, string> = {};
+      
+      if (categoryIds.length > 0) {
+        const { data: categories, error: catError } = await supabase
+          .from("product_categories")
+          .select("id, name")
+          .in("id", categoryIds);
+        
+        if (catError) throw catError;
+        
+        categories?.forEach(cat => {
+          categoryMap[cat.id] = cat.name;
+        });
+      }
+
       const csvData = products.map(p => {
         const row: any = {
           nombre: p.name,
-          categoria: p.category || "",
+          categoria: p.category_id ? (categoryMap[p.category_id] || "") : "",
           codigo_barras: p.barcode || "",
           sku: p.sku || "",
           precio: p.price,
@@ -1776,12 +1837,30 @@ export default function Products() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="category">Categoría</Label>
-                    <Input
-                      id="category"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      placeholder="Ej: Electrónica, Alimentos, etc."
-                    />
+                    <div className="flex gap-2">
+                      <Select value={formData.category_id} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Selecciona una categoría" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Sin categoría</SelectItem>
+                          {categories?.map((category: any) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsAddCategoryDialogOpen(true)}
+                        className="whitespace-nowrap"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="barcode">Código de Barras</Label>
@@ -1909,6 +1988,18 @@ export default function Products() {
                       <Plus className="h-4 w-4" />
                       Gestionar Campos Personalizados ({customFields.length})
                     </Button>
+                    {customFields.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => customFieldsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                        className="w-full gap-2"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Ver Campos Personalizados
+                      </Button>
+                    )}
                   </div>
                   </div>
                   
@@ -2100,7 +2191,7 @@ export default function Products() {
 
                   {/* Campos Personalizados Dinámicos */}
                   {customFields.length > 0 && (
-                    <div className="bg-muted/30 p-4 rounded-lg space-y-3 border border-dashed">
+                    <div ref={customFieldsSectionRef} className="bg-muted/30 p-4 rounded-lg space-y-3 border border-dashed">
                       <p className="text-sm font-medium">Campos Personalizados</p>
                       <div className="space-y-3">
                         {customFields.map((field) => (
@@ -3319,6 +3410,63 @@ export default function Products() {
                   <p>Haz clic en "Preview" para ver los cambios antes de aplicarlos</p>
                 </div>
               )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Category Dialog */}
+        <Dialog open={isAddCategoryDialogOpen} onOpenChange={setIsAddCategoryDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nueva Categoría</DialogTitle>
+              <DialogDescription>
+                Crea una nueva categoría de productos
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-category-name">Nombre de la Categoría</Label>
+                <Input
+                  id="new-category-name"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Ej: Electrónica, Alimentos, Ropa, etc."
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && newCategoryName.trim()) {
+                      createCategoryMutation.mutate(newCategoryName);
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsAddCategoryDialogOpen(false)}
+                  disabled={createCategoryMutation.isPending}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={() => {
+                    if (newCategoryName.trim()) {
+                      createCategoryMutation.mutate(newCategoryName);
+                    }
+                  }}
+                  disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                >
+                  {createCategoryMutation.isPending ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
+                      Creando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear Categoría
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
