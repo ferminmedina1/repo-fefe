@@ -92,6 +92,7 @@ export default function Products() {
   const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const customFieldsSectionRef = useRef<HTMLDivElement>(null);
+  const [digitalPriceTier, setDigitalPriceTier] = useState({name: "", price: ""});
   
   // Cargar parámetro de búsqueda desde URL
   useEffect(() => {
@@ -125,9 +126,11 @@ export default function Products() {
     batch_number: "",
     expiration_date: "",
     is_combo: false,
+    is_digital: false,
     currency: "ARS",
     tags: [] as string[],
     custom_fields: {} as Record<string, any>,
+    digital_prices: [] as Array<{name: string, price: string}>,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -743,9 +746,11 @@ export default function Products() {
       batch_number: "",
       expiration_date: "",
       is_combo: false,
+      is_digital: false,
       currency: "ARS",
       tags: [],
       custom_fields: {},
+      digital_prices: [],
     });
     setEditingProduct(null);
     setImageFile(null);
@@ -753,6 +758,7 @@ export default function Products() {
     setTagInput("");
     setCustomFields([]);
     setNewCustomField({ name: "", type: "text", options: "" });
+    setDigitalPriceTier({name: "", price: ""});
   };
 
   // Funciones para manejar tags
@@ -849,6 +855,8 @@ export default function Products() {
         batch_number: validatedData.batch_number || null,
         expiration_date: validatedData.expiration_date || null,
         is_combo: formData.is_combo,
+        is_digital: formData.is_digital,
+        digital_prices: formData.digital_prices || [],
         currency: formData.currency || 'ARS',
         tags: formData.tags,
         custom_fields: formData.custom_fields,
@@ -889,9 +897,11 @@ export default function Products() {
         batch_number: product.batch_number || "",
         expiration_date: product.expiration_date || "",
         is_combo: product.is_combo || false,
+        is_digital: product.is_digital || false,
         currency: product.currency || "ARS",
         tags: product.tags || [],
         custom_fields: product.custom_fields || {},
+        digital_prices: product.digital_prices || [],
       });
       setImagePreview(product.image_url || "");
       setImageFile(null);
@@ -2068,6 +2078,33 @@ export default function Products() {
                   </div>
                 </div>
 
+                {/* Tipo de Producto */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-blue-50/50 dark:bg-blue-950/30">
+                    <div className="space-y-1">
+                      <Label htmlFor="is_digital" className="text-sm font-medium cursor-pointer">
+                        Este es un producto digital
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Los productos digitales no tienen stock físico. Pueden tener múltiples opciones de precios (ej: Basic, Pro, Enterprise).
+                      </p>
+                    </div>
+                    <Switch
+                      id="is_digital"
+                      checked={formData.is_digital}
+                      onCheckedChange={(checked) => {
+                        setFormData({ 
+                          ...formData, 
+                          is_digital: checked,
+                          stock: checked ? "999999" : "0",
+                          min_stock: checked ? "0" : ""
+                        });
+                        setDigitalPriceTier({name: "", price: ""});
+                      }}
+                    />
+                  </div>
+                </div>
+
                 {/* Precios y Stock */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b">
@@ -2075,91 +2112,196 @@ export default function Products() {
                       <DollarSign className="h-4 w-4 text-green-600 dark:text-green-500" />
                     </div>
                     <h3 className="text-sm font-semibold">
-                      Precios y Stock
+                      Precios {formData.is_digital && "(Producto Digital)"} y Stock
                     </h3>
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="price" className="flex items-center gap-1">
-                      Precio de Venta <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                      required
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cost">Costo (Opcional)</Label>
-                    <Input
-                      id="cost"
-                      type="number"
-                      step="0.01"
-                      value={formData.cost}
-                      onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="currency">Moneda</Label>
-                    <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ARS">🇦🇷 ARS (Peso Argentino)</SelectItem>
-                        <SelectItem value="USD">🇺🇸 USD (Dólar)</SelectItem>
-                        <SelectItem value="EUR">🇪🇺 EUR (Euro)</SelectItem>
-                        <SelectItem value="BRL">🇧🇷 BRL (Real)</SelectItem>
-                        <SelectItem value="CLP">🇨🇱 CLP (Peso Chileno)</SelectItem>
-                        <SelectItem value="UYU">🇺🇾 UYU (Peso Uruguayo)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  </div>
+                  
+                  {/* Productos Digitales - Múltiples Precios */}
+                  {formData.is_digital ? (
+                    <div className="space-y-4 p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold">Opciones de Precio</p>
+                        <p className="text-xs text-muted-foreground">Define hasta 3 opciones de precios diferentes (ej: Básico, Estándar, Premium)</p>
+                      </div>
+                      
+                      {/* Precio Base */}
+                      <div className="space-y-2 p-3 bg-white dark:bg-slate-950 rounded border">
+                        <Label className="text-sm font-medium">Opción Base (Requerida)</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Nombre"
+                            value="Acceso Standard"
+                            disabled
+                            className="flex-1"
+                          />
+                          <div className="flex gap-2 items-center">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={formData.price}
+                              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                              className="w-32"
+                              required
+                            />
+                            <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+                              <SelectTrigger className="w-24">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ARS">ARS</SelectItem>
+                                <SelectItem value="USD">USD</SelectItem>
+                                <SelectItem value="EUR">EUR</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
 
-                  {/* Botón para gestionar lista de precios */}
-                  {editingProduct && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full gap-2 text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-950/30"
-                      onClick={() => handlePriceListEdit(editingProduct)}
-                    >
-                      <DollarSign className="h-4 w-4" />
-                      Gestionar Lista de Precios
-                    </Button>
+                      {/* Opciones Adicionales */}
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium">Opciones Adicionales (Máximo 2)</p>
+                        {formData.digital_prices && formData.digital_prices.map((tier: any, idx: number) => (
+                          <div key={idx} className="flex gap-2 items-center p-3 bg-white dark:bg-slate-950 rounded border">
+                            <Input
+                              placeholder="Nombre (ej: Pro)"
+                              value={tier.name}
+                              onChange={(e) => {
+                                const newPrices = [...formData.digital_prices];
+                                newPrices[idx].name = e.target.value;
+                                setFormData({ ...formData, digital_prices: newPrices });
+                              }}
+                              className="flex-1"
+                            />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={tier.price}
+                              onChange={(e) => {
+                                const newPrices = [...formData.digital_prices];
+                                newPrices[idx].price = e.target.value;
+                                setFormData({ ...formData, digital_prices: newPrices });
+                              }}
+                              className="w-32"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const nPrices = formData.digital_prices.filter((_: any, i: number) => i !== idx);
+                                setFormData({ ...formData, digital_prices: nPrices });
+                              }}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        
+                        {formData.digital_prices.length < 2 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                digital_prices: [...(formData.digital_prices || []), {name: "", price: ""}]
+                              });
+                            }}
+                            className="w-full"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Agregar Opción
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="price" className="flex items-center gap-1">
+                            Precio de Venta <span className="text-destructive">*</span>
+                          </Label>
+                          <Input
+                            id="price"
+                            type="number"
+                            step="0.01"
+                            value={formData.price}
+                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                            required
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="cost">Costo (Opcional)</Label>
+                          <Input
+                            id="cost"
+                            type="number"
+                            step="0.01"
+                            value={formData.cost}
+                            onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="currency">Moneda</Label>
+                          <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ARS">🇦🇷 ARS</SelectItem>
+                              <SelectItem value="USD">🇺🇸 USD</SelectItem>
+                              <SelectItem value="EUR">🇪🇺 EUR</SelectItem>
+                              <SelectItem value="BRL">🇧🇷 BRL</SelectItem>
+                              <SelectItem value="CLP">🇨🇱 CLP</SelectItem>
+                              <SelectItem value="UYU">🇺🇾 UYU</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {editingProduct && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full gap-2 text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-950/30"
+                          onClick={() => handlePriceListEdit(editingProduct)}
+                        >
+                          <DollarSign className="h-4 w-4" />
+                          Gestionar Lista de Precios
+                        </Button>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="stock" className="flex items-center gap-1">
+                            Cantidad en Stock <span className="text-destructive">*</span>
+                          </Label>
+                          <Input
+                            id="stock"
+                            type="number"
+                            value={formData.stock}
+                            onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                            required
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="min_stock">Stock Mínimo</Label>
+                          <Input
+                            id="min_stock"
+                            type="number"
+                            value={formData.min_stock}
+                            onChange={(e) => setFormData({ ...formData, min_stock: e.target.value })}
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    </>
                   )}
-
-                  <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="stock" className="flex items-center gap-1">
-                      Cantidad en Stock <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="stock"
-                      type="number"
-                      value={formData.stock}
-                      onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                      required
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="min_stock">Stock Mínimo (Alerta)</Label>
-                    <Input
-                      id="min_stock"
-                      type="number"
-                      value={formData.min_stock}
-                      onChange={(e) => setFormData({ ...formData, min_stock: e.target.value })}
-                      placeholder="0"
-                    />
-                  </div>
-                  </div>
                 </div>
 
                 {/* Producto Combo */}
