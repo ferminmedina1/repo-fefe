@@ -1721,7 +1721,17 @@ export default function Products() {
           </Dialog>
           )}
           {canCreate && (
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog 
+              open={isDialogOpen} 
+              onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (!open) {
+                  resetForm();
+                  setEditingProduct(null);
+                  setCustomFields([]);
+                }
+              }}
+            >
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-1 sm:gap-2">
                   <Plus className="h-4 w-4" />
@@ -2002,6 +2012,20 @@ export default function Products() {
                     </Select>
                   </div>
                   </div>
+
+                  {/* Botón para gestionar lista de precios */}
+                  {editingProduct && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full gap-2 text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-950/30"
+                      onClick={() => handlePriceListEdit(editingProduct)}
+                    >
+                      <DollarSign className="h-4 w-4" />
+                      Gestionar Lista de Precios
+                    </Button>
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="stock" className="flex items-center gap-1">
