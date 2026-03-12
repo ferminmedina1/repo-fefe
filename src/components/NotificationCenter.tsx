@@ -1,16 +1,14 @@
-import { Bell, Trash2, CheckCircle2, X } from "lucide-react";
+import { Bell, CheckCircle2, X } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Badge } from "./ui/badge";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -57,7 +55,6 @@ const NOTIFICATION_CONFIG: Record<string, any> = {
 
 export function NotificationCenter() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
   const { data: notifications, refetch } = useQuery({
     queryKey: ["notifications"],
@@ -149,12 +146,15 @@ export function NotificationCenter() {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-96 p-0 border-0 shadow-lg">
-        {/* Header */}
-        <div className="bg-background border-b p-4 sticky top-0">
-          <DropdownMenuLabel className="text-base font-semibold">Notificaciones</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-96 p-0 border-0 shadow-lg overflow-hidden">
+        {/* Header - Estilo sidebar azul oscuro */}
+        <div className="bg-slate-900 dark:bg-slate-950 text-white p-4 sticky top-0">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Notificaciones
+          </h3>
           {unreadCount > 0 && (
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-slate-300 mt-2">
               {unreadCount} sin leer
             </p>
           )}
@@ -162,8 +162,8 @@ export function NotificationCenter() {
 
         {/* Content */}
         {notifications && notifications.length > 0 ? (
-          <ScrollArea className="h-[400px]">
-            <div className="p-3 space-y-2">
+          <ScrollArea className="h-[420px]">
+            <div className="p-3 space-y-2 bg-slate-50 dark:bg-slate-900/50">
               {notifications.map((notification) => {
                 const config =
                   NOTIFICATION_CONFIG[notification.type] || NOTIFICATION_CONFIG.low_stock;
@@ -172,12 +172,12 @@ export function NotificationCenter() {
                 return (
                   <div
                     key={notification.id}
-                    className={`p-3 rounded-lg border transition-all ${config.bg} ${config.border} hover:shadow-md group`}
+                    className={`p-3 rounded-md border transition-all ${config.bg} ${config.border} hover:shadow-sm group cursor-pointer hover:scale-[1.01]`}
                   >
                     <div className="flex gap-3">
                       {/* Icon */}
                       <div className="flex-shrink-0 pt-0.5">
-                        <Icon className="h-4 w-4 text-muted-foreground/60" />
+                        <Icon className="h-4 w-4 text-muted-foreground" />
                       </div>
 
                       {/* Content */}
@@ -195,15 +195,15 @@ export function NotificationCenter() {
                             </p>
                           </div>
                           {!notification.read && (
-                            <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-1" />
+                            <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-1 animate-pulse" />
                           )}
                         </div>
-                        <p className="text-sm text-foreground/80 mb-2">
+                        <p className="text-sm text-foreground/80 line-clamp-2">
                           {notification.message}
                         </p>
 
                         {/* Actions */}
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           {!notification.read && (
                             <Button
                               size="xs"
@@ -213,10 +213,9 @@ export function NotificationCenter() {
                                 markAsRead.mutate(notification.id);
                               }}
                               disabled={markAsRead.isPending}
-                              className="h-7 px-2 text-xs gap-1"
+                              className="h-6 px-2 text-xs"
                             >
                               <CheckCircle2 className="h-3 w-3" />
-                              Marcar
                             </Button>
                           )}
                           <Button
@@ -227,10 +226,9 @@ export function NotificationCenter() {
                               deleteNotification.mutate(notification.id);
                             }}
                             disabled={deleteNotification.isPending}
-                            className="h-7 px-2 text-xs text-destructive hover:text-destructive gap-1"
+                            className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive ml-auto"
                           >
-                            <Trash2 className="h-3 w-3" />
-                            Eliminar
+                            <X className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -241,7 +239,7 @@ export function NotificationCenter() {
             </div>
           </ScrollArea>
         ) : (
-          <div className="h-[300px] flex items-center justify-center">
+          <div className="h-[300px] bg-slate-50 dark:bg-slate-900/50 flex items-center justify-center">
             <div className="text-center">
               <Bell className="h-10 w-10 text-muted-foreground/20 mx-auto mb-2" />
               <p className="text-sm text-muted-foreground">
@@ -254,15 +252,16 @@ export function NotificationCenter() {
         {/* Footer */}
         {notifications && notifications.length > 0 && (
           <>
-            <DropdownMenuSeparator className="m-0" />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/inventory-alerts")}
-              className="w-full justify-center border-0 rounded-none text-xs h-9"
-            >
-              Ver todas las notificaciones
-            </Button>
+            <div className="border-t bg-slate-50 dark:bg-slate-900/50">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/inventory-alerts")}
+                className="w-full justify-center border-0 rounded-none text-xs h-8 text-muted-foreground hover:text-foreground"
+              >
+                Ver todas las notificaciones
+              </Button>
+            </div>
           </>
         )}
       </DropdownMenuContent>
