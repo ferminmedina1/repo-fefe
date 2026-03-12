@@ -11,9 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Loader2, Send, AlertCircle, CheckCircle2, Eye, Trash2 } from "lucide-react";
+import { Loader2, Send, AlertCircle, CheckCircle2, Eye, Trash2, AlertTriangle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
+import { validateNotificationTitle, validateNotificationMessage } from "@/lib/validators";
+import { useRateLimitWithPreset, formatResetTime } from "@/lib/rateLimiter";
+import { createSecurityAlert, sendSecurityAlert } from "@/lib/security.config";
 
 const NOTIFICATION_TYPES = [
   { value: "payment_overdue", label: "Pago Vencido" },
@@ -43,6 +46,11 @@ export function SendNotificationModule() {
   const [message, setMessage] = useState("");
   const [previewDialog, setPreviewDialog] = useState(false);
   const [sentNotifications, setSentNotifications] = useState<any[]>([]);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
+
+  // Rate limiting para envío de notificaciones
+  const rateLimiter = useRateLimitWithPreset("send-notification", "sendNotification");
 
   // Fetch companies
   const { data: companies, isLoading: loadingCompanies } = useQuery({
@@ -71,11 +79,58 @@ export function SendNotificationModule() {
     },
   });
 
+  /**
+   * Valida todos los inputs antes de enviar
+   */
+  const validateInputs = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Validar título
+    const titleValidation = validateNotificationTitle(title);
+    if (!titleValidation.valid) {
+      errors.title = titleValidation.error || "Título inválido";
+    }
+
+    // Validar mensaje
+    const messageValidation = validateNotificationMessage(message);
+    if (!messageValidation.valid) {
+      errors.message = messageValidation.error || "Mensaje inválido";
+    }
+
+    // Validar scope
+    if (scope === "single" && !selectedCompanyId) {
+      errors.company = "Debe seleccionar una empresa";
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   // Send notification mutation
   const sendNotification = useMutation({
     mutationFn: async () => {
-      if (!title.trim() || !message.trim()) {
-        throw new Error("Título y mensaje son requeridos");
+      // Primero, validar inputs
+      if (!validateInputs()) {
+        throw new Error("Errores de validación");
+      }
+
+      // Verificar rate limit
+      const rateLimitCheck = rateLimiter.check();
+      if (!rateLimitCheck.allowed) {
+        const resetIn = formatResetTime(rateLimitCheck.resetTime);
+        const errorMsg = `Demasiadas notificaciones. Intenta en ${resetIn}`;
+        setRateLimitError(errorMsg);
+
+        // Registrar alerta de seguridad
+        sendSecurityAlert(
+          createSecurityAlert(
+            "rate_limit_exceeded",
+            "high",
+            `Rate limit exceeded para send-notification. Intenta en ${resetIn}`
+          )
+        );
+
+        throw new Error(errorMsg);
       }
 
       const targetCompanies = scope === "all" 
@@ -90,8 +145,8 @@ export function SendNotificationModule() {
       const notifications = targetCompanies.map(company_id => ({
         company_id,
         notification_type: notificationType,
-        title,
-        message,
+        title: title.trim(),
+        message: message.trim(),
         severity,
         read: false,
       }));
@@ -169,6 +224,30 @@ export function SendNotificationModule() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Rate Limit Error */}
+          {rateLimitError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{rateLimitError}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Validation Errors Summary */}
+          {Object.keys(validationErrors).length > 0 && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="space-y-1">
+                  <p className="font-semibold">Errores de validación:</p>
+                  <ul className="list-disc pl-5">
+                    {Object.entries(validationErrors).map(([key, error]) => (
+                      <li key={key} className="text-sm">{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
           {/* Scope Selection */}
           <div>
             <Label className="text-base font-semibold mb-3 block">Destinatario</Label>
@@ -257,31 +336,55 @@ export function SendNotificationModule() {
 
           {/* Title */}
           <div>
-            <Label htmlFor="title-input">Título</Label>
+            <Label htmlFor="title-input" className={validationErrors.title ? "text-destructive" : ""}>
+              Título {validationErrors.title && `(${validationErrors.title})`}
+            </Label>
             <Input
               id="title-input"
               placeholder="Ej: Importante actualización del sistema"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (validationErrors.title) {
+                  setValidationErrors(err => {
+                    const newErr = { ...err };
+                    delete newErr.title;
+                    return newErr;
+                  });
+                }
+              }}
               maxLength={100}
+              className={validationErrors.title ? "border-destructive" : ""}
             />
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className={`text-xs mt-1 ${title.length > 90 ? "text-amber-600" : "text-muted-foreground"}`}>
               {title.length}/100 caracteres
             </p>
           </div>
 
           {/* Message */}
           <div>
-            <Label htmlFor="message-input">Mensaje</Label>
+            <Label htmlFor="message-input" className={validationErrors.message ? "text-destructive" : ""}>
+              Mensaje {validationErrors.message && `(${validationErrors.message})`}
+            </Label>
             <Textarea
               id="message-input"
               placeholder="Escribe el mensaje de la notificación..."
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                if (validationErrors.message) {
+                  setValidationErrors(err => {
+                    const newErr = { ...err };
+                    delete newErr.message;
+                    return newErr;
+                  });
+                }
+              }}
               maxLength={500}
               rows={5}
+              className={validationErrors.message ? "border-destructive" : ""}
             />
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className={`text-xs mt-1 ${message.length > 450 ? "text-amber-600" : "text-muted-foreground"}`}>
               {message.length}/500 caracteres
             </p>
           </div>

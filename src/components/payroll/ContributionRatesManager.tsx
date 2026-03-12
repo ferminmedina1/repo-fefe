@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Settings, Save } from "lucide-react";
+import { Settings, Save, AlertCircle } from "lucide-react";
+import { validateNumber } from "@/lib/validators";
 
 interface ContributionRatesManagerProps {
   companyId: string;
@@ -105,13 +106,30 @@ export function ContributionRatesManager({ companyId }: ContributionRatesManager
   });
 
   const handleSave = () => {
+    // Validar todos los porcentajes
+    const allRates = Object.values(rates);
+    const isValid = allRates.every(rate => typeof rate === 'number' && rate >= 0 && rate <= 100);
+    
+    if (!isValid) {
+      toast.error("Todos los porcentajes deben estar entre 0 y 100");
+      return;
+    }
+
     saveMutation.mutate(rates);
   };
 
   const handleChange = (key: keyof ContributionRates, value: string) => {
+    const numValue = parseFloat(value) || 0;
+    
+    // Validar que el número esté en rango permitido (0-100 para porcentajes)
+    if (numValue < 0 || numValue > 100) {
+      toast.error("El porcentaje debe estar entre 0 y 100");
+      return;
+    }
+
     setRates((prev) => ({
       ...prev,
-      [key]: parseFloat(value) || 0,
+      [key]: numValue,
     }));
   };
 

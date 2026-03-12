@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Receipt, AlertCircle, Loader2, CheckCircle2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { validateNumber, validateString, validateUUID } from "@/lib/validators";
 
 interface AFIPInvoiceDialogProps {
   open: boolean;
@@ -67,6 +68,7 @@ export function AFIPInvoiceDialog({
   const [tipoDocumento, setTipoDocumento] = useState("96"); // Default DNI
   const [numeroDocumento, setNumeroDocumento] = useState("");
   const [selectedPOSId, setSelectedPOSId] = useState("");
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   // Fetch AFIP POS points
   const { data: posPoints } = useQuery({
@@ -119,6 +121,31 @@ export function AFIPInvoiceDialog({
     mutationFn: async () => {
       if (!selectedPOSId) throw new Error("Seleccione un punto de venta");
       if (!saleData) throw new Error("No hay datos de venta");
+
+      // Validate UUIDs
+      if (!validateUUID(selectedPOSId).valid) {
+        throw new Error("ID de punto de venta inválido");
+      }
+      if (!validateUUID(saleData.id).valid) {
+        throw new Error("ID de venta inválido");
+      }
+      if (!validateUUID(companyId).valid) {
+        throw new Error("ID de empresa inválido");
+      }
+
+      // Validate documento number
+      const docValidation = validateString(numeroDocumento, { required: true, min: 5, max: 20 });
+      if (!docValidation.valid) {
+        throw new Error("Número de documento inválido");
+      }
+
+      // Validate financial amounts
+      if (!validateNumber(String(saleData.total), { required: true, min: 0.01 }).valid) {
+        throw new Error("Monto total inválido");
+      }
+      if (!validateNumber(String(saleData.subtotal), { required: true, min: 0.01 }).valid) {
+        throw new Error("Subtotal inválido");
+      }
       
       const pos = posPoints?.find((p: any) => p.id === selectedPOSId);
       if (!pos) throw new Error("Punto de venta no encontrado");
@@ -164,11 +191,14 @@ export function AFIPInvoiceDialog({
     },
     onSuccess: (data) => {
       toast.success(`Comprobante emitido: ${data.numeroComprobante}`);
+      setValidationError(null);
       if (onSuccess) onSuccess(data);
       onOpenChange(false);
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al emitir comprobante AFIP");
+      const errorMessage = error.message || "Error al emitir comprobante AFIP";
+      setValidationError(errorMessage);
+      toast.error(errorMessage);
     },
   });
 
@@ -200,6 +230,13 @@ export function AFIPInvoiceDialog({
           </Alert>
         ) : (
           <div className="space-y-4">
+            {validationError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{validationError}</AlertDescription>
+              </Alert>
+            )}
+
             {ambiente === "testing" && (
               <Alert className="border-amber-500/50 bg-amber-500/10">
                 <AlertCircle className="h-4 w-4 text-amber-500" />

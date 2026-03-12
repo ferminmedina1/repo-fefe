@@ -11,9 +11,10 @@ import { Label } from "@/components/ui/label";
 import { DEFAULT_ROLE_PERMISSIONS, Module } from "@/hooks/usePermissions";
 
 import { toast } from "sonner";
-import { Shield, Save, Settings, RotateCcw, Info } from "lucide-react";
+import { Shield, Save, Settings, RotateCcw, Info, AlertCircle } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { validateString, validateUUID } from "@/lib/validators";
 
 type AppRole = "admin" | "manager" | "cashier" | "accountant" | "viewer" | "warehouse" | "technician" | "auditor" | "employee";
 
@@ -120,6 +121,7 @@ export function EmployeePermissionsManager(): JSX.Element {
   const [permissions, setPermissions] = useState<Record<string, Permission>>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [isCustomized, setIsCustomized] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const normalizeCode = (code?: string | null) => (typeof code === "string" ? code.trim() : "");
 
@@ -266,8 +268,52 @@ export function EmployeePermissionsManager(): JSX.Element {
     setHasChanges(false);
   }, [rolePermissions, selectedRole, normalizedModules]);
 
+  // Validation function for permissions data
+  const validatePermissionsData = (): string | null => {
+    // Validate company ID
+    if (!currentCompany?.id || !validateUUID(currentCompany.id).valid) {
+      return "ID de empresa inválido";
+    }
+
+    // Validate role
+    if (!selectedRole || !AVAILABLE_ROLES.find(r => r.value === selectedRole)) {
+      return "Rol seleccionado inválido";
+    }
+
+    // Validate permissions object
+    if (!permissions || typeof permissions !== 'object') {
+      return "Datos de permisos inválidos";
+    }
+
+    // Validate each module code and permissions
+    for (const [module, perms] of Object.entries(permissions)) {
+      const moduleValidation = validateString(module, { required: true, min: 1, max: 100 });
+      if (!moduleValidation.valid) {
+        return `Código de módulo inválido: ${module}`;
+      }
+
+      // Validate permissions flags
+      if (typeof perms.can_view !== 'boolean' || 
+          typeof perms.can_create !== 'boolean' ||
+          typeof perms.can_edit !== 'boolean' ||
+          typeof perms.can_delete !== 'boolean' ||
+          typeof perms.can_export !== 'boolean') {
+        return "Permisos contienen valores inválidos";
+      }
+    }
+
+    return null;
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Validate all data before saving
+      const validationError = validatePermissionsData();
+      if (validationError) {
+        setValidationError(validationError);
+        throw new Error(validationError);
+      }
+
       if (!currentCompany?.id) throw new Error("No company selected");
       
       // Delete existing permissions for this role
@@ -292,6 +338,7 @@ export function EmployeePermissionsManager(): JSX.Element {
       if (error) throw error;
     },
     onSuccess: () => {
+      setValidationError(null);
       queryClient.invalidateQueries({ queryKey: ["role-permissions-config"] });
       queryClient.invalidateQueries({ queryKey: ["role-permissions"] });
       toast.success("Permisos guardados correctamente");
@@ -391,6 +438,15 @@ export function EmployeePermissionsManager(): JSX.Element {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {validationError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {validationError}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="space-y-2">
           <Label>Seleccionar Rol</Label>
           <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as AppRole)}>
