@@ -1,9 +1,11 @@
-import { Bell, CheckCircle2, X, AlertCircle } from "lucide-react";
+import { Bell, CheckCircle2, X, AlertCircle, MoreVertical, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import { Badge } from "./ui/badge";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -14,6 +16,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ScrollArea } from "./ui/scroll-area";
 import { Boxes, Clock, Users, FileText, Zap } from "lucide-react";
+import { useState } from "react";
 
 const NOTIFICATION_CONFIG: Record<string, any> = {
   low_stock: {
@@ -66,6 +69,7 @@ const getTimeCategory = (createdAt: string): "new" | "previous" => {
 
 export function NotificationCenter() {
   const navigate = useNavigate();
+  const [filter, setFilter] = useState<"all" | "unread">("all");
 
   const { data: notifications, refetch } = useQuery({
     queryKey: ["notifications"],
@@ -142,11 +146,15 @@ export function NotificationCenter() {
     }
   };
 
-  // Group notifications by time category
-  const newNotifications = notifications?.filter(
+  // Group notifications by time category and apply filter
+  const filteredNotifications = filter === "unread" 
+    ? notifications?.filter((n) => !n.read) || []
+    : notifications || [];
+
+  const newNotifications = filteredNotifications.filter(
     (n) => getTimeCategory(n.created_at) === "new"
   ) || [];
-  const previousNotifications = notifications?.filter(
+  const previousNotifications = filteredNotifications.filter(
     (n) => getTimeCategory(n.created_at) === "previous"
   ) || [];
 
@@ -166,41 +174,51 @@ export function NotificationCenter() {
       <div
         key={notification.id}
         onClick={() => handleNotificationClick(notification)}
-        className="group relative p-4 border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer last:border-b-0"
+        className="group relative p-2.5 border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer last:border-b-0 animate-in fade-in-50 duration-300"
       >
-        <div className="flex gap-4">
+        {/* Delete Button - Top Right */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteNotification.mutate(notification.id);
+          }}
+          disabled={deleteNotification.isPending}
+          className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-destructive transition-all duration-200 hover:rotate-90 hover:scale-110"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="flex gap-3 pr-6">
           {/* Avatar */}
-          <div className={`flex-shrink-0 h-12 w-12 rounded-full ${config.avatar_bg} flex items-center justify-center text-white shadow-md`}>
-            <Icon className="h-6 w-6" />
+          <div className={`flex-shrink-0 h-9 w-9 rounded-full ${config.avatar_bg} flex items-center justify-center text-white shadow-sm`}>
+            <Icon className="h-4 w-4" />
           </div>
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="flex items-start justify-between gap-1 mb-0.5">
               <div className="flex-1">
-                <h4 className="font-semibold text-sm text-foreground">
+                <h4 className="font-semibold text-xs text-foreground leading-tight">
                   {typeLabel}
                 </h4>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-xs text-muted-foreground">
                   {timeDistance}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                {!notification.read && (
-                  <div className="h-3 w-3 rounded-full bg-blue-500 flex-shrink-0 animate-pulse" />
-                )}
-              </div>
+              {!notification.read && (
+                <div className="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0 animate-pulse mt-0.5" />
+              )}
             </div>
-            <p className="text-sm font-medium text-foreground mb-1">
+            <p className="text-xs font-medium text-foreground mb-0.5 line-clamp-1">
               {notification.title}
             </p>
-            <p className="text-sm text-foreground/70 line-clamp-2">
+            <p className="text-xs text-foreground/70 line-clamp-1">
               {notification.message}
             </p>
 
-            {/* Actions */}
-            <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-              {!notification.read && (
+            {/* Mark as Read Action */}
+            {!notification.read && (
+              <div className="mt-1.5">
                 <Button
                   size="sm"
                   variant="outline"
@@ -209,25 +227,13 @@ export function NotificationCenter() {
                     markAsRead.mutate(notification.id);
                   }}
                   disabled={markAsRead.isPending}
-                  className="h-8 px-2 text-xs"
+                  className="h-6 px-1.5 text-xs"
                 >
-                  <CheckCircle2 className="h-4 w-4 mr-1" />
-                  Marcar leída
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Leída
                 </Button>
-              )}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteNotification.mutate(notification.id);
-                }}
-                disabled={deleteNotification.isPending}
-                className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -249,32 +255,85 @@ export function NotificationCenter() {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-full max-w-[500px] p-0 border-0 shadow-xl overflow-hidden">
+      <DropdownMenuContent align="end" className="w-full max-w-[500px] p-0 border-0 shadow-xl overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 duration-200 ease-out">
         {/* Header */}
-        <div className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-b border-slate-200 dark:border-slate-700 p-5 sticky top-0">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
-                <Bell className="h-5 w-5 text-blue-500" />
-                Notificaciones
-              </h3>
-              {unreadCount > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {unreadCount} sin leer
-                </p>
-              )}
-            </div>
+        <div className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-b border-slate-200 dark:border-slate-700 p-3 sticky top-0 animate-in fade-in-50 slide-in-from-top-2 duration-300">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+              <Bell className="h-4 w-4 text-blue-500" />
+              Notificaciones
+            </h3>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 transition-transform duration-200 hover:rotate-90"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent 
+                align="end" 
+                className="w-48 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200"
+              >
+                <DropdownMenuItem onClick={() => {
+                  const allUnread = notifications?.filter((n) => !n.read) || [];
+                  allUnread.forEach((n) => markAsRead.mutate(n.id));
+                }}>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Marcar todo como leído
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => {
+                    if (window.confirm("¿Eliminar todas las notificaciones?")) {
+                      notifications?.forEach((n) => deleteNotification.mutate(n.id));
+                    }
+                  }}
+                  className="text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar todo
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+
+          {/* Filter Buttons */}
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={filter === "all" ? "default" : "outline"}
+              onClick={() => setFilter("all")}
+              className="h-7 text-xs transition-all duration-200 hover:shadow-md"
+            >
+              Todas
+            </Button>
+            <Button
+              size="sm"
+              variant={filter === "unread" ? "default" : "outline"}
+              onClick={() => setFilter("unread")}
+              className="h-7 text-xs transition-all duration-200 hover:shadow-md"
+            >
+              No leídas {unreadCount > 0 && `(${unreadCount})`}
+            </Button>
+          </div>
+          {unreadCount > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {unreadCount} sin leer
+            </p>
+          )}
         </div>
 
         {/* Timeline Feed */}
         {notifications && notifications.length > 0 ? (
-          <ScrollArea className="h-[600px]">
+          <ScrollArea className="h-[400px]">
             <div className="bg-white dark:bg-slate-950">
               {/* NEW NOTIFICATIONS SECTION */}
               {newNotifications.length > 0 && (
-                <div>
-                  <div className="sticky top-0 bg-slate-100 dark:bg-slate-900 px-4 py-2 border-b border-slate-200 dark:border-slate-700">
+                <div className="animate-in fade-in-50 duration-300">
+                  <div className="bg-slate-100 dark:bg-slate-900 px-4 py-1.5 border-b border-slate-200 dark:border-slate-700">
                     <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                       Nuevas
                     </h4>
@@ -289,11 +348,11 @@ export function NotificationCenter() {
 
               {/* PREVIOUS NOTIFICATIONS SECTION */}
               {previousNotifications.length > 0 && (
-                <div>
+                <div className="animate-in fade-in-50 duration-300">
                   {newNotifications.length > 0 && (
-                    <div className="h-2 bg-slate-50 dark:bg-slate-800" />
+                    <div className="h-1 bg-slate-50 dark:bg-slate-800" />
                   )}
-                  <div className="sticky top-0 bg-slate-100 dark:bg-slate-900 px-4 py-2 border-b border-slate-200 dark:border-slate-700">
+                  <div className="bg-slate-100 dark:bg-slate-900 px-4 py-1.5 border-b border-slate-200 dark:border-slate-700">
                     <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                       Anteriores
                     </h4>
@@ -323,12 +382,12 @@ export function NotificationCenter() {
 
         {/* Footer */}
         {notifications && notifications.length > 0 && (
-          <div className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-3">
+          <div className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-3 animate-in fade-in-50 duration-300">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate("/inventory-alerts")}
-              className="w-full justify-center text-sm h-9 rounded-lg"
+              className="w-full justify-center text-sm h-9 rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Ver todas las notificaciones
             </Button>
