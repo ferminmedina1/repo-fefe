@@ -54,6 +54,7 @@ import { CustomPricingManager } from "@/components/settings/CustomPricingManager
 import { ModuleLimitsManager } from "@/components/settings/ModuleLimitsManager";
 import { ModuleAuditLog } from "@/components/settings/ModuleAuditLog";
 import { PlatformAdminHeader, PlatformAdminNav, PlatformAdminDashboard } from "@/components/platformAdmin";
+import { SendNotificationModule } from "@/components/platformAdmin/SendNotificationModule";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { usePagination } from "@/hooks/usePagination";
 
@@ -1598,6 +1599,10 @@ export default function PlatformAdmin() {
 
           {/* Notifications Tab */}
           <TabsContent value="notifications" className="space-y-4">
+            {/* Send Notifications Section */}
+            <SendNotificationModule />
+            
+            {/* View Sent Notifications Section */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
