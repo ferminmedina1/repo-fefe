@@ -48,7 +48,8 @@ import {
   ExternalLink,
   AlertCircle,
   AlertOctagon,
-  Info
+  Info,
+  Filter
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -972,7 +973,7 @@ export default function InventoryAlerts() {
                 )}
               </div>
 
-              {/* Dropdown de tipos */}
+              {/* Dropdown de Filtros */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
@@ -980,12 +981,48 @@ export default function InventoryAlerts() {
                     size="icon"
                     className="shrink-0"
                   >
-                    <ChevronDown className="h-4 w-4" />
+                    <Filter className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="font-semibold">Tipos de Notificaciones</DropdownMenuLabel>
+                <DropdownMenuContent align="end" className="w-64">
+                  {/* Toggle Solo sin leer */}
+                  <div className="px-2 py-1.5 cursor-pointer select-none">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={unreadOnly}
+                        onChange={(e) => setUnreadOnly(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                      />
+                      <span className="text-sm font-medium">Solo sin leer</span>
+                    </label>
+                  </div>
+                  
                   <DropdownMenuSeparator />
+                  
+                  {/* Selector de origen */}
+                  <DropdownMenuLabel className="font-semibold">Origen</DropdownMenuLabel>
+                  <div className="px-2 py-1 space-y-1">
+                    {['all', 'operational', 'system'].map((origin) => (
+                      <label key={origin} className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 rounded px-2 py-1 transition-colors">
+                        <input
+                          type="radio"
+                          name="origin"
+                          checked={notificationOriginFilter === origin}
+                          onChange={() => setNotificationOriginFilter(origin as any)}
+                          className="h-4 w-4 cursor-pointer"
+                        />
+                        <span className="text-sm">
+                          {origin === 'all' ? 'Todas' : origin === 'operational' ? 'Operacionales' : 'Sistema'}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  {/* Tipos de notificaciones */}
+                  <DropdownMenuLabel className="font-semibold">Tipos</DropdownMenuLabel>
                   
                   {Object.entries(NOTIFICATION_TYPES).map(([typeKey, typeInfo]) => {
                     const Icon = typeInfo.icon;
@@ -1018,63 +1055,29 @@ export default function InventoryAlerts() {
                     );
                   })}
                   
-                  <DropdownMenuSeparator />
-                  {selectedNotificationTypes.size > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedNotificationTypes(new Set())}
-                      className="w-full justify-center text-xs"
-                    >
-                      Limpiar filtros
-                    </Button>
+                  {(selectedNotificationTypes.size > 0 || unreadOnly || notificationOriginFilter !== 'all') && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedNotificationTypes(new Set());
+                          setUnreadOnly(false);
+                          setNotificationOriginFilter('all');
+                        }}
+                        className="w-full justify-center text-xs"
+                      >
+                        Limpiar todos
+                      </Button>
+                    </>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
 
-            {/* Toggle para mostrar solo sin leer y botones de acción */}
+            {/* Botones de acción */}
             <div className="flex flex-wrap gap-2 items-center">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-background hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => setUnreadOnly(!unreadOnly)}>
-                <CheckCircle2 className={`h-4 w-4 transition-colors ${unreadOnly ? 'text-primary' : 'text-muted-foreground'}`} />
-                <span className="text-sm font-medium">
-                  {unreadOnly ? 'Solo sin leer' : 'Todas'}
-                </span>
-              </div>
-
-              {/* Selector de origen de notificaciones */}
-              <div className="flex gap-1 items-center border rounded-lg bg-background">
-                <button
-                  onClick={() => setNotificationOriginFilter('all')}
-                  className={`px-3 py-2 text-sm font-medium transition-all ${
-                    notificationOriginFilter === 'all'
-                      ? 'text-primary border-r'
-                      : 'text-muted-foreground border-r hover:text-foreground'
-                  }`}
-                >
-                  Todas
-                </button>
-                <button
-                  onClick={() => setNotificationOriginFilter('operational')}
-                  className={`px-3 py-2 text-sm font-medium transition-all border-r ${
-                    notificationOriginFilter === 'operational'
-                      ? 'text-blue-600 dark:text-blue-400'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Operacionales
-                </button>
-                <button
-                  onClick={() => setNotificationOriginFilter('system')}
-                  className={`px-3 py-2 text-sm font-medium transition-all ${
-                    notificationOriginFilter === 'system'
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  Sistema
-                </button>
-              </div>
 
               {/* Botón marcar todo como leído */}
               {filteredNotifications.some(n => !n.read) && (

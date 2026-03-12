@@ -1,23 +1,63 @@
-import { Bell } from "lucide-react";
+import { Bell, Trash2, CheckCircle2, X } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Badge } from "./ui/badge";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { ScrollArea } from "./ui/scroll-area";
+import { Boxes, Clock, Users, FileText, Zap } from "lucide-react";
+
+const NOTIFICATION_CONFIG: Record<string, any> = {
+  low_stock: {
+    icon: Boxes,
+    bg: "bg-red-50 dark:bg-red-950/30",
+    border: "border-red-200 dark:border-red-800",
+    badge: "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200",
+    label: "Stock Bajo",
+  },
+  expiring_product: {
+    icon: Clock,
+    bg: "bg-amber-50 dark:bg-amber-950/30",
+    border: "border-amber-200 dark:border-amber-800",
+    badge: "bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200",
+    label: "Próximo a Vencer",
+  },
+  inactive_customer: {
+    icon: Users,
+    bg: "bg-blue-50 dark:bg-blue-950/30",
+    border: "border-blue-200 dark:border-blue-800",
+    badge: "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200",
+    label: "Cliente Inactivo",
+  },
+  overdue_invoice: {
+    icon: FileText,
+    bg: "bg-orange-50 dark:bg-orange-950/30",
+    border: "border-orange-200 dark:border-orange-800",
+    badge: "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200",
+    label: "Factura Vencida",
+  },
+  expiring_check: {
+    icon: Zap,
+    bg: "bg-purple-50 dark:bg-purple-950/30",
+    border: "border-purple-200 dark:border-purple-800",
+    badge: "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200",
+    label: "Cheque por Vencer",
+  },
+};
 
 export function NotificationCenter() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: notifications, refetch } = useQuery({
     queryKey: ["notifications"],
@@ -35,22 +75,63 @@ export function NotificationCenter() {
       if (error) throw error;
       return data;
     },
+    refetchInterval: 30000,
   });
 
   const unreadCount = notifications?.filter((n) => !n.read).length || 0;
 
-  const markAsRead = async (notificationId: string) => {
-    const { error } = await supabase
-      .from("notifications")
-      .update({ read: true })
-      .eq("id", notificationId);
+  // Mark as read mutation
+  const markAsRead = useMutation({
+    mutationFn: async (notificationId: string) => {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: true })
+        .eq("id", notificationId);
 
-    if (error) {
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetch();
+    },
+    onError: () => {
       toast.error("Error al marcar como leída");
-      return;
-    }
+    },
+  });
 
-    refetch();
+  // Delete notification mutation
+  const deleteNotification = useMutation({
+    mutationFn: async (notificationId: string) => {
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("id", notificationId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetch();
+    },
+    onError: () => {
+      toast.error("Error al eliminar notificación");
+    },
+  });
+
+  const handleNotificationClick = (notification: any) => {
+    markAsRead.mutate(notification.id);
+    
+    if (notification.type === "low_stock" || notification.type === "expiring_product") {
+      navigate("/inventory-alerts");
+    } else if (notification.type === "inactive_customer") {
+      const data = notification.data as any;
+      const customerId = data?.customer_id;
+      if (customerId) {
+        navigate(`/customer-account/${customerId}`);
+      }
+    } else if (notification.type === "overdue_invoice") {
+      navigate("/accounts-receivable");
+    } else if (notification.type === "expiring_check") {
+      navigate("/checks");
+    }
   };
 
   return (
@@ -61,66 +142,129 @@ export function NotificationCenter() {
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs animate-pulse"
             >
               {unreadCount > 9 ? "9+" : unreadCount}
             </Badge>
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 max-h-[70vh] overflow-y-auto">
-        <DropdownMenuLabel>Notificaciones</DropdownMenuLabel>
-        <DropdownMenuSeparator />
+      <DropdownMenuContent align="end" className="w-96 p-0 border-0 shadow-lg">
+        {/* Header */}
+        <div className="bg-background border-b p-4 sticky top-0">
+          <DropdownMenuLabel className="text-base font-semibold">Notificaciones</DropdownMenuLabel>
+          {unreadCount > 0 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {unreadCount} sin leer
+            </p>
+          )}
+        </div>
+
+        {/* Content */}
         {notifications && notifications.length > 0 ? (
-          notifications.map((notification) => (
-            <DropdownMenuItem
-              key={notification.id}
-              className={`flex flex-col items-start p-3 cursor-pointer ${
-                notification.read ? "opacity-60" : ""
-              }`}
-              onClick={() => {
-                markAsRead(notification.id);
-                if (notification.type === "low_stock" || notification.type === "expiring_product") {
-                  navigate("/inventory-alerts");
-                } else if (notification.type === "inactive_customer") {
-                  const data = notification.data as any;
-                  const customerId = data?.customer_id;
-                  if (customerId) {
-                    navigate(`/customer-account/${customerId}`);
-                  }
-                } else if (notification.type === "overdue_invoice") {
-                  navigate("/accounts-receivable");
-                } else if (notification.type === "expiring_check") {
-                  navigate("/checks");
-                }
-              }}
-            >
-              <div className="flex justify-between w-full mb-1">
-                <span className="font-medium">{notification.title}</span>
-                <span className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(notification.created_at), {
-                    addSuffix: true,
-                    locale: es,
-                  })}
-                </span>
-              </div>
-              <span className="text-sm text-muted-foreground">
-                {notification.message}
-              </span>
-            </DropdownMenuItem>
-          ))
+          <ScrollArea className="h-[400px]">
+            <div className="p-3 space-y-2">
+              {notifications.map((notification) => {
+                const config =
+                  NOTIFICATION_CONFIG[notification.type] || NOTIFICATION_CONFIG.low_stock;
+                const Icon = config.icon;
+
+                return (
+                  <div
+                    key={notification.id}
+                    className={`p-3 rounded-lg border transition-all ${config.bg} ${config.border} hover:shadow-md group`}
+                  >
+                    <div className="flex gap-3">
+                      {/* Icon */}
+                      <div className="flex-shrink-0 pt-0.5">
+                        <Icon className="h-4 w-4 text-muted-foreground/60" />
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-sm leading-tight">
+                              {notification.title}
+                            </h4>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {formatDistanceToNow(
+                                new Date(notification.created_at),
+                                { addSuffix: true, locale: es }
+                              )}
+                            </p>
+                          </div>
+                          {!notification.read && (
+                            <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-1" />
+                          )}
+                        </div>
+                        <p className="text-sm text-foreground/80 mb-2">
+                          {notification.message}
+                        </p>
+
+                        {/* Actions */}
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {!notification.read && (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markAsRead.mutate(notification.id);
+                              }}
+                              disabled={markAsRead.isPending}
+                              className="h-7 px-2 text-xs gap-1"
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              Marcar
+                            </Button>
+                          )}
+                          <Button
+                            size="xs"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteNotification.mutate(notification.id);
+                            }}
+                            disabled={deleteNotification.isPending}
+                            className="h-7 px-2 text-xs text-destructive hover:text-destructive gap-1"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Eliminar
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
         ) : (
-          <div className="p-4 text-center text-sm text-muted-foreground">
-            No hay notificaciones
+          <div className="h-[300px] flex items-center justify-center">
+            <div className="text-center">
+              <Bell className="h-10 w-10 text-muted-foreground/20 mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">
+                No hay notificaciones
+              </p>
+            </div>
           </div>
         )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem 
-          className="text-center cursor-pointer"
-          onClick={() => navigate("/inventory-alerts")}
-        >
-          Ver todas las notificaciones
-        </DropdownMenuItem>
+
+        {/* Footer */}
+        {notifications && notifications.length > 0 && (
+          <>
+            <DropdownMenuSeparator className="m-0" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/inventory-alerts")}
+              className="w-full justify-center border-0 rounded-none text-xs h-9"
+            >
+              Ver todas las notificaciones
+            </Button>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
