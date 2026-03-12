@@ -270,28 +270,32 @@ export default function Products() {
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
-      let query = supabase.from("products").select("*").eq("company_id", currentCompany.id).eq("active", true);
+      let query: any = supabase
+        .from("products")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .eq("active", true);
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
         if (sanitized) {
-          query = query.or(`name.ilike.%${sanitized}%,barcode.ilike.%${sanitized}%,sku.ilike.%${sanitized}%`);
+          query = (query as any).or(`name.ilike.%${sanitized}%,barcode.ilike.%${sanitized}%,sku.ilike.%${sanitized}%`);
         }
       }
       
       if (categoryFilter) {
-        query = query.eq("category_id", categoryFilter);
+        query = (query as any).eq("category_id", categoryFilter);
       }
       
       // Apply price range filter
-      query = query.gte("price", priceRange[0]).lte("price", priceRange[1]);
+      query = (query as any).gte("price", priceRange[0]).lte("price", priceRange[1]);
       
       // Apply sorting
       let orderColumn = sortBy;
       if (sortBy === "created_at") {
         orderColumn = "created_at";
       }
-      query = query.order(orderColumn, { ascending: sortDirection === "asc" });
+      query = (query as any).order(orderColumn, { ascending: sortDirection === "asc" });
       
       const { data, error } = await query;
       if (error) throw error;

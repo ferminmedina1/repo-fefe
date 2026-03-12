@@ -118,7 +118,7 @@ export function ModulesNavigationPanel({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col border-0 bg-background/80 backdrop-blur-xl">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col border-0 bg-background/80 backdrop-blur-xl p-0">
         <style>{`
           @keyframes futuristicScan {
             0% {
@@ -153,6 +153,15 @@ export function ModulesNavigationPanel({
             }
           }
 
+          @keyframes hoverLift {
+            0%, 100% {
+              transform: translateY(0);
+            }
+            50% {
+              transform: translateY(-2px);
+            }
+          }
+
           .modules-grid-entrance {
             animation: futuristicScan 0.8s ease-out forwards;
           }
@@ -164,23 +173,26 @@ export function ModulesNavigationPanel({
           .module-icon-glow {
             animation: glowPulse 3s ease-in-out infinite;
           }
+
+          .close-button {
+            transition: all 0.3s ease;
+          }
+
+          .close-button:hover {
+            transform: rotate(90deg) scale(1.1);
+          }
         `}</style>
 
-        {/* Header minimalista */}
-        <div className="flex items-center justify-between px-6 pt-4 pb-2 modules-grid-entrance">
-          <div>
-            <h1 className="text-3xl font-light tracking-tight">Módulos</h1>
-          </div>
+        {/* Header Minimalista */}
+        <div className="flex items-center justify-between px-8 py-6 modules-grid-entrance border-b border-primary/10">
+          <h1 className="text-4xl font-light tracking-[-0.02em] text-foreground">Módulos</h1>
           <button
             onClick={() => onOpenChange(false)}
-            className="p-2 hover:bg-muted/50 rounded-lg transition-colors"
+            className="close-button p-2 hover:bg-destructive/10 rounded-lg transition-all"
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5 text-muted-foreground hover:text-destructive" />
           </button>
         </div>
-
-        {/* Divider minimalista */}
-        <div className="h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent modules-grid-entrance" />
 
         {/* Modules Grid */}
         <div className="flex-1 overflow-y-auto">
@@ -196,7 +208,7 @@ export function ModulesNavigationPanel({
               </p>
             </div>
           ) : (
-            <div className="px-6 py-8 space-y-12 modules-grid-entrance">
+            <div className="px-8 py-12 space-y-12 modules-grid-entrance">
               {Object.entries(groupedModules).map(([categoryKey, modules]) => (
                 <div key={categoryKey} className="space-y-4">
                   {/* Grid minimalista de módulos */}
@@ -209,36 +221,39 @@ export function ModulesNavigationPanel({
                           key={module.code}
                           onClick={() => handleModuleClick(module.route)}
                           disabled={!module.route}
-                          className={cn(
-                            "group flex flex-col items-center gap-3 transition-all duration-500 module-item",
-                            module.route
+                          className={`
+                            group flex flex-col items-center gap-3 transition-all duration-500 module-item
+                            ${module.route
                               ? "cursor-pointer"
                               : "opacity-40 cursor-not-allowed"
-                          )}
+                            }
+                          `}
                           style={{
                             animationDelay: `${index * 50}ms`,
                           }}
                         >
-                          {/* Icon - Ultra minimalista con efecto futurista */}
+                          {/* Icon Container - Ultra Futurista */}
                           <div
-                            className={cn(
-                              "flex items-center justify-center transition-all duration-500 module-icon-glow",
-                              module.route
-                                ? "text-muted-foreground group-hover:text-primary group-hover:-translate-y-1 group-hover:scale-110"
+                            className={`
+                              flex items-center justify-center transition-all duration-500 module-icon-glow
+                              ${module.route
+                                ? "text-muted-foreground group-hover:text-primary group-hover:-translate-y-1 group-hover:scale-125"
                                 : "text-muted-foreground/40"
-                            )}
+                              }
+                            `}
                           >
                             <Icon className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14" />
                           </div>
 
-                          {/* Title - Ultra minimalista */}
+                          {/* Module Name */}
                           <p
-                            className={cn(
-                              "text-xs sm:text-sm text-center leading-tight transition-all duration-500 font-medium",
-                              module.route
-                                ? "text-muted-foreground group-hover:text-foreground"
+                            className={`
+                              text-xs sm:text-sm text-center leading-tight transition-all duration-500 font-medium
+                              ${module.route
+                                ? "text-muted-foreground group-hover:text-foreground group-hover:font-semibold"
                                 : "text-muted-foreground/40"
-                            )}
+                              }
+                            `}
                           >
                             {module.name}
                           </p>
