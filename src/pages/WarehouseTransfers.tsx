@@ -34,6 +34,13 @@ interface TransferItem {
   quantity: number;
 }
 
+interface TransferLine {
+  id: string; // Temporary ID for UI
+  from_warehouse_id: string;
+  to_warehouse_id: string;
+  items: TransferItem[];
+}
+
 interface Transfer {
   id: string;
   transfer_number: string;
@@ -51,10 +58,12 @@ export default function WarehouseTransfers() {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [lines, setLines] = useState<TransferLine[]>([]);
+  const [notes, setNotes] = useState("");
+  
+  // State for adding new line
   const [fromWarehouse, setFromWarehouse] = useState<string>("");
   const [toWarehouse, setToWarehouse] = useState<string>("");
-  const [notes, setNotes] = useState("");
-  const [items, setItems] = useState<TransferItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<string>("");
   const [quantity, setQuantity] = useState<number>(1);
 
@@ -108,35 +117,44 @@ export default function WarehouseTransfers() {
 
       const transferNumber = await generateTransferNumber();
       
-      const { data: transfer, error: transferError } = await supabase
+      // Create a transfer record for each line
+      const transfersToCreate = lines.map(line => ({
+        transfer_number: transferNumber,
+        from_warehouse_id: line.from_warehouse_id,
+        to_warehouse_id: line.to_warehouse_id,
+        status: "pending",
+        requested_by: user.id,
+        notes,
+        company_id: currentCompany?.id,
+      }));
+
+      const { data: createdTransfers, error: transferError } = await supabase
         .from("warehouse_transfers")
-        .insert([{
-          transfer_number: transferNumber,
-          from_warehouse_id: fromWarehouse,
-          to_warehouse_id: toWarehouse,
-          status: "pending",
-          requested_by: user.id,
-          notes,
-          company_id: currentCompany?.id,
-        }])
-        .select()
-        .single();
+        .insert(transfersToCreate)
+        .select();
 
       if (transferError) throw transferError;
 
-      const { error: itemsError } = await supabase
-        .from("warehouse_transfer_items")
-        .insert(
-          items.map((item) => ({
-            transfer_id: transfer.id,
-            product_id: item.product_id,
-            product_name: item.product_name,
-            quantity: item.quantity,
-            company_id: currentCompany?.id!
-          }))
-        );
+      // Add items for each transfer line
+      const allItems: any[] = [];
+      createdTransfers.forEach((transfer, index) => {
+        const lineItems = lines[index].items.map(item => ({
+          transfer_id: transfer.id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          company_id: currentCompany?.id!
+        }));
+        allItems.push(...lineItems);
+      });
 
-      if (itemsError) throw itemsError;
+      if (allItems.length > 0) {
+        const { error: itemsError } = await supabase
+          .from("warehouse_transfer_items")
+          .insert(allItems);
+
+        if (itemsError) throw itemsError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["warehouse-transfers"] });
@@ -186,12 +204,12 @@ export default function WarehouseTransfers() {
     setFromWarehouse("");
     setToWarehouse("");
     setNotes("");
-    setItems([]);
+    setLines([]);
     setSelectedProduct("");
     setQuantity(1);
   };
 
-  const addItem = () => {
+  const addItem = (lineId: string) => {
     if (!selectedProduct || quantity <= 0) {
       toast.error("Seleccione un producto y cantidad válida");
       return;
@@ -200,40 +218,49 @@ export default function WarehouseTransfers() {
     const product = products?.find((p) => p.id === selectedProduct);
     if (!product) return;
 
-    const existingItem = items.find((i) => i.product_id === selectedProduct);
-    if (existingItem) {
-      setItems(
-        items.map((i) =>
-          i.product_id === selectedProduct
-            ? { ...i, quantity: i.quantity + quantity }
-            : i
-        )
-      );
-    } else {
-      setItems([
-        ...items,
-        {
-          product_id: product.id,
-          product_name: product.name,
-          quantity,
-        },
-      ]);
-    }
+    setLines(lines.map(line => {
+      if (line.id !== lineId) return line;
+
+      const existingItem = line.items.find((i) => i.product_id === selectedProduct);
+      if (existingItem) {
+        return {
+          ...line,
+          items: line.items.map((i) =>
+            i.product_id === selectedProduct
+              ? { ...i, quantity: i.quantity + quantity }
+              : i
+          )
+        };
+      } else {
+        return {
+          ...line,
+          items: [
+            ...line.items,
+            {
+              product_id: product.id,
+              product_name: product.name,
+              quantity,
+            },
+          ]
+        };
+      }
+    }));
 
     setSelectedProduct("");
     setQuantity(1);
   };
 
-  const removeItem = (productId: string) => {
-    setItems(items.filter((i) => i.product_id !== productId));
+  const removeItem = (lineId: string, productId: string) => {
+    setLines(lines.map(line => {
+      if (line.id !== lineId) return line;
+      return {
+        ...line,
+        items: line.items.filter((i) => i.product_id !== productId)
+      };
+    }));
   };
 
-  const handleSubmit = () => {
-    if (!currentCompany?.id) {
-      toast.error("Empresa no seleccionada");
-      return;
-    }
-
+  const addNewLine = () => {
     if (!fromWarehouse || !toWarehouse) {
       toast.error("Seleccione depósito origen y destino");
       return;
@@ -244,40 +271,69 @@ export default function WarehouseTransfers() {
       return;
     }
 
-    if (items.length === 0) {
-      toast.error("Agregue al menos un producto");
+    setLines([
+      ...lines,
+      {
+        id: crypto.randomUUID(),
+        from_warehouse_id: fromWarehouse,
+        to_warehouse_id: toWarehouse,
+        items: [],
+      }
+    ]);
+
+    setFromWarehouse("");
+    setToWarehouse("");
+  };
+
+  const removeLine = (lineId: string) => {
+    setLines(lines.filter(line => line.id !== lineId));
+  };
+
+  const handleSubmit = () => {
+    if (!currentCompany?.id) {
+      toast.error("Empresa no seleccionada");
       return;
     }
 
-    // Validate stock availability before creating transfer
+    if (lines.length === 0) {
+      toast.error("Agregue al menos una línea de transferencia");
+      return;
+    }
+
+    const allItemsCount = lines.reduce((sum, line) => sum + line.items.length, 0);
+    if (allItemsCount === 0) {
+      toast.error("Agregue al menos un producto en alguna línea");
+      return;
+    }
+
     validateAndCreateTransfer();
   };
 
   const validateAndCreateTransfer = async () => {
     try {
-      // Get current warehouse stock for validation
-      const { data: warehouseStock, error: stockError } = await supabase
-        .from("warehouse_stock")
-        .select("product_id, stock")
-        .eq("warehouse_id", fromWarehouse);
+      // Validate stock for all lines
+      for (const line of lines) {
+        const { data: warehouseStock, error: stockError } = await supabase
+          .from("warehouse_stock")
+          .select("product_id, stock")
+          .eq("warehouse_id", line.from_warehouse_id);
 
-      if (stockError) throw stockError;
+        if (stockError) throw stockError;
 
-      // Check if all products have sufficient stock
-      const stockMap = new Map((warehouseStock || []).map(s => [s.product_id, s.stock]));
-      
-      for (const item of items) {
-        const availableStock = stockMap.get(item.product_id) || 0;
-        if (availableStock < item.quantity) {
-          toast.error(
-            `Stock insuficiente para ${item.product_name}. ` +
-            `Disponible: ${availableStock}, Solicitado: ${item.quantity}`
-          );
-          return;
+        const stockMap = new Map((warehouseStock || []).map(s => [s.product_id, s.stock]));
+        
+        for (const item of line.items) {
+          const availableStock = stockMap.get(item.product_id) || 0;
+          if (availableStock < item.quantity) {
+            toast.error(
+              `Stock insuficiente para ${item.product_name} en destino. ` +
+              `Disponible: ${availableStock}, Solicitado: ${item.quantity}`
+            );
+            return;
+          }
         }
       }
 
-      // If all validations pass, create the transfer
       createTransfer.mutate();
     } catch (error: any) {
       toast.error("Error validando stock: " + error.message);
@@ -314,44 +370,11 @@ export default function WarehouseTransfers() {
                 Nueva Transferencia
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl animate-scale-in">
+            <DialogContent className="max-w-4xl animate-scale-in max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Nueva Transferencia</DialogTitle>
+                <DialogTitle>Nueva Transferencia (Múltiples Depósitos)</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Depósito Origen *</Label>
-                    <Select value={fromWarehouse} onValueChange={setFromWarehouse}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {warehouses?.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.code} - {w.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Depósito Destino *</Label>
-                    <Select value={toWarehouse} onValueChange={setToWarehouse}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {warehouses?.map((w) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.code} - {w.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
                 <div>
                   <Label>Notas</Label>
                   <Textarea
@@ -362,64 +385,145 @@ export default function WarehouseTransfers() {
                   />
                 </div>
 
+                {/* Líneas de transferencia */}
                 <div className="border-t pt-4">
-                  <Label className="text-lg">Productos</Label>
-                  <div className="flex gap-2 mt-2">
-                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Seleccionar producto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products?.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name} ({p.sku})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={quantity}
-                      onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                      className="w-24"
-                      placeholder="Cant."
-                    />
-                    <Button onClick={addItem} type="button">
-                      <Plus className="h-4 w-4" />
+                  <div className="flex justify-between items-center mb-4">
+                    <Label className="text-lg">Líneas de Transferencia</Label>
+                    <Badge variant="secondary">{lines.length} línea{lines.length !== 1 ? 's' : ''}</Badge>
+                  </div>
+
+                  <div className="space-y-4 mb-4">
+                    {lines.map((line, lineIndex) => {
+                      const fromWarehouseName = warehouses?.find(w => w.id === line.from_warehouse_id)?.name;
+                      const toWarehouseName = warehouses?.find(w => w.id === line.to_warehouse_id)?.name;
+                      const fromWarehouseCode = warehouses?.find(w => w.id === line.from_warehouse_id)?.code;
+                      const toWarehouseCode = warehouses?.find(w => w.id === line.to_warehouse_id)?.code;
+
+                      return (
+                        <Card key={line.id} className="p-4 bg-muted/30 space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-2 flex-1">
+                              <Badge variant="outline">{lineIndex + 1}</Badge>
+                              <div className="text-sm">
+                                <span className="font-semibold">{fromWarehouseCode} - {fromWarehouseName}</span>
+                                <ArrowLeftRight className="h-4 w-4 inline mx-2 text-primary" />
+                                <span className="font-semibold">{toWarehouseCode} - {toWarehouseName}</span>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeLine(line.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+
+                          {/* Agregar productos a esta línea */}
+                          <div className="flex gap-2 border-t pt-3">
+                            <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                              <SelectTrigger className="flex-1">
+                                <SelectValue placeholder="Seleccionar producto" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products?.map((p) => (
+                                  <SelectItem key={p.id} value={p.id}>
+                                    {p.name} ({p.sku})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={quantity}
+                              onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                              className="w-24"
+                              placeholder="Cant."
+                            />
+                            <Button onClick={() => addItem(line.id)} type="button">
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+
+                          {/* Items en esta línea */}
+                          {line.items.length > 0 && (
+                            <div className="space-y-2 border-t pt-3">
+                              {line.items.map((item) => (
+                                <div key={item.product_id} className="flex justify-between items-center p-2 bg-background rounded">
+                                  <div className="flex items-center gap-2">
+                                    <Package className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{item.product_name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <Badge variant="outline">x{item.quantity}</Badge>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeItem(line.id, item.product_id)}
+                                      className="h-6 w-6 p-0"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+
+                  {/* Agregar nueva línea */}
+                  <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
+                    <div className="text-sm font-medium">Agregar nueva línea de transferencia</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs mb-1 block">Depósito Origen *</Label>
+                        <Select value={fromWarehouse} onValueChange={setFromWarehouse}>
+                          <SelectTrigger className="text-sm">
+                            <SelectValue placeholder="Seleccionar" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {warehouses?.map((w) => (
+                              <SelectItem key={w.id} value={w.id}>
+                                {w.code} - {w.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs mb-1 block">Depósito Destino *</Label>
+                        <Select value={toWarehouse} onValueChange={setToWarehouse}>
+                          <SelectTrigger className="text-sm">
+                            <SelectValue placeholder="Seleccionar" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {warehouses?.map((w) => (
+                              <SelectItem key={w.id} value={w.id}>
+                                {w.code} - {w.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <Button onClick={addNewLine} variant="outline" className="w-full">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Línea
                     </Button>
                   </div>
                 </div>
-
-                {items.length > 0 && (
-                  <div className="border rounded-lg p-3 space-y-2">
-                    {items.map((item) => (
-                      <div key={item.product_id} className="flex justify-between items-center p-2 bg-muted/50 rounded">
-                        <div className="flex items-center gap-2">
-                          <Package className="h-4 w-4" />
-                          <span>{item.product_name}</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Badge variant="outline">x{item.quantity}</Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeItem(item.product_id)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
 
                 <div className="flex justify-end gap-2 border-t pt-4">
                   <Button variant="outline" onClick={() => setDialogOpen(false)}>
                     Cancelar
                   </Button>
                   <Button onClick={handleSubmit}>
-                    Crear Transferencia
+                    Crear Transferencia ({lines.length} línea{lines.length !== 1 ? 's' : ''})
                   </Button>
                 </div>
               </div>

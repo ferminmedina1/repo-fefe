@@ -78,28 +78,20 @@ export function ModulesNavigationPanel({
     queryFn: async () => {
       if (!currentCompany?.id) return [];
 
+      // Get active modules for the company
       const { data, error } = await supabase
-        .from("company_platform_modules")
-        .select(`
-          platform_modules (
-            id,
-            code,
-            name,
-            description,
-            category,
-            route
-          )
-        `)
-        .eq("company_id", currentCompany.id)
-        .eq("is_active", true);
+        .from("platform_modules")
+        .select("id, code, name, description, category, route")
+        .eq("is_active", true)
+        .order("category")
+        .order("display_order");
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching modules:", error);
+        throw error;
+      }
 
-      return (
-        data
-          ?.map((item: any) => item.platform_modules)
-          .filter(Boolean) as Module[]
-      ) || [];
+      return (data as Module[]) || [];
     },
     enabled: open && !!currentCompany?.id,
   });

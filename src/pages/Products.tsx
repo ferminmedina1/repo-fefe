@@ -10,7 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
-import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight, DollarSign, AlertCircle, CheckCircle2, Info, Image as ImageIcon, BarChart3, ShoppingCart, PackageOpen, Eye } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight, DollarSign, AlertCircle, CheckCircle2, Info, Image as ImageIcon, BarChart3, ShoppingCart, PackageOpen, Eye, Sliders } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +91,7 @@ export default function Products() {
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const customFieldsSectionRef = useRef<HTMLDivElement>(null);
   const [digitalPriceTier, setDigitalPriceTier] = useState({name: "", price: ""});
   
@@ -2751,9 +2752,9 @@ export default function Products() {
         <Card className="shadow-soft">
           <CardHeader>
             <div className="flex flex-col gap-3">
-              {/* Búsqueda y Categoría */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
+              {/* Búsqueda y Botón de Filtros */}
+              <div className="flex flex-col sm:flex-row gap-2 items-center">
+                <div className="relative flex-1 w-full">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Buscar productos..."
@@ -2762,91 +2763,109 @@ export default function Products() {
                     className="pl-10"
                   />
                 </div>
-                <Select value={categoryFilter || "ALL"} onValueChange={(value) => setCategoryFilter(value === "ALL" ? "" : value)}>
-                  <SelectTrigger className="w-full sm:w-[200px]">
-                    <SelectValue placeholder="Todas las categorías" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Todas las categorías</SelectItem>
-                    {categories?.map((cat: any) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Filtros Rápidos */}
-              <div className="flex flex-wrap gap-2">
-                <div className="text-xs font-medium text-muted-foreground pt-1">Tipo:</div>
-                {["all", "physical", "digital", "combo"].map((type) => (
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <Select value={categoryFilter || "ALL"} onValueChange={(value) => setCategoryFilter(value === "ALL" ? "" : value)}>
+                    <SelectTrigger className="flex-1 sm:w-[200px]">
+                      <SelectValue placeholder="Categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Todas</SelectItem>
+                      {categories?.map((cat: any) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
-                    key={type}
-                    variant={filterType === type ? "default" : "outline"}
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => setFilterType(type as any)}
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+                    title="Abrir filtros avanzados"
+                    className={isFiltersOpen ? "bg-primary text-primary-foreground" : ""}
                   >
-                    {type === "all" && "Todos"}
-                    {type === "physical" && "📦 Físicos"}
-                    {type === "digital" && "💻 Digitales"}
-                    {type === "combo" && "🎁 Combos"}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Filtro de Stock */}
-              <div className="flex flex-wrap gap-2">
-                <div className="text-xs font-medium text-muted-foreground pt-1">Stock:</div>
-                {[
-                  { value: "all", label: "Todos" },
-                  { value: "low", label: "⚠️ Bajo" },
-                  { value: "out", label: "💔 Agotado" }
-                ].map((status) => (
-                  <Button
-                    key={status.value}
-                    variant={filterStockStatus === status.value ? "default" : "outline"}
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => setFilterStockStatus(status.value as any)}
-                  >
-                    {status.label}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Rango de Precios */}
-              <div className="flex flex-col gap-2">
-                <div className="text-xs font-medium text-muted-foreground">Rango de Precios: ${priceRange[0]} - ${priceRange[1]}</div>
-                <div className="flex gap-2 items-center">
-                  <Input
-                    type="number"
-                    placeholder="Min"
-                    value={priceRange[0]}
-                    onChange={(e) => setPriceRange([parseInt(e.target.value) || 0, priceRange[1]])}
-                    className="w-24 text-xs"
-                    min="0"
-                  />
-                  <span className="text-muted-foreground">-</span>
-                  <Input
-                    type="number"
-                    placeholder="Max"
-                    value={priceRange[1]}
-                    onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value) || 10000])}
-                    className="w-24 text-xs"
-                    min="0"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setPriceRange([0, 10000])}
-                    className="text-xs"
-                  >
-                    Reset
+                    <Sliders className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
+
+              {/* Panel de Filtros Desplegable */}
+              {isFiltersOpen && (
+                <Collapsible defaultOpen open={isFiltersOpen} onOpenChange={setIsFiltersOpen} className="w-full">
+                  <CollapsibleContent className="space-y-3 pt-3 border-t">
+                    {/* Filtro de Tipo */}
+                    <div className="flex flex-wrap gap-2">
+                      <div className="text-xs font-medium text-muted-foreground pt-1">Tipo:</div>
+                      {["all", "physical", "digital", "combo"].map((type) => (
+                        <Button
+                          key={type}
+                          variant={filterType === type ? "default" : "outline"}
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => setFilterType(type as any)}
+                        >
+                          {type === "all" && "Todos"}
+                          {type === "physical" && "📦 Físicos"}
+                          {type === "digital" && "💻 Digitales"}
+                          {type === "combo" && "🎁 Combos"}
+                        </Button>
+                      ))}
+                    </div>
+
+                    {/* Filtro de Stock */}
+                    <div className="flex flex-wrap gap-2">
+                      <div className="text-xs font-medium text-muted-foreground pt-1">Stock:</div>
+                      {[
+                        { value: "all", label: "Todos" },
+                        { value: "low", label: "⚠️ Bajo" },
+                        { value: "out", label: "💔 Agotado" }
+                      ].map((status) => (
+                        <Button
+                          key={status.value}
+                          variant={filterStockStatus === status.value ? "default" : "outline"}
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => setFilterStockStatus(status.value as any)}
+                        >
+                          {status.label}
+                        </Button>
+                      ))}
+                    </div>
+
+                    {/* Rango de Precios */}
+                    <div className="flex flex-col gap-2">
+                      <div className="text-xs font-medium text-muted-foreground">Rango de Precios: ${priceRange[0]} - ${priceRange[1]}</div>
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          type="number"
+                          placeholder="Min"
+                          value={priceRange[0]}
+                          onChange={(e) => setPriceRange([parseInt(e.target.value) || 0, priceRange[1]])}
+                          className="w-24 text-xs"
+                          min="0"
+                        />
+                        <span className="text-muted-foreground">-</span>
+                        <Input
+                          type="number"
+                          placeholder="Max"
+                          value={priceRange[1]}
+                          onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value) || 10000])}
+                          className="w-24 text-xs"
+                          min="0"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPriceRange([0, 10000])}
+                          className="text-xs"
+                        >
+                          Reset
+                        </Button>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
             </div>
           </CardHeader>
           <CardContent className="p-2 sm:p-6 overflow-x-auto">
