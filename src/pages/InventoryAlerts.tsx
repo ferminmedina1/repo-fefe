@@ -21,7 +21,13 @@ import {
   Trash2,
   Power,
   Eye,
-  Pencil
+  Pencil,
+  Boxes,
+  Clock,
+  Users,
+  FileText,
+  X,
+  CheckCircle2
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -42,11 +48,52 @@ const SCOPE_LABELS: Record<string, string> = {
   product: "Producto",
 };
 
+const NOTIFICATION_TYPES = {
+  low_stock: {
+    label: "Stock Bajo",
+    icon: Boxes,
+    color: "bg-red-500/20 border-red-500/50",
+    badge: "destructive",
+    textColor: "text-red-600 dark:text-red-400",
+  },
+  expiring_product: {
+    label: "Próximo a Vencer",
+    icon: Clock,
+    color: "bg-amber-500/20 border-amber-500/50",
+    badge: "default",
+    textColor: "text-amber-600 dark:text-amber-400",
+  },
+  inactive_customer: {
+    label: "Cliente Inactivo",
+    icon: Users,
+    color: "bg-blue-500/20 border-blue-500/50",
+    badge: "secondary",
+    textColor: "text-blue-600 dark:text-blue-400",
+  },
+  overdue_invoice: {
+    label: "Factura Vencida",
+    icon: FileText,
+    color: "bg-red-500/20 border-red-500/50",
+    badge: "destructive",
+    textColor: "text-red-600 dark:text-red-400",
+  },
+  expiring_check: {
+    label: "Cheque por Vencer",
+    icon: Calendar,
+    color: "bg-orange-500/20 border-orange-500/50",
+    badge: "default",
+    textColor: "text-orange-600 dark:text-orange-400",
+  },
+};
+
 export default function InventoryAlerts() {
   const { currentCompany } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<any>(null);
+  const [notificationSearchQuery, setNotificationSearchQuery] = useState("");
+  const [selectedNotificationType, setSelectedNotificationType] = useState<string | null>(null);
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -202,7 +249,7 @@ export default function InventoryAlerts() {
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
       return data;
@@ -222,6 +269,30 @@ export default function InventoryAlerts() {
 
     refetchNotifications();
   };
+
+  // Filtro mejorado de notificaciones
+  const filteredNotifications = notifications?.filter((notification) => {
+    // Filtro por tipo si está seleccionado
+    if (selectedNotificationType && notification.type !== selectedNotificationType) {
+      return false;
+    }
+    
+    // Filtro por estado de lectura
+    if (unreadOnly && notification.read) {
+      return false;
+    }
+    
+    // Búsqueda por texto
+    if (notificationSearchQuery.trim()) {
+      const query = notificationSearchQuery.toLowerCase();
+      return (
+        notification.title.toLowerCase().includes(query) ||
+        notification.message.toLowerCase().includes(query)
+      );
+    }
+    
+    return true;
+  }) || [];
 
   const filteredLowStock = lowStockProducts?.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -596,46 +667,173 @@ export default function InventoryAlerts() {
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-4">
+          {/* Filtros y búsqueda */}
+          <div className="space-y-3">
+            {/* Buscador */}
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar notificaciones..."
+                value={notificationSearchQuery}
+                onChange={(e) => setNotificationSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+              {notificationSearchQuery && (
+                <button
+                  onClick={() => setNotificationSearchQuery("")}
+                  className="absolute right-3 top-3"
+                >
+                  <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                </button>
+              )}
+            </div>
+
+            {/* Filtros por tipo y estado */}
+            <div className="flex flex-wrap gap-2 items-center">
+              {/* Toggle para mostrar solo sin leer */}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-background hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => setUnreadOnly(!unreadOnly)}>
+                <CheckCircle2 className={`h-4 w-4 transition-colors ${unreadOnly ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className="text-sm font-medium">
+                  {unreadOnly ? 'Solo sin leer' : 'Todas'}
+                </span>
+              </div>
+
+              {/* Separador */}
+              <div className="h-6 w-px bg-border mx-1" />
+
+              {/* Filtros por tipo */}
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(NOTIFICATION_TYPES).map(([typeKey, typeInfo]) => {
+                  const Icon = typeInfo.icon;
+                  const isSelected = selectedNotificationType === typeKey;
+                  const count = notifications?.filter(n => n.type === typeKey).length || 0;
+                  
+                  return (
+                    <button
+                      key={typeKey}
+                      onClick={() => setSelectedNotificationType(isSelected ? null : typeKey)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                        isSelected
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-background hover:bg-muted/50 border-border'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="text-sm font-medium">{typeInfo.label}</span>
+                      {count > 0 && (
+                        <Badge 
+                          variant={isSelected ? 'secondary' : 'outline'} 
+                          className="ml-1 text-xs"
+                        >
+                          {count}
+                        </Badge>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Resumen de resultados */}
+            {(notificationSearchQuery || selectedNotificationType || unreadOnly) && (
+              <div className="text-sm text-muted-foreground">
+                Mostrando {filteredNotifications.length} de {notifications?.length || 0} notificaciones
+                {notificationSearchQuery || selectedNotificationType || unreadOnly ? ' • ' : ''}
+                {selectedNotificationType && NOTIFICATION_TYPES[selectedNotificationType as keyof typeof NOTIFICATION_TYPES] && (
+                  <span>{NOTIFICATION_TYPES[selectedNotificationType as keyof typeof NOTIFICATION_TYPES].label}</span>
+                )}
+                {unreadOnly && <span>{selectedNotificationType ? ' • ' : ''}Sin leer</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Notificaciones */}
           {notifications?.length === 0 ? (
+            <Card className="p-8 text-center space-y-4">
+              <div className="flex justify-center">
+                <Bell className="h-12 w-12 text-muted-foreground/50" />
+              </div>
+              <div>
+                <p className="text-muted-foreground font-medium">No hay notificaciones</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Las notificaciones de alertas aparecerán aquí
+                </p>
+              </div>
+            </Card>
+          ) : filteredNotifications.length === 0 ? (
             <Card className="p-8 text-center">
-              <p className="text-muted-foreground">No hay notificaciones</p>
+              <p className="text-muted-foreground">No hay notificaciones que coincidan con los filtros</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setNotificationSearchQuery("");
+                  setSelectedNotificationType(null);
+                  setUnreadOnly(false);
+                }}
+                className="mt-2"
+              >
+                Limpiar filtros
+              </Button>
             </Card>
           ) : (
-            notifications?.map((notification) => (
-              <Card
-                key={notification.id}
-                className={`p-4 ${notification.read ? "opacity-60" : ""}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{notification.title}</h3>
+            <div className="space-y-3">
+              {filteredNotifications.map((notification) => {
+                const typeInfo = NOTIFICATION_TYPES[notification.type as keyof typeof NOTIFICATION_TYPES];
+                const Icon = typeInfo?.icon || Bell;
+                
+                return (
+                  <Card
+                    key={notification.id}
+                    className={`p-4 border-l-4 transition-all ${
+                      typeInfo?.color || 'bg-background border-border'
+                    } ${!notification.read ? 'ring-1 ring-primary/50' : 'opacity-75'}`}
+                  >
+                    <div className="flex items-start gap-4 justify-between">
+                      <div className="flex gap-3 flex-1 min-w-0">
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${typeInfo?.color || 'bg-background'}`}>
+                          <Icon className={`h-4 w-4 ${typeInfo?.textColor || 'text-foreground'}`} />
+                        </div>
+                        
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold truncate">{notification.title}</h3>
+                            <Badge variant={typeInfo?.badge as any || 'secondary'} className="text-xs flex-shrink-0">
+                              {typeInfo?.label || notification.type}
+                            </Badge>
+                            {!notification.read && (
+                              <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                            )}
+                          </div>
+                          
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {notification.message}
+                          </p>
+                          
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {formatDistanceToNow(new Date(notification.created_at), {
+                              addSuffix: true,
+                              locale: es,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      
                       {!notification.read && (
-                        <Badge variant="default">Nueva</Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => markAsRead(notification.id)}
+                          className="flex-shrink-0 ml-2"
+                        >
+                          Leer
+                        </Button>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {notification.message}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(notification.created_at), {
-                        addSuffix: true,
-                        locale: es,
-                      })}
-                    </p>
-                  </div>
-                  {!notification.read && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => markAsRead(notification.id)}
-                    >
-                      Marcar como leída
-                    </Button>
-                  )}
-                </div>
-              </Card>
-            ))
+                  </Card>
+                );
+              })}
+            </div>
           )}
         </TabsContent>
       </Tabs>

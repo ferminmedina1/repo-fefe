@@ -290,6 +290,20 @@ export default function Products() {
       // Apply price range filter
       query = (query as any).gte("price", priceRange[0]).lte("price", priceRange[1]);
       
+      // Apply type filter at DB level
+      if (filterType === "digital") {
+        query = (query as any).eq("is_digital", true);
+      } else if (filterType === "combo") {
+        query = (query as any).eq("is_combo", true);
+      } else if (filterType === "physical") {
+        query = (query as any).eq("is_digital", false).eq("is_combo", false);
+      }
+      
+      // Apply stock status filter at DB level (simple cases)
+      if (filterStockStatus === "out") {
+        query = (query as any).eq("stock", 0);
+      }
+      
       // Apply sorting
       let orderColumn = sortBy;
       if (sortBy === "created_at") {
@@ -300,23 +314,10 @@ export default function Products() {
       const { data, error } = await query;
       if (error) throw error;
       
-      // Apply client-side filters
+      // Filter by low stock (requires client-side for min_stock comparison)
       let filtered = (data || []) as any[];
-      
-      // Filter by type (digital/combo/physical)
-      if (filterType === "digital") {
-        filtered = filtered.filter(p => p.is_digital === true);
-      } else if (filterType === "combo") {
-        filtered = filtered.filter(p => p.is_combo === true);
-      } else if (filterType === "physical") {
-        filtered = filtered.filter(p => p.is_digital !== true && p.is_combo !== true);
-      }
-      
-      // Filter by stock status
       if (filterStockStatus === "low") {
         filtered = filtered.filter(p => p.stock > 0 && p.stock <= (p.min_stock || 5));
-      } else if (filterStockStatus === "out") {
-        filtered = filtered.filter(p => p.stock === 0);
       }
       
       return filtered;

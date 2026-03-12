@@ -62,7 +62,6 @@ import { Sidebar as UISidebar } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AvailableModulesDialog } from "./AvailableModulesDialog";
-import { ModulesNavigationPanel } from "./ModulesNavigationPanel";
 
 interface NavItem {
   title: string;
@@ -86,7 +85,6 @@ export function Sidebar() {
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showModulesDialog, setShowModulesDialog] = useState(false);
-  const [showModulesPanel, setShowModulesPanel] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('sidebar-favorites');
     return saved ? JSON.parse(saved) : ['/pos', '/sales', '/products'];
@@ -780,10 +778,8 @@ export function Sidebar() {
           
           <div className="flex items-center gap-4 relative z-10">
             <button
-              onClick={() => setShowModulesPanel(true)}
               className="p-3 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/40 shadow-lg shadow-primary/20 backdrop-blur-sm transition-all duration-1000 hover:scale-110 hover:shadow-lg hover:shadow-primary/40 cursor-pointer active:scale-95"
               style={{animation: 'softGlow 4s infinite ease-in-out'}}
-              title="Click para ver todos los módulos"
             >
               <img 
                 src={currentCompany?.logo_url || "/landing/images/logo_transparente_hd.png"} 
@@ -945,11 +941,7 @@ export function Sidebar() {
           activeModules={activeModules.data || []}
         />
 
-        {/* Panel de navegación de módulos (Logo click) */}
-        <ModulesNavigationPanel
-          open={showModulesPanel}
-          onOpenChange={setShowModulesPanel}
-        />
+
       </div>
     </UISidebar>
   );
