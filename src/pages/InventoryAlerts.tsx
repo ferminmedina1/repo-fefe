@@ -52,7 +52,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useCompany } from "@/contexts/CompanyContext";
 import { CreateAlertDialog } from "@/components/inventory/CreateAlertDialog";
@@ -206,6 +206,8 @@ const NotificationSkeleton = () => (
 
 export default function InventoryAlerts() {
   const { currentCompany } = useCompany();
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => searchParams.get("tab") || "my-alerts");
   const [searchQuery, setSearchQuery] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<any>(null);
@@ -655,7 +657,7 @@ export default function InventoryAlerts() {
         />
       </div>
 
-      <Tabs defaultValue="my-alerts" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="my-alerts" className="flex-1 min-w-[100px] text-xs sm:text-sm">Mis Alertas</TabsTrigger>
           <TabsTrigger value="low-stock" className="flex-1 min-w-[100px] text-xs sm:text-sm">Stock Bajo</TabsTrigger>

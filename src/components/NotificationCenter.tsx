@@ -179,11 +179,16 @@ export function NotificationCenter() {
         {/* Delete Button - Top Right */}
         <button
           onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
             deleteNotification.mutate(notification.id);
           }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
           disabled={deleteNotification.isPending}
-          className="absolute top-2 right-2 p-1 text-muted-foreground hover:text-destructive transition-all duration-200 hover:rotate-90 hover:scale-110"
+          className="absolute top-1 right-1 p-1.5 z-10 text-muted-foreground hover:text-destructive transition-all duration-200 hover:rotate-90 hover:scale-110 cursor-pointer pointer-events-auto"
         >
           <X className="h-4 w-4" />
         </button>
@@ -386,7 +391,7 @@ export function NotificationCenter() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/inventory-alerts")}
+              onClick={() => navigate("/inventory-alerts?tab=notifications")}
               className="w-full justify-center text-sm h-9 rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               Ver todas las notificaciones
