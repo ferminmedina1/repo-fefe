@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import { Badge } from "./ui/badge";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow, isPast, subDays, isAfter } from "date-fns";
 import { es } from "date-fns/locale";
@@ -70,8 +70,9 @@ const getTimeCategory = (createdAt: string): "new" | "previous" => {
 export function NotificationCenter() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<"all" | "unread">("all");
+  const queryClient = useQueryClient();
 
-  const { data: notifications, refetch } = useQuery({
+  const { data: notifications } = useQuery({
     queryKey: ["notifications"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -103,7 +104,8 @@ export function NotificationCenter() {
       if (error) throw error;
     },
     onSuccess: () => {
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      toast.success("Marcada como leída");
     },
     onError: () => {
       toast.error("Error al marcar como leída");
@@ -119,11 +121,14 @@ export function NotificationCenter() {
         .eq("id", notificationId);
 
       if (error) throw error;
+      return notificationId;
     },
-    onSuccess: () => {
-      refetch();
+    onSuccess: (deletedId) => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      toast.success("Notificación eliminada");
     },
-    onError: () => {
+    onError: (error) => {
+      console.error("Error deleting notification:", error);
       toast.error("Error al eliminar notificación");
     },
   });
