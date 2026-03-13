@@ -59,6 +59,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AvailableModulesDialog } from "./AvailableModulesDialog";
@@ -948,74 +949,92 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Botón + Funcionalidades - Solo visible si no es platform admin */}
-        {!isPlatformAdmin && (
-          <div className="px-3 py-2 border-t">
-            <Button
-              onClick={() => setShowModulesDialog(true)}
-              variant="ghost"
-              size="sm"
-              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md border-dashed border border-primary/50 text-primary hover:bg-primary/5 hover:border-primary transition-all"
+        {/* Footer compacto */}
+        <div className="px-3 py-2 border-t">
+          <div className="flex items-center gap-1.5">
+            {/* Asistente IA - pill compacto */}
+            <Link
+              to="/ai-assistant"
+              className="flex flex-1 items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 font-semibold active:scale-[0.97]"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="font-medium">Más Funcionalidades</span>
-            </Button>
-          </div>
-        )}
-
-        {/* Footer - Touch-friendly */}
-        <div className="px-3 py-3 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-2">
-          <Link
-            to="/ai-assistant"
-            className="flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-md hover:shadow-lg active:scale-[0.98]"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span className="font-semibold">Asistente IA</span>
-          </Link>
-
-          <div className="flex gap-2">
-            <Link to="/platform-support" className="flex-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all active:scale-[0.98]"
-              >
-                <LifeBuoy className="w-3.5 h-3.5" />
-                <span>Soporte</span>
-              </Button>
+              <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              <span>Asistente IA</span>
             </Link>
 
-            <Link to="/bot-requests" className="flex-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-purple-500/50 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 transition-all active:scale-[0.98]"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span>Contáctanos</span>
-              </Button>
-            </Link>
-          </div>
+            <TooltipProvider delayDuration={300}>
+              {/* Más Funcionalidades */}
+              {!isPlatformAdmin && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => setShowModulesDialog(true)}
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-primary hover:bg-primary/10 border border-dashed border-primary/50 hover:border-primary rounded-md"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top"><p>Más Funcionalidades</p></TooltipContent>
+                </Tooltip>
+              )}
 
-          <div className="flex gap-2">
-            <Button
-              onClick={async () => {
-                const { error } = await supabase.auth.signOut();
-                if (error) {
-                  toast.error("Error al cerrar sesión");
-                  console.error(error);
-                } else {
-                  toast.success("Sesión cerrada correctamente");
-                  navigate("/auth");
-                }
-              }}
-              variant="outline"
-              size="sm"
-              className="flex-1 h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all active:scale-[0.98]"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Salir</span>
-            </Button>
+              {/* Soporte */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link to="/platform-support">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-md"
+                    >
+                      <LifeBuoy className="w-3.5 h-3.5" />
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="top"><p>Soporte</p></TooltipContent>
+              </Tooltip>
+
+              {/* Contáctanos */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link to="/bot-requests">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 rounded-md"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="top"><p>Contáctanos</p></TooltipContent>
+              </Tooltip>
+
+              {/* Salir */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={async () => {
+                      const { error } = await supabase.auth.signOut();
+                      if (error) {
+                        toast.error("Error al cerrar sesión");
+                        console.error(error);
+                      } else {
+                        toast.success("Sesión cerrada correctamente");
+                        navigate("/auth");
+                      }
+                    }}
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-destructive hover:bg-destructive hover:text-destructive-foreground rounded-md"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top"><p>Salir</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 

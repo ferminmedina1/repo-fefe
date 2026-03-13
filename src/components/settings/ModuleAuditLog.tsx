@@ -6,39 +6,60 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
-import { 
-  Activity, 
-  CheckCircle2, 
-  XCircle, 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  Activity,
+  CheckCircle2,
+  XCircle,
+  TrendingUp,
+  TrendingDown,
   Clock,
   AlertTriangle
 } from "lucide-react";
 import { formatDate } from "@/lib/exportUtils";
-import { ModuleChangeHistory, ModuleChangeAction } from "@/integrations/supabase/types.modules";
+import { ModuleChangeAction } from "@/integrations/supabase/types.modules";
+import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
+
+// AL-007: tipo explícito para las filas del join — evita "as any[]"
+interface AuditHistoryEntry {
+  id: number;
+  company_id: string;
+  module_id: string;
+  action: ModuleChangeAction;
+  changed_at: string;
+  previous_price: number | null;
+  new_price: number | null;
+  reason: string | null;
+  metadata: Record<string, unknown> | null;
+  companies: { name: string } | null;
+  platform_modules: { name: string; code: string } | null;
+}
 
 export function ModuleAuditLog() {
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Fetch audit history
+  // AL-005: guard de autorización — solo platform admins
+  const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
+
   const { data: auditHistory, isLoading } = useQuery({
     queryKey: ['module_change_history', companyFilter, actionFilter],
+    enabled: isPlatformAdmin,
     queryFn: async () => {
       let query = supabase
         .from('module_change_history')
         .select(`
-          *,
+          id, company_id, module_id, action, changed_at,
+          previous_price, new_price, reason, metadata,
           companies:company_id (name),
           platform_modules:module_id (name, code)
         `)
@@ -54,25 +75,36 @@ export function ModuleAuditLog() {
       }
 
       const { data, error } = await query;
-      
       if (error) throw error;
-      return data as any[];
+      return data as AuditHistoryEntry[];
     }
   });
 
-  // Fetch companies for filter
   const { data: companies } = useQuery({
     queryKey: ['companies_for_audit'],
+    enabled: isPlatformAdmin,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('companies')
         .select('id, name')
         .order('name');
-      
       if (error) throw error;
       return data;
     }
   });
+
+  // AL-005: render guard — no mostrar nada hasta confirmar permisos
+  if (adminLoading) return null;
+
+  if (!isPlatformAdmin) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          No tienes permisos para ver el historial de auditoría de módulos.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   const getActionIcon = (action: ModuleChangeAction) => {
     switch (action) {
@@ -119,6 +151,7 @@ export function ModuleAuditLog() {
     );
   };
 
+  // Filtro client-side sobre los 200 registros ya cargados
   const filteredHistory = auditHistory?.filter(entry => {
     if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
@@ -131,7 +164,13 @@ export function ModuleAuditLog() {
   });
 
   if (isLoading) {
-    return <div>Cargando historial de auditoría...</div>;
+    return (
+      <Card>
+        <CardContent className="py-8 text-center text-muted-foreground">
+          Cargando historial de auditoría...
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -218,9 +257,8 @@ export function ModuleAuditLog() {
                 filteredHistory?.map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell className="whitespace-nowrap">
-                      <div className="text-sm">
-                        {formatDate(entry.changed_at)}
-                      </div>
+                      {/* AL-008: changed_at está tipado como string (no nullable) pero igual lo guardamos */}
+                      <div className="text-sm">{formatDate(entry.changed_at)}</div>
                       <div className="text-xs text-muted-foreground">
                         {new Date(entry.changed_at).toLocaleTimeString('es-AR', {
                           hour: '2-digit',
