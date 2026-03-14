@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Upload, Loader2, X, DollarSign, Pencil, Check } from "lucide-react";
+import { Building2, Upload, Loader2, X, DollarSign, Pencil, Check, AlertCircle } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
+import { validateString, validateNumber } from "@/lib/validators";
 
 const companySchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
@@ -216,10 +217,14 @@ export function CompanySettings() {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const content = event.target?.result as string;
-      // Convert to base64
-      const base64 = btoa(content);
-      
+      const buffer = event.target?.result as ArrayBuffer;
+      const bytes = new Uint8Array(buffer);
+      let binary = "";
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+
       if (type === 'certificate') {
         setFormData({ ...formData, afip_certificate: base64 });
         toast.success("Certificado cargado correctamente");
@@ -231,7 +236,7 @@ export function CompanySettings() {
     reader.onerror = () => {
       toast.error("Error al leer el archivo");
     };
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handleTestAFIPConnection = async () => {
@@ -291,11 +296,22 @@ export function CompanySettings() {
   });
 
   const handleSaveExchangeRate = (currency: string) => {
-    const rate = parseFloat(editingRate);
-    if (isNaN(rate) || rate <= 0) {
-      toast.error("Ingrese un tipo de cambio válido");
+    // Validate currency code
+    const currencyValidation = validateString(currency, { required: true, min: 1, max: 10 });
+    if (!currencyValidation.valid) {
+      toast.error("Código de moneda inválido");
       return;
     }
+
+    // Validate exchange rate
+    const rate = parseFloat(editingRate);
+    const rateValidation = validateNumber(editingRate, { required: true, min: 0.0001, max: 999999999 });
+    
+    if (!rateValidation.valid || isNaN(rate) || rate <= 0) {
+      toast.error("Ingrese un tipo de cambio válido (mayor a 0)");
+      return;
+    }
+
     updateExchangeRateMutation.mutate({ currency, rate });
   };
 
@@ -436,7 +452,9 @@ export function CompanySettings() {
     onSuccess: () => {
       toast.success("Configuración actualizada");
       refreshCompanies();
-      queryClient.invalidateQueries({ queryKey: ['company', currentCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['company-settings', currentCompany?.id] });
+      // Limpiar material criptográfico de la memoria del componente una vez guardado
+      setFormData((prev) => ({ ...prev, afip_private_key: "", afip_certificate: "" }));
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al actualizar");
@@ -971,7 +989,7 @@ export function CompanySettings() {
                 </p>
               )}
               <p className="text-xs text-yellow-600">
-                ⚠️ La clave privada se almacenará encriptada
+                ⚠️ Asegurate de subir la clave privada solo bajo conexión HTTPS
               </p>
             </div>
 
@@ -1067,23 +1085,7 @@ export function CompanySettings() {
           </div>
 
           {/* Financial Settings */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="currency">Moneda</Label>
-              <Select
-                value={formData.currency}
-                onValueChange={(value) => setFormData({ ...formData, currency: value })}
-              >
-                <SelectTrigger id="currency">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ARS">ARS - Peso Argentino</SelectItem>
-                  <SelectItem value="USD">USD - Dólar</SelectItem>
-                  <SelectItem value="EUR">EUR - Euro</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="tax_rate">Tasa de impuesto (%)</Label>
               <Input

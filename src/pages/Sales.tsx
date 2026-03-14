@@ -116,13 +116,21 @@ export default function Sales() {
   const { data: sales } = useQuery({
     queryKey: ["sales", searchQuery, productFilter, currentCompany?.id],
     queryFn: async () => {
-      let query = supabase
+      let query: any = supabase
         .from("sales")
         .select(`
-          *,
-          customer:customers(name, email, phone, document, address),
-          sale_items(*, product:products(name)),
-          returns(id, return_number, status, refund_method, total)
+          id,
+          sale_number,
+          created_at,
+          total,
+          status,
+          payment_method,
+          paid_method,
+          company_id,
+          customer_id,
+          customer:customers(id, name, email, phone, document),
+          sale_items(id, quantity, unit_price, product_id, product:products(name)),
+          returns(id, return_number, status)
         `)
         .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });

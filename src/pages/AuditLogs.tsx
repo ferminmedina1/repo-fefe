@@ -12,17 +12,24 @@ import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
+import { useDebounce } from "@/hooks/useDebounce";
 
 export default function AuditLogs() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const { hasPermission, isAdmin, isManager } = usePermissions();
+  const [searchInput, setSearchInput] = useState("");
+  const { isAdmin, isManager } = usePermissions();
 
+  // AL-004: debounce para no disparar una query por cada tecla
+  const searchQuery = useDebounce(searchInput, 300);
+
+  // AL-001: enabled guard — la query no se ejecuta si el usuario no tiene permisos
   const { data: auditLogs, isLoading } = useQuery({
     queryKey: ["audit-logs", searchQuery],
+    enabled: isAdmin || isManager,
     queryFn: async () => {
+      // AL-003: solo columnas necesarias — excluimos old_data y new_data (pueden contener datos sensibles)
       let query = supabase
         .from("audit_logs")
-        .select("*")
+        .select("id, created_at, user_name, user_email, table_name, action, changed_fields")
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -98,8 +105,8 @@ export default function AuditLogs() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por tabla, usuario o email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   className="pl-10"
                 />
               </div>
@@ -129,8 +136,11 @@ export default function AuditLogs() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-muted-foreground" />
+                            {/* AL-008: guard contra created_at null */}
                             <span className="text-sm">
-                              {format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
+                              {log.created_at
+                                ? format(new Date(log.created_at), "dd/MM/yyyy HH:mm", { locale: es })
+                                : "-"}
                             </span>
                           </div>
                         </TableCell>
@@ -148,8 +158,9 @@ export default function AuditLogs() {
                         <TableCell>
                           {log.changed_fields && log.changed_fields.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
-                              {log.changed_fields.map((field, idx) => (
-                                <Badge key={idx} variant="outline" className="text-xs">
+                              {/* AL-010: key por nombre de campo, no por índice */}
+                              {log.changed_fields.map((field) => (
+                                <Badge key={field} variant="outline" className="text-xs">
                                   {field}
                                 </Badge>
                               ))}

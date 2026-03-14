@@ -53,12 +53,12 @@ import { useActiveModules } from "@/hooks/useActiveModules";
 import { usePermissions, Module } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useCompany } from "@/contexts/CompanyContext";
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useSidebar } from "@/components/ui/sidebar";
+import { Sidebar as UISidebar } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AvailableModulesDialog } from "./AvailableModulesDialog";
@@ -82,41 +82,9 @@ export function Sidebar() {
   const { isPlatformAdmin } = usePlatformAdmin();
   const { currentCompany } = useCompany();
   
-  const { open, isMobile, openMobile, setOpenMobile } = useSidebar();
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showModulesDialog, setShowModulesDialog] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    const stored = localStorage.getItem("sidebar-width");
-    return stored ? parseInt(stored, 10) : 256;
-  });
-  const isResizing = useRef(false);
-
-  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizing.current = true;
-    const startX = e.clientX;
-    const startWidth = sidebarWidth;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!isResizing.current) return;
-      const next = Math.max(180, Math.min(360, startWidth + (ev.clientX - startX)));
-      setSidebarWidth(next);
-    };
-    const onMouseUp = (ev: MouseEvent) => {
-      isResizing.current = false;
-      const final = Math.max(180, Math.min(360, startWidth + (ev.clientX - startX)));
-      localStorage.setItem("sidebar-width", String(final));
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-    };
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  }, [sidebarWidth]);
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('sidebar-favorites');
     return saved ? JSON.parse(saved) : ['/pos', '/sales', '/products'];
@@ -266,43 +234,7 @@ export function Sidebar() {
         },
       ],
     },
-// CRM
-        {
-          section: "CRM",
-          items: [
-            {
-            title: "CRM",
-          href: "/crm",
-          icon: FileText,
-          children: [
-            {
-              title: "Oportunidades",
-              href: "/opportunities",
-              icon: Target,
-              module: "opportunities",
-            },
-            {
-              title: "Pipelines",
-              href: "/pipelines",
-              icon: TrendingUp,
-              module: "pipelines",
-            },
-            {
-              title: "Reporting",
-              href: "/crm-reports",
-              icon: BarChart3,
-              module: "opportunities",
-            },
-            {
-              title: "Roles CRM",
-              href: "/settings/crm-roles",
-              icon: Shield,
-              module: "opportunities",
-            },
-          ],
-        },
-      ],
-    },
+
     // Inventario
     {
       section: "Inventario",
@@ -832,28 +764,8 @@ export function Sidebar() {
   }, [favorites, navItems]);
 
   return (
-    <>
-      {/* Mobile backdrop */}
-      {isMobile && openMobile && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50"
-          onClick={() => setOpenMobile(false)}
-        />
-      )}
-
-      <aside
-        className={cn(
-          "flex flex-col border-r border-sidebar-border shrink-0",
-          isMobile
-            ? cn(
-                "fixed left-0 top-0 h-screen z-50 transition-transform duration-200",
-                openMobile ? "translate-x-0" : "-translate-x-full"
-              )
-            : cn("h-screen sticky top-0 overflow-hidden transition-all duration-200", !open && "w-0 border-0")
-        )}
-        style={{ width: isMobile ? sidebarWidth : open ? sidebarWidth : 0 }}
-      >
-      <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95 relative" style={{ width: sidebarWidth }}>
+    <UISidebar collapsible="offcanvas" className="border-r border-sidebar-border w-64">
+      <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95">
         {/* Header - Premium */}
         <div className="px-5 py-5 border-b border-primary/20 relative overflow-hidden group" style={{animation: 'gradientShift 8s infinite ease-in-out'}}>
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 -z-10"></div>
@@ -865,16 +777,19 @@ export function Sidebar() {
           </div>
           
           <div className="flex items-center gap-4 relative z-10">
-            <div className="p-3 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/40 shadow-lg shadow-primary/20 backdrop-blur-sm transition-all duration-1000" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
+            <button
+              className="p-3 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/40 shadow-lg shadow-primary/20 backdrop-blur-sm transition-all duration-1000 hover:scale-110 hover:shadow-lg hover:shadow-primary/40 cursor-pointer active:scale-95"
+              style={{animation: 'softGlow 4s infinite ease-in-out'}}
+            >
               <img 
                 src={currentCompany?.logo_url || "/landing/images/logo_transparente_hd.png"} 
-                alt={currentCompany?.name || "Ventify"} 
+                alt={currentCompany?.name || "Ventify Space"} 
                 className="w-10 h-10 drop-shadow-lg object-contain" 
               />
-            </div>
+            </button>
             <div className="flex-1 min-w-0">
               <span className="text-base font-bold text-white block truncate">{currentCompany?.name || 'Tienda.Space'}</span>
-              <p className="text-xs text-primary/80 font-medium">Ventify</p>
+              <p className="text-xs text-primary/80 font-medium">Ventify Space</p>
             </div>
           </div>
           
@@ -1026,17 +941,9 @@ export function Sidebar() {
           activeModules={activeModules.data || []}
         />
 
-        {/* Resize handle */}
-        <div
-          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-50 group flex items-center justify-center"
-          onMouseDown={handleResizeMouseDown}
-          title="Arrastrar para redimensionar"
-        >
-          <div className="w-0.5 h-10 rounded-full bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
-        </div>
+
       </div>
-      </aside>
-    </>
+    </UISidebar>
   );
 }
 

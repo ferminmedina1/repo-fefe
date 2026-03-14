@@ -5,10 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Bot, Send, CheckCircle2, CalendarClock, Phone, Mail, Building2, User } from "lucide-react";
+import { Bot, Send, CheckCircle2, CalendarClock, Phone, Mail, Building2, User, AlertCircle } from "lucide-react";
 import type { BotRequestFormData } from "@/types/botRequests";
+import { useSecureMutation, useFormValidation } from "@/lib/useSecureMutation";
+import { validateString, validateEmail } from "@/lib/validators";
 
 interface ContactUsDialogProps {
   open: boolean;
@@ -16,6 +19,18 @@ interface ContactUsDialogProps {
   /** Pre-fill from authenticated user context */
   defaultValues?: Partial<BotRequestFormData>;
 }
+
+// Validadores específicos para este formulario
+const FIELD_VALIDATORS = {
+  contact_name: (value: any) => validateString(value, { required: true, min: 1, max: 100 }),
+  contact_email: (value: any) => validateEmail(value),
+  contact_phone: (value: any) => validateString(value, { min: 0, max: 20 }),
+  company_name: (value: any) => validateString(value, { min: 0, max: 100 }),
+  subject: (value: any) => validateString(value, { required: true, min: 1, max: 200 }),
+  description: (value: any) => validateString(value, { required: true, min: 10, max: 2000 }),
+  bot_objectives: (value: any) => validateString(value, { min: 0, max: 1000 }),
+  preferred_schedule: (value: any) => validateString(value, { min: 0, max: 100 }),
+};
 
 export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUsDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,45 +46,63 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
     preferred_schedule: defaultValues?.preferred_schedule ?? "",
   });
 
-  const updateField = (field: keyof BotRequestFormData, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
+  // Setup validaciones
+  const { errors, validate, clearError } = useFormValidation(FIELD_VALIDATORS);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!form.contact_name || !form.contact_email || !form.subject || !form.description) {
-      toast.error("Por favor completa los campos obligatorios");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      // Get current user if authenticated
+  // Setup mutation segura con rate limiting
+  const secureMutate = useSecureMutation(
+    async (data) => {
       const { data: { user } } = await supabase.auth.getUser();
-
       const { error } = await supabase
         .from("bot_implementation_requests" as any)
         .insert({
-          contact_name: form.contact_name,
-          contact_email: form.contact_email,
-          contact_phone: form.contact_phone || null,
-          company_name: form.company_name || null,
-          subject: form.subject,
-          description: form.description,
-          bot_objectives: form.bot_objectives || null,
-          preferred_schedule: form.preferred_schedule || null,
+          contact_name: data.contact_name,
+          contact_email: data.contact_email,
+          contact_phone: data.contact_phone || null,
+          company_name: data.company_name || null,
+          subject: data.subject,
+          description: data.description,
+          bot_objectives: data.bot_objectives || null,
+          preferred_schedule: data.preferred_schedule || null,
           status: "solicitud",
           created_by: user?.id || null,
         } as any);
 
       if (error) throw error;
+      return true;
+    },
+    {
+      operationName: "submit_contact_request",
+      rateLimit: "write",
+      logAudit: true,
+    }
+  );
 
+  const updateField = (field: keyof BotRequestFormData, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    // Limpiar error cuando el usuario empieza a escribir
+    if (errors[field]) {
+      clearError(field);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validar todos los campos
+    if (!validate(form)) {
+      toast.error("Por favor revisa los errores en el formulario");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await secureMutate(form);
       setIsSubmitted(true);
       toast.success("¡Solicitud enviada con éxito!");
     } catch (error: any) {
       console.error("Error submitting bot request:", error);
-      toast.error("Error al enviar la solicitud. Intenta nuevamente.");
+      // Error ya está manejado en useSecureMutation
     } finally {
       setIsSubmitting(false);
     }
@@ -165,7 +198,14 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
                   onChange={(e) => updateField("contact_name", e.target.value)}
                   placeholder="Tu nombre"
                   required
+                  className={errors.contact_name ? "border-red-500 focus-visible:ring-red-200" : ""}
                 />
+                {errors.contact_name && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {errors.contact_name}
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="contact_email" className="flex items-center gap-1.5">
@@ -179,7 +219,14 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
                   onChange={(e) => updateField("contact_email", e.target.value)}
                   placeholder="tu@email.com"
                   required
+                  className={errors.contact_email ? "border-red-500 focus-visible:ring-red-200" : ""}
                 />
+                {errors.contact_email && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {errors.contact_email}
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="contact_phone" className="flex items-center gap-1.5">
@@ -191,7 +238,14 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
                   value={form.contact_phone}
                   onChange={(e) => updateField("contact_phone", e.target.value)}
                   placeholder="+54 11 1234-5678"
+                  className={errors.contact_phone ? "border-red-500 focus-visible:ring-red-200" : ""}
                 />
+                {errors.contact_phone && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {errors.contact_phone}
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="company_name" className="flex items-center gap-1.5">
@@ -203,7 +257,14 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
                   value={form.company_name}
                   onChange={(e) => updateField("company_name", e.target.value)}
                   placeholder="Nombre de tu empresa"
+                  className={errors.company_name ? "border-red-500 focus-visible:ring-red-200" : ""}
                 />
+                {errors.company_name && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {errors.company_name}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -222,7 +283,14 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
                   onChange={(e) => updateField("subject", e.target.value)}
                   placeholder="Ej: Bot de atención al cliente, Bot de ventas, Automatización..."
                   required
+                  className={errors.subject ? "border-red-500 focus-visible:ring-red-200" : ""}
                 />
+                {errors.subject && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {errors.subject}
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="description">Descripción del requerimiento *</Label>
@@ -231,9 +299,15 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
                   value={form.description}
                   onChange={(e) => updateField("description", e.target.value)}
                   placeholder="Describe qué necesitas que haga el bot, en qué contexto se usará, y cualquier detalle relevante..."
-                  className="min-h-[100px]"
+                  className={`min-h-[100px] ${errors.description ? "border-red-500 focus-visible:ring-red-200" : ""}`}
                   required
                 />
+                {errors.description && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {errors.description}
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="bot_objectives">Objetivos del bot</Label>
@@ -242,8 +316,14 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
                   value={form.bot_objectives}
                   onChange={(e) => updateField("bot_objectives", e.target.value)}
                   placeholder="¿Qué resultados esperas lograr? Ej: reducir tiempos de respuesta, automatizar consultas frecuentes..."
-                  className="min-h-[80px]"
+                  className={`min-h-[80px] ${errors.bot_objectives ? "border-red-500 focus-visible:ring-red-200" : ""}`}
                 />
+                {errors.bot_objectives && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {errors.bot_objectives}
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="preferred_schedule">Disponibilidad para llamada de diagnóstico</Label>
@@ -251,7 +331,7 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
                   value={form.preferred_schedule}
                   onValueChange={(value) => updateField("preferred_schedule", value)}
                 >
-                  <SelectTrigger id="preferred_schedule">
+                  <SelectTrigger id="preferred_schedule" className={errors.preferred_schedule ? "border-red-500" : ""}>
                     <SelectValue placeholder="Selecciona tu disponibilidad" />
                   </SelectTrigger>
                   <SelectContent>
@@ -261,6 +341,12 @@ export function ContactUsDialog({ open, onOpenChange, defaultValues }: ContactUs
                     <SelectItem value="flexible">Horario flexible</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.preferred_schedule && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {errors.preferred_schedule}
+                  </p>
+                )}
               </div>
             </div>
           </div>

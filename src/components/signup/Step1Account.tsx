@@ -5,14 +5,51 @@ import { Button } from "@/components/ui/button";
 import { SignupFormData } from "@/hooks/useSignupWizard";
 import { useState } from "react";
 import { z } from "zod";
+import { validateEmail, validateString } from "@/lib/validators";
+import { AlertCircle } from "lucide-react";
 
 const accountSchema = z.object({
   email: z.string().email("Email inválido"),
-  full_name: z.string().min(1, "Nombre requerido"),
-  company_name: z.string().min(1, "Nombre de empresa requerido"),
-  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres"),
+  full_name: z.string().min(1, "Nombre requerido").max(100, "Nombre muy largo"),
+  company_name: z.string().min(1, "Nombre de empresa requerido").max(150, "Nombre de empresa muy largo"),
+  password: z.string()
+    .min(8, "La contraseña debe tener al menos 8 caracteres")
+    .max(128, "La contraseña no puede exceder 128 caracteres")
+    .regex(/[A-Z]/, "La contraseña debe contener al menos una mayúscula")
+    .regex(/[0-9]/, "La contraseña debe contener al menos un número"),
   country: z.string().min(2, "El país es requerido"),
 });
+
+// Additional security validation layer
+const validateFormSecurity = (data: SignupFormData): Record<string, string> => {
+  const securityErrors: Record<string, string> = {};
+
+  // Email validation
+  if (data.email) {
+    const emailValid = validateEmail(data.email);
+    if (!emailValid.valid) {
+      securityErrors.email = "Formato de email no válido";
+    }
+  }
+
+  // Name validation (prevent XSS)
+  if (data.full_name) {
+    const nameValid = validateString(data.full_name, { required: true, min: 1, max: 100 });
+    if (!nameValid.valid) {
+      securityErrors.full_name = "Nombre contiene caracteres no permitidos";
+    }
+  }
+
+  // Company name validation
+  if (data.company_name) {
+    const companyValid = validateString(data.company_name, { required: true, min: 1, max: 150 });
+    if (!companyValid.valid) {
+      securityErrors.company_name = "Nombre de empresa contiene caracteres no permitidos";
+    }
+  }
+
+  return securityErrors;
+};
 
 interface Step1AccountProps {
   formData: SignupFormData;
@@ -25,6 +62,14 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
 
   const handleNext = () => {
     try {
+      // Check security validations first
+      const securityErrors = validateFormSecurity(formData);
+      if (Object.keys(securityErrors).length > 0) {
+        setErrors(securityErrors);
+        return;
+      }
+
+      // Then check schema
       accountSchema.parse(formData);
       setErrors({});
       nextStep();
@@ -59,7 +104,7 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
             placeholder="tu@empresa.com"
             className="bg-slate-900/70 border-white/15 text-white placeholder:text-slate-300 focus:border-primary focus:ring-primary/30 h-11"
           />
-          {errors.email && <p className="text-sm text-destructive mt-1">{errors.email}</p>}
+          {errors.email && <p className="text-sm text-destructive mt-1 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" />{errors.email}</p>}
         </div>
 
         <div>
@@ -71,7 +116,7 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
             placeholder="Juan Pérez"
             className="bg-slate-900/70 border-white/15 text-white placeholder:text-slate-300 focus:border-primary focus:ring-primary/30 h-11"
           />
-          {errors.full_name && <p className="text-sm text-destructive mt-1">{errors.full_name}</p>}
+          {errors.full_name && <p className="text-sm text-destructive mt-1 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" />{errors.full_name}</p>}
         </div>
 
         <div>
@@ -83,7 +128,7 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
             placeholder="Mi Empresa SRL"
             className="bg-slate-900/70 border-white/15 text-white placeholder:text-slate-300 focus:border-primary focus:ring-primary/30 h-11"
           />
-          {errors.company_name && <p className="text-sm text-destructive mt-1">{errors.company_name}</p>}
+          {errors.company_name && <p className="text-sm text-destructive mt-1 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" />{errors.company_name}</p>}
         </div>
 
         <div>
@@ -96,7 +141,7 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
             placeholder="Mínimo 8 caracteres"
             className="bg-slate-900/70 border-white/15 text-white placeholder:text-slate-300 focus:border-primary focus:ring-primary/30 h-11"
           />
-          {errors.password && <p className="text-sm text-destructive mt-1">{errors.password}</p>}
+          {errors.password && <p className="text-sm text-destructive mt-1 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" />{errors.password}</p>}
         </div>
 
         <div>
@@ -115,7 +160,7 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
               <SelectItem value="OTHER">Otro país</SelectItem>
             </SelectContent>
           </Select>
-          {errors.country && <p className="text-sm text-destructive mt-1">{errors.country}</p>}
+          {errors.country && <p className="text-sm text-destructive mt-1 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" />{errors.country}</p>}
         </div>
       </div>
 

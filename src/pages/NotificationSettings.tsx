@@ -9,14 +9,15 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Bell, Mail, MessageCircle, Save } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Bell, Mail, MessageCircle, Save, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function NotificationSettings() {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
 
-  const { data: preferences, isLoading } = useQuery({
+  const { data: preferences, isLoading: prefsLoading, isError: prefsError } = useQuery({
     queryKey: ["notification-preferences", currentCompany?.id],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -35,12 +36,12 @@ export default function NotificationSettings() {
     enabled: !!currentCompany?.id,
   });
 
-  const { data: whatsappCreds } = useQuery({
+  const { data: whatsappCreds, isLoading: credsLoading, isError: credsError } = useQuery({
     queryKey: ["crm-whatsapp-credentials", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("crm_whatsapp_credentials")
-        .select("id, account_sid, auth_token, phone_number")
+        .select("id, account_sid, phone_number")
         .eq("company_id", currentCompany?.id)
         .maybeSingle();
       if (error) throw error;
@@ -49,27 +50,28 @@ export default function NotificationSettings() {
     enabled: !!currentCompany?.id,
   });
 
+  // NS-008: defaults directos — preferences siempre es undefined al init
   const [formData, setFormData] = useState({
-    email_enabled: preferences?.email_enabled ?? true,
-    whatsapp_enabled: preferences?.whatsapp_enabled ?? false,
-    whatsapp_number: preferences?.whatsapp_number ?? "",
-    low_stock: preferences?.low_stock ?? true,
-    expiring_products: preferences?.expiring_products ?? true,
-    inactive_customers: preferences?.inactive_customers ?? true,
-    overdue_invoices: preferences?.overdue_invoices ?? true,
-    expiring_checks: preferences?.expiring_checks ?? true,
-    crm_stage_changed: preferences?.crm_stage_changed ?? true,
-    crm_auto_assign: preferences?.crm_auto_assign ?? true,
-    crm_sla_assigned: preferences?.crm_sla_assigned ?? true,
-    crm_reminder_created: preferences?.crm_reminder_created ?? true,
-    daily_summary: preferences?.daily_summary ?? false,
-    weekly_summary: preferences?.weekly_summary ?? false,
+    email_enabled: true,
+    whatsapp_enabled: false,
+    whatsapp_number: "",
+    low_stock: true,
+    expiring_products: true,
+    inactive_customers: true,
+    overdue_invoices: true,
+    expiring_checks: true,
+    crm_stage_changed: true,
+    crm_auto_assign: true,
+    crm_sla_assigned: true,
+    crm_reminder_created: true,
+    daily_summary: false,
+    weekly_summary: false,
   });
 
   const [whatsappForm, setWhatsappForm] = useState({
-    account_sid: whatsappCreds?.account_sid ?? "",
-    auth_token: whatsappCreds?.auth_token ?? "",
-    phone_number: whatsappCreds?.phone_number ?? "",
+    account_sid: "",
+    auth_token: "",  // NS-004: siempre "" — auth_token no está en el select
+    phone_number: "",
   });
 
   useEffect(() => {
@@ -96,7 +98,7 @@ export default function NotificationSettings() {
     if (!whatsappCreds) return;
     setWhatsappForm({
       account_sid: whatsappCreds.account_sid ?? "",
-      auth_token: whatsappCreds.auth_token ?? "",
+      auth_token: "", // write-only: no se carga del servidor
       phone_number: whatsappCreds.phone_number ?? "",
     });
   }, [whatsappCreds]);
@@ -112,12 +114,13 @@ export default function NotificationSettings() {
           user_id: user.id,
           company_id: currentCompany?.id,
           ...formData,
-        });
+        }, { onConflict: "user_id,company_id" });
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notification-preferences"] });
+      // NS-002: invalidar solo la empresa actual
+      queryClient.invalidateQueries({ queryKey: ["notification-preferences", currentCompany?.id] });
       toast.success("Preferencias actualizadas correctamente");
     },
     onError: (error) => {
@@ -128,16 +131,20 @@ export default function NotificationSettings() {
 
   const saveWhatsappCreds = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("crm_whatsapp_credentials").upsert({
+      const payload: Record<string, string | undefined> = {
         company_id: currentCompany?.id,
         account_sid: whatsappForm.account_sid,
-        auth_token: whatsappForm.auth_token,
         phone_number: whatsappForm.phone_number,
-      });
+      };
+      // Solo actualizar auth_token si el usuario ingresó uno nuevo
+      if (whatsappForm.auth_token.trim()) {
+        payload.auth_token = whatsappForm.auth_token;
+      }
+      const { error } = await supabase.from("crm_whatsapp_credentials").upsert(payload, { onConflict: "company_id" });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["crm-whatsapp-credentials"] });
+      queryClient.invalidateQueries({ queryKey: ["crm-whatsapp-credentials", currentCompany?.id] });
       toast.success("Credenciales WhatsApp guardadas");
     },
     onError: () => {
@@ -145,13 +152,46 @@ export default function NotificationSettings() {
     },
   });
 
-  if (isLoading) {
+  // NS-003: validaciones antes de guardar credenciales Twilio
+  const handleSaveCredentials = () => {
+    if (whatsappForm.account_sid && !/^AC[0-9a-f]{32}$/i.test(whatsappForm.account_sid)) {
+      toast.error("Account SID inválido. Debe comenzar con 'AC' seguido de 32 caracteres hexadecimales.");
+      return;
+    }
+    const e164 = /^\+[1-9]\d{1,14}$/;
+    if (whatsappForm.phone_number && !e164.test(whatsappForm.phone_number)) {
+      toast.error("El número de WhatsApp debe tener formato E.164 (ej: +5491112345678)");
+      return;
+    }
+    saveWhatsappCreds.mutate();
+  };
+
+  // NS-005 + NS-007: loading cubre ambas queries, dentro de <Layout>
+  if (prefsLoading || credsLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex justify-center items-center h-64">
-          <p>Cargando preferencias...</p>
+      <Layout>
+        <div className="container mx-auto p-6">
+          <div className="flex justify-center items-center h-64">
+            <p>Cargando preferencias...</p>
+          </div>
         </div>
-      </div>
+      </Layout>
+    );
+  }
+
+  // NS-006: estado de error explícito — evita que defaults sobreescriban prefs reales
+  if (prefsError || credsError) {
+    return (
+      <Layout>
+        <div className="container mx-auto p-6">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No se pudieron cargar las preferencias. Recargá la página para intentar nuevamente.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </Layout>
     );
   }
 
@@ -417,7 +457,7 @@ export default function NotificationSettings() {
                 onChange={(e) =>
                   setWhatsappForm({ ...whatsappForm, auth_token: e.target.value })
                 }
-                placeholder="Token de Twilio"
+                placeholder={whatsappCreds?.account_sid ? "Dejá vacío para mantener el token actual" : "Token de Twilio"}
               />
             </div>
             <div className="space-y-1">
@@ -432,8 +472,9 @@ export default function NotificationSettings() {
             </div>
           </div>
           <div className="flex justify-end">
-            <Button onClick={() => saveWhatsappCreds.mutate()}>
-              Guardar credenciales
+            {/* NS-001: disabled durante pending — evita double-submit */}
+            <Button onClick={handleSaveCredentials} disabled={saveWhatsappCreds.isPending}>
+              {saveWhatsappCreds.isPending ? "Guardando..." : "Guardar credenciales"}
             </Button>
           </div>
         </div>
@@ -482,7 +523,7 @@ export default function NotificationSettings() {
         <div className="flex justify-end">
           <Button onClick={() => savePreferences.mutate()} disabled={savePreferences.isPending}>
             <Save className="h-4 w-4 mr-2" />
-            Guardar Preferencias
+            {savePreferences.isPending ? "Guardando..." : "Guardar Preferencias"}
           </Button>
         </div>
       </Card>

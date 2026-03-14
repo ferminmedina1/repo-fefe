@@ -1,0 +1,43 @@
+#!/bin/sh
+# Pre-commit hook for running tests and linting before commit
+
+echo "🔍 Running pre-commit quality checks..."
+
+# Get changed files
+CHANGED_FILES=$(git diff --cached --name-only)
+
+# Check if any TypeScript files changed
+TS_FILES=$(echo "$CHANGED_FILES" | grep -E '\.(ts|tsx)$')
+
+if [ -n "$TS_FILES" ]; then
+  echo "📝 TypeScript files detected, running type check..."
+  npx tsc --noEmit
+  if [ $? -ne 0 ]; then
+    echo "❌ TypeScript compilation failed. Commit aborted."
+    exit 1
+  fi
+fi
+
+# Run linter on changed files
+echo "🔗 Running ESLint on changed files..."
+npx eslint $TS_FILES --max-warnings=5
+
+if [ $? -ne 0 ]; then
+  echo "⚠️  ESLint found issues. Review them before committing."
+  # Note: Not failing here to allow override with --no-verify
+fi
+
+# Run tests for any test file changes
+TEST_FILES=$(echo "$CHANGED_FILES" | grep -E '\.test\.(ts|tsx)$')
+
+if [ -n "$TEST_FILES" ]; then
+  echo "🧪 Running tests for changed test files..."
+  npx vitest run $TEST_FILES
+  if [ $? -ne 0 ]; then
+    echo "❌ Tests failed. Commit aborted."
+    exit 1
+  fi
+fi
+
+echo "✅ Pre-commit checks passed!"
+exit 0

@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { useSecureMutation } from "@/lib/useSecureMutation";
+import { validateUUID } from "@/lib/validators";
 
 interface PaymentMethod {
   id: string;
@@ -69,6 +71,14 @@ export function PaymentMethodsManager({
 
   const handleSetDefault = async (methodId: string) => {
     try {
+      // Validate UUID
+      const validation = validateUUID(methodId);
+      if (!validation.valid) {
+        toast.error("ID de método inválido");
+        console.error("Invalid payment method ID:", methodId);
+        return;
+      }
+
       const { error } = await supabase
         .from("company_payment_methods")
         .update({ is_default: false })
@@ -93,6 +103,14 @@ export function PaymentMethodsManager({
 
   const handleDelete = async (methodId: string) => {
     try {
+      // Validate UUID
+      const validation = validateUUID(methodId);
+      if (!validation.valid) {
+        toast.error("ID de método inválido");
+        console.error("Invalid payment method ID:", methodId);
+        return;
+      }
+
       const { error } = await supabase.functions.invoke("delete-payment-method", {
         body: { method_id: methodId },
       });
@@ -134,35 +152,10 @@ export function PaymentMethodsManager({
       {showTitle && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <h3 className="text-lg font-semibold">Tus tarjetas de pago</h3>
-          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" onClick={handleAddCard} className="w-full sm:w-auto">
-                <Plus className="h-4 w-4 mr-2" />
-                Añadir tarjeta
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Añadir tarjeta de crédito o débito</DialogTitle>
-                <DialogDescription>
-                  Ingresa los datos de tu tarjeta de forma segura
-                </DialogDescription>
-              </DialogHeader>
-              {effectiveProvider === "stripe" && stripePromise && clientSecret && (
-                <Elements stripe={stripePromise} options={{ clientSecret }}>
-                  <StripePaymentForm
-                    clientSecret={clientSecret}
-                    companyId={companyId!}
-                    onSuccess={() => {
-                      setAddDialogOpen(false);
-                      setClientSecret(null);
-                      queryClient.invalidateQueries({ queryKey: ["payment-methods", companyId] });
-                    }}
-                  />
-                </Elements>
-              )}
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" variant="outline" onClick={handleAddCard} className="w-full sm:w-auto">
+            <Plus className="h-4 w-4 mr-2" />
+            Añadir tarjeta
+          </Button>
         </div>
       )}
 

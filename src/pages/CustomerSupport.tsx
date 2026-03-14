@@ -585,8 +585,9 @@ export default function CustomerSupport() {
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
                           className="min-h-[80px]"
-                          onKeyPress={(e) => {
+                          onKeyDown={(e) => {
                             if (e.key === 'Enter' && e.ctrlKey && newMessage.trim()) {
+                              e.preventDefault();
                               sendMessageMutation.mutate();
                             }
                           }}
