@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Upload, Loader2, X, DollarSign, Pencil, Check } from "lucide-react";
+import { Building2, Upload, Loader2, X, DollarSign, Pencil, Check, AlertCircle } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
+import { validateString, validateNumber } from "@/lib/validators";
 
 const companySchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
@@ -295,11 +296,22 @@ export function CompanySettings() {
   });
 
   const handleSaveExchangeRate = (currency: string) => {
-    const rate = parseFloat(editingRate);
-    if (isNaN(rate) || rate <= 0) {
-      toast.error("Ingrese un tipo de cambio válido");
+    // Validate currency code
+    const currencyValidation = validateString(currency, { required: true, min: 1, max: 10 });
+    if (!currencyValidation.valid) {
+      toast.error("Código de moneda inválido");
       return;
     }
+
+    // Validate exchange rate
+    const rate = parseFloat(editingRate);
+    const rateValidation = validateNumber(editingRate, { required: true, min: 0.0001, max: 999999999 });
+    
+    if (!rateValidation.valid || isNaN(rate) || rate <= 0) {
+      toast.error("Ingrese un tipo de cambio válido (mayor a 0)");
+      return;
+    }
+
     updateExchangeRateMutation.mutate({ currency, rate });
   };
 

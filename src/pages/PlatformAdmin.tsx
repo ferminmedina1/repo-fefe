@@ -39,9 +39,13 @@ import {
   Rocket,
   Circle,
   Calculator,
-  Package
+  Package,
+  AlertTriangle,
+  AlertOctagon
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 import { exportToExcel, exportToPDF, formatCurrency, formatDate } from "@/lib/exportUtils";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { usePlatformAdminRealtime } from "@/hooks/usePlatformAdminRealtime";
@@ -54,6 +58,7 @@ import { CustomPricingManager } from "@/components/settings/CustomPricingManager
 import { ModuleLimitsManager } from "@/components/settings/ModuleLimitsManager";
 import { ModuleAuditLog } from "@/components/settings/ModuleAuditLog";
 import { PlatformAdminHeader, PlatformAdminNav, PlatformAdminDashboard } from "@/components/platformAdmin";
+import { SendNotificationModule } from "@/components/platformAdmin/SendNotificationModule";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { usePagination } from "@/hooks/usePagination";
 
@@ -1598,96 +1603,157 @@ export default function PlatformAdmin() {
 
           {/* Notifications Tab */}
           <TabsContent value="notifications" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+            {/* Send Notifications Section */}
+            <SendNotificationModule />
+            
+            {/* View Sent Notifications Section */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-3 border-b">
+                <div className="flex items-center justify-between mb-4">
                   <div>
-                    <CardTitle>Notificaciones del Sistema</CardTitle>
-                    <CardDescription>
-                      Alertas y notificaciones importantes de todas las empresas
+                    <CardTitle className="flex items-center gap-2">
+                      <Bell className="h-5 w-5" />
+                      Historial de Notificaciones
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      {notificationsPagination.totalItems} notificaciones enviadas
+                      {notificationsPagination.totalItems > 0 && notificationsPagination.paginatedData?.some(n => !n.read) && (
+                        <span className="text-primary font-medium"> • {notificationsPagination.paginatedData?.filter(n => !n.read).length} sin leer</span>
+                      )}
                     </CardDescription>
                   </div>
                 </div>
-                <div className="flex gap-4 mt-4">
+
+                {/* Filtros */}
+                <div className="flex flex-wrap gap-2 items-center">
                   <Select value={notificationFilter} onValueChange={setNotificationFilter}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Filtrar por tipo" />
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filtrar..." />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="unread">No leídas</SelectItem>
-                      <SelectItem value="payment_overdue">Pagos vencidos</SelectItem>
-                      <SelectItem value="system_error">Errores del sistema</SelectItem>
+                      <SelectItem value="unread">Sin leer</SelectItem>
+                      <SelectItem value="info">Información</SelectItem>
+                      <SelectItem value="warning">Advertencias</SelectItem>
+                      <SelectItem value="error">Errores</SelectItem>
+                      <SelectItem value="critical">Críticas</SelectItem>
                     </SelectContent>
                   </Select>
+                  
+                  {notificationsPagination.paginatedData?.some(n => !n.read) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const unreadCount = notificationsPagination.paginatedData?.filter(n => !n.read).length || 0;
+                        if (confirm(`¿Marcar ${unreadCount} notificaciones como leídas?`)) {
+                          notificationsPagination.paginatedData?.forEach(n => {
+                            if (!n.read) {
+                              markNotificationReadMutation.mutate(n.id);
+                            }
+                          });
+                        }
+                      }}
+                      disabled={markNotificationReadMutation.isPending}
+                      className="gap-1"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      Marcar todas como leídas
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Título</TableHead>
-                      <TableHead>Mensaje</TableHead>
-                      <TableHead>Severidad</TableHead>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {notificationsPagination.paginatedData?.map((notification) => (
-                      <TableRow key={notification.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {!notification.read && (
-                              <div className="h-2 w-2 rounded-full bg-primary" />
-                            )}
-                            <Badge variant={notification.read ? "outline" : "default"}>
-                              {notification.read ? "Leída" : "Nueva"}
-                            </Badge>
+              <CardContent className="pt-6">
+                {notificationsPagination.paginatedData && notificationsPagination.paginatedData.length > 0 ? (
+                  <div className="space-y-3">
+                    {notificationsPagination.paginatedData.map((notification) => {
+                      const severityConfig: Record<string, any> = {
+                        info: { bg: "bg-blue-50 dark:bg-blue-950/30", border: "border-blue-200 dark:border-blue-800", badge: "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200", icon: <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" /> },
+                        warning: { bg: "bg-amber-50 dark:bg-amber-950/30", border: "border-amber-200 dark:border-amber-800", badge: "bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200", icon: <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" /> },
+                        error: { bg: "bg-red-50 dark:bg-red-950/30", border: "border-red-200 dark:border-red-800", badge: "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200", icon: <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" /> },
+                        critical: { bg: "bg-destructive/10", border: "border-destructive/50", badge: "bg-destructive/20 text-destructive", icon: <AlertOctagon className="h-4 w-4 text-destructive" /> },
+                      };
+
+                      const config = severityConfig[notification.severity] || severityConfig.info;
+
+                      return (
+                        <div
+                          key={notification.id}
+                          className={`p-4 rounded-lg border transition-all ${config.bg} ${config.border} hover:shadow-md`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="pt-1">{config.icon}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-sm leading-tight">
+                                    {notification.title}
+                                  </h3>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {formatDistanceToNow(new Date(notification.created_at), { locale: es, addSuffix: true })}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <Badge className={config.badge} variant="outline">
+                                    {notification.severity}
+                                  </Badge>
+                                  {!notification.read && (
+                                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-sm text-foreground/80 mb-3">
+                                {notification.message}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(notification.created_at).toLocaleString()}
+                                </span>
+                                {!notification.read && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => markNotificationReadMutation.mutate(notification.id)}
+                                    disabled={markNotificationReadMutation.isPending}
+                                    className="h-6 px-2 ml-auto text-xs"
+                                  >
+                                    Marcar como leída
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </TableCell>
-                        <TableCell className="font-medium">{notification.title}</TableCell>
-                        <TableCell className="max-w-md">{notification.message}</TableCell>
-                        <TableCell>
-                          {getSeverityBadge(notification.severity)}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(notification.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          {!notification.read && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                markNotificationReadMutation.mutate(notification.id)
-                              }
-                            >
-                              Marcar como leída
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <PaginationControls
-                  currentPage={notificationsPagination.currentPage}
-                  totalPages={notificationsPagination.totalPages}
-                  totalItems={notificationsPagination.totalItems}
-                  startIndex={notificationsPagination.startIndex}
-                  endIndex={notificationsPagination.endIndex}
-                  pageSize={notificationsPagination.pageSize}
-                  canGoNext={notificationsPagination.canGoNext}
-                  canGoPrevious={notificationsPagination.canGoPrevious}
-                  onPageChange={notificationsPagination.setCurrentPage}
-                  onPageSizeChange={notificationsPagination.setPageSize}
-                  onNextPage={notificationsPagination.goToNextPage}
-                  onPreviousPage={notificationsPagination.goToPreviousPage}
-                  onFirstPage={notificationsPagination.goToFirstPage}
-                  onLastPage={notificationsPagination.goToLastPage}
-                />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Bell className="h-12 w-12 text-muted-foreground/20 mx-auto mb-3" />
+                    <p className="text-muted-foreground">No hay notificaciones para mostrar</p>
+                  </div>
+                )}
+
+                {notificationsPagination.totalPages > 1 && (
+                  <div className="mt-6 pt-6 border-t">
+                    <PaginationControls
+                      currentPage={notificationsPagination.currentPage}
+                      totalPages={notificationsPagination.totalPages}
+                      totalItems={notificationsPagination.totalItems}
+                      startIndex={notificationsPagination.startIndex}
+                      endIndex={notificationsPagination.endIndex}
+                      pageSize={notificationsPagination.pageSize}
+                      canGoNext={notificationsPagination.canGoNext}
+                      canGoPrevious={notificationsPagination.canGoPrevious}
+                      onPageChange={notificationsPagination.setCurrentPage}
+                      onPageSizeChange={notificationsPagination.setPageSize}
+                      onNextPage={notificationsPagination.goToNextPage}
+                      onPreviousPage={notificationsPagination.goToPreviousPage}
+                      onFirstPage={notificationsPagination.goToFirstPage}
+                      onLastPage={notificationsPagination.goToLastPage}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

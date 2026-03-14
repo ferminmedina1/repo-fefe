@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
-import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight, DollarSign, AlertCircle, CheckCircle2, Info, Image as ImageIcon, BarChart3, ShoppingCart, PackageOpen } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Upload, Download, X, Package, ChevronDown, ChevronRight, DollarSign, AlertCircle, CheckCircle2, Info, Image as ImageIcon, BarChart3, ShoppingCart, PackageOpen, Eye, Sliders } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,10 @@ import { compressImage, isValidImage, formatFileSize } from "@/lib/imageUtils";
 import { ComboComponentsDialog } from "@/components/products/ComboComponentsDialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { auditLogger, AuditActionType } from "@/lib/auditLog";
+import { validateProductUniqueness, validateStockConsistency, validateWarehouseDistribution, validateBulkUpdateData, validatePriceChange } from "@/lib/dataIntegrity";
+import { batchInsertWithValidation, batchUpdateWithValidation, softDeleteBatch, createTransactionContext, upsertWithConflictHandling } from "@/lib/transactionService";
+import { createAppError, classifyError, getUserFriendlyError } from "@/lib/errorHandler";
 
 const productSchema = z.object({
   name: z.string().trim().min(1, "El nombre es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
@@ -46,12 +50,15 @@ const productSchema = z.object({
     .nonnegative("El stock mínimo no puede ser negativo")
     .max(10000000, "El stock mínimo debe ser menor a 10,000,000")
     .optional(),
-  category: z.string().max(100, "La categoría debe tener máximo 100 caracteres").optional(),
+  category_id: z.string().uuid("La categoría debe ser un ID válido").optional(),
   barcode: z.string().max(50, "El código de barras debe tener máximo 50 caracteres").optional(),
   sku: z.string().max(50, "El SKU debe tener máximo 50 caracteres").optional(),
   location: z.string().max(100, "La ubicación debe tener máximo 100 caracteres").optional(),
   batch_number: z.string().max(50, "El número de lote debe tener máximo 50 caracteres").optional(),
   expiration_date: z.string().optional(),
+}).refine((data) => !data.cost || data.cost <= data.price, {
+  message: "El costo no puede ser mayor que el precio",
+  path: ["cost"],
 });
 
 export default function Products() {
@@ -82,6 +89,18 @@ export default function Products() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const customFieldsSectionRef = useRef<HTMLDivElement>(null);
+  const [digitalPriceTier, setDigitalPriceTier] = useState({name: "", price: ""});
+  
+  // Sorting & Filtering States
+  const [sortBy, setSortBy] = useState<"name" | "price" | "stock" | "category" | "created_at">("created_at");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [filterType, setFilterType] = useState<"all" | "digital" | "combo" | "physical">("all");
+  const [filterStockStatus, setFilterStockStatus] = useState<"all" | "low" | "out">("all");
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
   
   // Cargar parámetro de búsqueda desde URL
   useEffect(() => {
@@ -94,7 +113,6 @@ export default function Products() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   
   // Reset form when dialog opens for new product
   useEffect(() => {
@@ -111,12 +129,16 @@ export default function Products() {
     cost: "",
     stock: "",
     min_stock: "",
-    category: "",
+    category_id: "",
     location: "",
     batch_number: "",
     expiration_date: "",
     is_combo: false,
+    is_digital: false,
     currency: "ARS",
+    tags: [] as string[],
+    custom_fields: {} as Record<string, any>,
+    digital_prices: [] as Array<{name: string, price: string}>,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
@@ -130,7 +152,7 @@ export default function Products() {
     price: "",
     cost: "",
     stock: "",
-    category: "",
+    category_id: "",
   });
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
@@ -146,6 +168,67 @@ export default function Products() {
   const [adjustmentPercentage, setAdjustmentPercentage] = useState<string>('');
   const [previewAdjustments, setPreviewAdjustments] = useState<any[]>([]);
   const [isApplyingAdjustments, setIsApplyingAdjustments] = useState(false);
+  const [tagInput, setTagInput] = useState<string>("");
+  const [isCustomFieldsDialogOpen, setIsCustomFieldsDialogOpen] = useState(false);
+  const [customFields, setCustomFields] = useState<Array<{id: string, name: string, type: "text" | "number" | "textarea" | "select" | "checkbox" | "date", options?: string[], required?: boolean}>>([]);
+  const [newCustomField, setNewCustomField] = useState<any>({name: "", type: "text", options: ""});
+
+  // Fetch categories
+  const { data: categories } = useQuery({
+    queryKey: ["product-categories", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      try {
+        const { data, error } = await supabase
+          .from("product_categories" as any)
+          .select("*")
+          .eq("company_id", currentCompany.id)
+          .order("name");
+        if (error) {
+          console.warn("Error fetching categories:", error);
+          return [];
+        }
+        return data || [];
+      } catch (err) {
+        console.warn("Error in categories query:", err);
+        return [];
+      }
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Create category mutation
+  const createCategoryMutation = useMutation({
+    mutationFn: async (name: string) => {
+      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
+      try {
+        const { data, error } = await supabase
+          .from("product_categories" as any)
+          .insert({ company_id: currentCompany.id, name: name.trim() })
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      } catch (err: any) {
+        if (err.message?.includes("404") || err.message?.includes("not found")) {
+          throw new Error("La tabla de categorías no está disponible. Contacta al administrador.");
+        }
+        throw err;
+      }
+    },
+    onSuccess: (newCategory: any) => {
+      toast.success(`Categoría "${newCategory?.name || 'Nueva'}" creada exitosamente`);
+      queryClient.invalidateQueries({ queryKey: ["product-categories"] });
+      if (newCategory?.id) {
+        setFormData({ ...formData, category_id: newCategory.id });
+      }
+      setIsAddCategoryDialogOpen(false);
+      setNewCategoryName("");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al crear la categoría");
+    },
+  });
 
   // Función para convertir precio a ARS
   const convertToARS = (price: number, currency: string) => {
@@ -154,31 +237,90 @@ export default function Products() {
     if (!rate) return null;
     return price * rate.rate;
   };
+
+  // Función para generar SKU automáticamente
+  const generateSKU = (productName: string, category?: string): string => {
+    // Obtener las primeras 3 letras del nombre o categoría (en mayúsculas, sin acentos)
+    const baseText = productName.trim() || category?.trim() || 'PRD';
+    
+    // Remover acentos
+    const normalized = baseText
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toUpperCase();
+    
+    // Tomar primeras 3 letras, si no hay suficientes, rellenar con 'X'
+    const prefix = (normalized.substring(0, 3) + 'XXX').substring(0, 3);
+    
+    // Generar un identificador único basado en timestamp + random
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    const suffix = (timestamp + random).toString().slice(-6);
+    
+    return `${prefix}${suffix}`;
+  };
+
   const [isComboDialogOpen, setIsComboDialogOpen] = useState(false);
   const [comboProduct, setComboProduct] = useState<any>(null);
   const queryClient = useQueryClient();
 
   const { data: products, isLoading } = useQuery({
-    queryKey: ["products", searchQuery, categoryFilter, currentCompany?.id],
+    queryKey: ["products", searchQuery, categoryFilter, sortBy, sortDirection, filterType, filterStockStatus, priceRange, currentCompany?.id],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
-      let query = supabase.from("products").select("*").eq("company_id", currentCompany.id).order("created_at", { ascending: false });
+      let query: any = supabase
+        .from("products")
+        .select("*")
+        .eq("company_id", currentCompany.id)
+        .eq("active", true);
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
         if (sanitized) {
-          query = query.or(`name.ilike.%${sanitized}%,barcode.ilike.%${sanitized}%,sku.ilike.%${sanitized}%`);
+          query = (query as any).or(`name.ilike.%${sanitized}%,barcode.ilike.%${sanitized}%,sku.ilike.%${sanitized}%`);
         }
       }
       
       if (categoryFilter) {
-        query = query.eq("category", categoryFilter);
+        query = (query as any).eq("category_id", categoryFilter);
       }
+      
+      // Apply price range filter
+      query = (query as any).gte("price", priceRange[0]).lte("price", priceRange[1]);
+      
+      // Apply type filter at DB level
+      if (filterType === "digital") {
+        query = (query as any).eq("is_digital", true);
+      } else if (filterType === "combo") {
+        query = (query as any).eq("is_combo", true);
+      } else if (filterType === "physical") {
+        query = (query as any).eq("is_digital", false).eq("is_combo", false);
+      }
+      
+      // Apply stock status filter at DB level (simple cases)
+      if (filterStockStatus === "out") {
+        query = (query as any).eq("stock", 0);
+      }
+      
+      // Apply sorting
+      let orderColumn = sortBy;
+      if (sortBy === "created_at") {
+        orderColumn = "created_at";
+      }
+      query = (query as any).order(orderColumn, { ascending: sortDirection === "asc" });
       
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      
+      // Filter by low stock (requires client-side for min_stock comparison)
+      let filtered = (data || []) as any[];
+      if (filterStockStatus === "low") {
+        filtered = filtered.filter(p => p.stock > 0 && p.stock <= (p.min_stock || 5));
+      }
+      
+      return filtered;
     },
     enabled: !!currentCompany?.id,
   });
@@ -317,12 +459,56 @@ export default function Products() {
     return publicUrl;
   };
 
+  // Funciones para manejar múltiples precios
+  const getPriceRangeForProduct = (product: any) => {
+    const prices: number[] = [product.price];
+    
+    // Agregar precios de listas si existen
+    productPrices?.forEach((pp: any) => {
+      if (pp.product_id === product.id && pp.price) {
+        prices.push(pp.price);
+      }
+    });
+    
+    if (prices.length <= 1) return null;
+    
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    
+    return { min, max, count: prices.length };
+  };
+
+  const hasMultiplePrices = (product: any) => {
+    return (productPrices?.filter((pp: any) => pp.product_id === product.id).length || 0) > 0;
+  };
+
+  const formatPriceDisplay = (product: any) => {
+    const range = getPriceRangeForProduct(product);
+    if (range && range.min !== range.max) {
+      return `$${Number(range.min).toFixed(0)} - $${Number(range.max).toFixed(0)}`;
+    }
+    return `$${Number(product.price).toFixed(0)}`;
+  };
+
   const createProductMutation = useMutation({
     mutationFn: async (data: any) => {
-      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
-      if (!canCreate) throw new Error('No tienes permiso para crear productos en esta empresa');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+      if (!currentCompany?.id) throw new Error('COMPANY_NOT_SELECTED');
+      if (!canCreate) throw new Error('PERMISSION_DENIED');
       
-      // Forzar company_id correcto
+      // Validar unicidad de SKU y Barcode
+      const uniquenessValidation = await validateProductUniqueness(currentCompany.id, {
+        sku: data.sku,
+        barcode: data.barcode,
+      });
+      
+      if (!uniquenessValidation.isValid) {
+        const error = new Error(uniquenessValidation.errors.join('; '));
+        (error as any).code = uniquenessValidation.errors[0].includes('SKU') ? 'INVALID_SKU' : 'INVALID_BARCODE';
+        throw error;
+      }
+
       const payload = { ...data, company_id: currentCompany.id };
       const { data: product, error } = await supabase
         .from("products")
@@ -332,13 +518,28 @@ export default function Products() {
       
       if (error) throw error;
       
+      // Log creación en auditoría
+      await auditLogger.log({
+        action: AuditActionType.CREATE,
+        resourceType: 'product',
+        resourceId: product.id,
+        userId: user.id,
+        companyId: currentCompany.id,
+        metadata: {
+          productName: product.name,
+          sku: product.sku,
+          barcode: product.barcode,
+          price: product.price,
+        },
+        status: 'success',
+      });
+      
       // Upload image if provided
       if (imageFile) {
         try {
           setUploadingImage(true);
           const imageUrl = await uploadProductImage(imageFile, product.id);
           
-          // Update product with image URL
           const { error: updateError } = await supabase
             .from("products")
             .update({ image_url: imageUrl })
@@ -349,13 +550,19 @@ export default function Products() {
         } catch (imgError) {
           console.error('Error uploading image:', imgError);
           toast.error('Producto creado pero falló la subida de imagen');
+          // No lanzamos error para no romper la creación del producto
         } finally {
           setUploadingImage(false);
         }
       }
       
-      // Create warehouse stock entries if distribution was configured
+      // Create warehouse stock entries with batch operation
       if (warehouses && warehouseStockData["new"] && Object.keys(warehouseStockData["new"]).length > 0) {
+        const distribution = validateWarehouseDistribution(data.stock, warehouseStockData["new"]);
+        if (!distribution.isValid) {
+          throw new Error(distribution.error || 'Warehouse distribution invalid');
+        }
+
         const warehouseStockEntries = Object.entries(warehouseStockData["new"]).map(([warehouseId, stock]) => ({
           warehouse_id: warehouseId,
           product_id: product.id,
@@ -364,11 +571,16 @@ export default function Products() {
           company_id: currentCompany!.id,
         }));
         
-        const { error: stockError } = await supabase
-          .from("warehouse_stock")
-          .insert(warehouseStockEntries);
+        const txContext = createTransactionContext(user.id, currentCompany.id);
+        const stockResult = await batchInsertWithValidation(
+          'warehouse_stock',
+          warehouseStockEntries,
+          txContext
+        );
         
-        if (stockError) throw stockError;
+        if (!stockResult.success) {
+          throw new Error(stockResult.error || 'Failed to create warehouse stock entries');
+        }
       }
       
       return product;
@@ -382,32 +594,56 @@ export default function Products() {
       setWarehouseStockData({});
     },
     onError: (error: any) => {
-      const msg = error?.message || '';
-      if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('policy')) {
-        toast.error("No tienes permisos para crear productos en esta empresa.");
-        console.error('RLS error creating product', { currentCompany, canCreate, error });
-      } else if (msg.includes('No tienes permiso') || msg.includes('Empresa no seleccionada')) {
-        toast.error(msg);
-      } else {
-        toast.error(error.message || "Error al crear producto");
-      }
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error creating product:`, error);
     },
   });
 
   const updateProductMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
-      if (!canEdit) throw new Error('No tienes permiso para editar productos en esta empresa');
+    mutationFn: async ({ id, data: updateData, oldData }: { id: string; data: any; oldData?: any }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+      if (!currentCompany?.id) throw new Error('COMPANY_NOT_SELECTED');
+      if (!canEdit) throw new Error('PERMISSION_DENIED');
+      
+      // Validar unicidad de SKU y Barcode (excluyendo el producto actual)
+      if (updateData.sku || updateData.barcode) {
+        const uniquenessValidation = await validateProductUniqueness(
+          currentCompany.id,
+          {
+            sku: updateData.sku,
+            barcode: updateData.barcode,
+          },
+          id
+        );
+        
+        if (!uniquenessValidation.isValid) {
+          const error = new Error(uniquenessValidation.errors.join('; '));
+          (error as any).code = uniquenessValidation.errors[0].includes('SKU') ? 'INVALID_SKU' : 'INVALID_BARCODE';
+          throw error;
+        }
+      }
+
+      // Validar cambios de precio (prevenir cambios radicales)
+      if (updateData.price && oldData?.price) {
+        const priceValidation = validatePriceChange(oldData.price, updateData.price);
+        if (!priceValidation.isValid) {
+          throw new Error(priceValidation.error);
+        }
+      }
       
       // Upload new image if provided
       if (imageFile) {
         try {
           setUploadingImage(true);
           const imageUrl = await uploadProductImage(imageFile, id);
-          data.image_url = imageUrl;
+          updateData.image_url = imageUrl;
         } catch (imgError) {
           console.error('Error uploading image:', imgError);
           toast.error('Error al subir la imagen');
+          throw imgError;
         } finally {
           setUploadingImage(false);
         }
@@ -415,41 +651,65 @@ export default function Products() {
       
       const { error } = await supabase
         .from("products")
-        .update(data)
+        .update(updateData)
         .eq("id", id)
         .eq("company_id", currentCompany.id);
       
       if (error) throw error;
       
-      // Update warehouse stock if provided (batch upsert instead of N queries)
+      // Log cambios en auditoría
+      if (oldData) {
+        await auditLogger.logChanges(
+          AuditActionType.UPDATE,
+          id,
+          'product',
+          oldData,
+          updateData,
+          currentCompany.id
+        );
+      }
+      
+      // Update warehouse stock if provided
       if (warehouses && warehouseStockData[id] && Object.keys(warehouseStockData[id]).length > 0) {
+        const distribution = validateWarehouseDistribution(updateData.stock || oldData?.stock, warehouseStockData[id]);
+        if (!distribution.isValid) {
+          throw new Error(distribution.error);
+        }
+
         const upsertEntries = Object.entries(warehouseStockData[id])
           .map(([warehouseId, stock]) => ({
             warehouse_id: warehouseId,
             product_id: id,
             stock: stock || 0,
-            min_stock: data.min_stock || 0,
+            min_stock: updateData.min_stock || oldData?.min_stock || 0,
             company_id: currentCompany.id,
           }));
 
         if (upsertEntries.length > 0) {
-          await supabase
-            .from("warehouse_stock")
-            .upsert(upsertEntries, { onConflict: 'warehouse_id,product_id' });
+          const txContext = createTransactionContext(user.id, currentCompany.id);
+          const result = await upsertWithConflictHandling(
+            'warehouse_stock',
+            upsertEntries,
+            ['warehouse_id', 'product_id'],
+            txContext
+          );
+
+          if (!result.success) {
+            throw new Error(result.error);
+          }
         }
         
-        // Recalculate total stock
-        const { data: allStocks } = await supabase
-          .from("warehouse_stock")
-          .select("stock")
-          .eq("product_id", id);
-        
-        const totalStock = allStocks?.reduce((sum, s) => sum + s.stock, 0) || 0;
-        
-        await supabase
-          .from("products")
-          .update({ stock: totalStock })
-          .eq("id", id);
+        // Validar consistencia de stock
+        const consistency = await validateStockConsistency(
+          id,
+          updateData.stock || oldData?.stock || 0,
+          currentCompany.id
+        );
+
+        if (!consistency.isConsistent) {
+          console.warn('Stock inconsistency detected:', consistency);
+          // Log pero no lanzo error para no afectar la actualización
+        }
       }
     },
     onSuccess: () => {
@@ -463,45 +723,56 @@ export default function Products() {
       setWarehouseStockData({});
     },
     onError: (error: any) => {
-      const msg = error?.message || '';
-      if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('policy')) {
-        toast.error("No tienes permisos para editar productos en esta empresa.");
-        console.error('RLS error updating product', { currentCompany, canEdit, error });
-      } else if (msg.includes('No tienes permiso') || msg.includes('Empresa no seleccionada')) {
-        toast.error(msg);
-      } else {
-        toast.error(error.message || "Error al actualizar producto");
-      }
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error updating product:`, error);
     },
   });
 
   const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {
-      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
-      if (!canDelete) throw new Error('No tienes permiso para eliminar productos en esta empresa');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+      if (!currentCompany?.id) throw new Error('COMPANY_NOT_SELECTED');
+      if (!canDelete) throw new Error('PERMISSION_DENIED');
       
+      // Soft delete: marcar como inactivo y archivado
       const { error } = await supabase
         .from("products")
-        .delete()
+        .update({ 
+          active: false,
+          updated_at: new Date().toISOString()
+        })
         .eq("id", id)
         .eq("company_id", currentCompany.id);
       
       if (error) throw error;
+
+      // Log eliminación en auditoría
+      await auditLogger.log({
+        action: AuditActionType.DELETE,
+        resourceType: 'product',
+        resourceId: id,
+        userId: user.id,
+        companyId: currentCompany.id,
+        metadata: {
+          deleteType: 'soft_delete',
+          markedInactive: true,
+          timestamp: new Date().toISOString(),
+        },
+        status: 'success',
+      });
     },
     onSuccess: () => {
       toast.success("Producto eliminado exitosamente");
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
     onError: (error: any) => {
-      const msg = error?.message || '';
-      if (msg.includes('row-level security') || msg.includes('RLS') || msg.includes('policy')) {
-        toast.error("No tienes permisos para eliminar productos en esta empresa.");
-        console.error('RLS error deleting product', { currentCompany, canDelete, error });
-      } else if (msg.includes('No tienes permiso') || msg.includes('Empresa no seleccionada')) {
-        toast.error(msg);
-      } else {
-        toast.error(error.message || "Error al eliminar producto");
-      }
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error deleting product:`, error);
     },
   });
 
@@ -515,68 +786,104 @@ export default function Products() {
       cost: "",
       stock: "",
       min_stock: "",
-      category: "",
+      category_id: "",
       location: "",
       batch_number: "",
       expiration_date: "",
       is_combo: false,
+      is_digital: false,
       currency: "ARS",
+      tags: [],
+      custom_fields: {},
+      digital_prices: [],
     });
     setEditingProduct(null);
     setImageFile(null);
     setImagePreview("");
-    setFormErrors({});
+    setTagInput("");
+    setCustomFields([]);
+    setNewCustomField({ name: "", type: "text", options: "" });
+    setDigitalPriceTier({name: "", price: ""});
+  };
+
+  // Funciones para manejar tags
+  const addTag = (tag: string) => {
+    const trimmedTag = tag.trim();
+    if (trimmedTag && !formData.tags.includes(trimmedTag)) {
+      setFormData({...formData, tags: [...formData.tags, trimmedTag]});
+      setTagInput("");
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    setFormData({...formData, tags: formData.tags.filter(t => t !== tag)});
+  };
+
+  // Funciones para campos personalizados
+  const addCustomField = () => {
+    if (!newCustomField.name.trim()) {
+      toast.error("El nombre del campo es requerido");
+      return;
+    }
+    const field = {
+      id: `field_${Date.now()}`,
+      name: newCustomField.name,
+      type: newCustomField.type,
+      options: (newCustomField.type === "select") ? newCustomField.options.split(",").map(o => o.trim()) : undefined,
+    };
+    setCustomFields([...customFields, field]);
+    setNewCustomField({name: "", type: "text", options: ""});
+    toast.success(`Campo "${newCustomField.name}" agregado`);
+  };
+
+  const removeCustomField = (fieldId: string) => {
+    const field = customFields.find(f => f.id === fieldId);
+    setCustomFields(customFields.filter(f => f.id !== fieldId));
+    const newCustom = {...formData.custom_fields};
+    delete newCustom[fieldId];
+    setFormData({...formData, custom_fields: newCustom});
+    toast.success(`Campo eliminado`);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('=== SUBMIT INICIADO ===');
-    console.log('formData:', formData);
-    console.log('currentCompany:', currentCompany);
-    console.log('imageFile:', imageFile);
-    
     try {
       if (!currentCompany?.id) {
-        console.error('No hay empresa seleccionada');
-        toast.error("No hay empresa seleccionada. Selecciona una empresa antes de crear productos.");
-        return;
+        throw new Error('COMPANY_NOT_SELECTED');
       }
       
       // Validate required fields
       if (!formData.name || !formData.price || !formData.stock) {
-        console.error('Faltan campos requeridos:', { name: formData.name, price: formData.price, stock: formData.stock });
-        toast.error("Por favor completa todos los campos requeridos: Nombre, Precio y Stock");
-        return;
+        throw new Error('VALIDATION_ERROR: Nombre, Precio y Stock son obligatorios');
       }
       
       // Validate warehouse distribution if provided
       if (warehouseStockData["new"]) {
-        const totalDistributed = Object.values(warehouseStockData["new"]).reduce((sum, val) => sum + (val || 0), 0);
         const totalStock = parseInt(formData.stock);
-        
-        if (totalDistributed > 0 && totalDistributed !== totalStock) {
-          toast.error(`La distribución (${totalDistributed}) debe coincidir con el stock total (${totalStock})`);
-          return;
+        const distribution = validateWarehouseDistribution(totalStock, warehouseStockData["new"]);
+        if (!distribution.isValid) {
+          throw new Error(distribution.error);
         }
       }
 
-      console.log('Validando con Zod...');
-      const validatedData = productSchema.parse({
-        name: formData.name,
+      // Generar SKU automáticamente si no está proporcionado (para mejorar UX)
+      const skuValue = formData.sku?.trim() || generateSKU(formData.name);
+
+      const validatedData = {
+        name: formData.name?.trim() || "",
         price: parseFloat(formData.price),
         cost: formData.cost ? parseFloat(formData.cost) : undefined,
         stock: parseInt(formData.stock),
         min_stock: formData.min_stock ? parseInt(formData.min_stock) : undefined,
-        category: formData.category || undefined,
+        category_id: formData.category_id || undefined,
         barcode: formData.barcode || undefined,
-        sku: formData.sku || undefined,
+        sku: skuValue || undefined,
         location: formData.location || undefined,
         batch_number: formData.batch_number || undefined,
         expiration_date: formData.expiration_date || undefined,
-      });
-      
-      console.log('Validación exitosa:', validatedData);
+      };
+      productSchema.parse(validatedData);
 
       const productData = {
         name: validatedData.name,
@@ -588,76 +895,98 @@ export default function Products() {
         stock_physical: validatedData.stock,
         stock_reserved: 0,
         min_stock: validatedData.min_stock ?? 0,
-        category: validatedData.category || null,
+        category_id: validatedData.category_id || null,
         location: validatedData.location || null,
         batch_number: validatedData.batch_number || null,
         expiration_date: validatedData.expiration_date || null,
         is_combo: formData.is_combo,
+        is_digital: formData.is_digital,
+        digital_prices: formData.digital_prices || [],
         currency: formData.currency || 'ARS',
+        tags: formData.tags,
+        custom_fields: formData.custom_fields,
+        custom_field_definitions: customFields,
         last_restock_date: editingProduct ? undefined : new Date().toISOString(),
         company_id: currentCompany.id,
       };
 
-      console.log('Ejecutando mutación con:', productData);
       if (editingProduct) {
-        updateProductMutation.mutate({ id: editingProduct.id, data: productData });
+        updateProductMutation.mutate({ 
+          id: editingProduct.id, 
+          data: productData,
+          oldData: editingProduct 
+        });
       } else {
         createProductMutation.mutate(productData);
       }
     } catch (error) {
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
       console.error('Error en handleSubmit:', error);
-      if (error instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {};
-        error.errors.forEach((err) => {
-          if (err.path[0]) {
-            newErrors[err.path[0] as string] = err.message;
-          }
-        });
-        setFormErrors(newErrors);
-      } else {
-        toast.error("Error al validar el producto");
-      }
     }
   };
 
   const handleEdit = async (product: any) => {
-    setEditingProduct(product);
-    setFormData({
-      name: product.name,
-      barcode: product.barcode || "",
-      sku: product.sku || "",
-      price: product.price.toString(),
-      cost: product.cost?.toString() || "",
-      stock: product.stock.toString(),
-      min_stock: product.min_stock?.toString() || "",
-      category: product.category || "",
-      location: product.location || "",
-      batch_number: product.batch_number || "",
-      expiration_date: product.expiration_date || "",
-      is_combo: product.is_combo || false,
-      currency: product.currency || "ARS",
-    });
-    setImagePreview(product.image_url || "");
-    setImageFile(null);
-    
-    // Load warehouse stock data for this product
-    if (warehouses) {
-      const { data: warehouseStockData } = await supabase
-        .from("warehouse_stock")
-        .select("warehouse_id, stock")
-        .eq("product_id", product.id);
-      
-      const stockByWarehouse: Record<string, number> = {};
-      warehouseStockData?.forEach(ws => {
-        stockByWarehouse[ws.warehouse_id] = ws.stock;
+    try {
+      setEditingProduct(product);
+      setFormData({
+        name: product.name,
+        barcode: product.barcode || "",
+        sku: product.sku || "",
+        price: product.price.toString(),
+        cost: product.cost?.toString() || "",
+        stock: product.stock.toString(),
+        min_stock: product.min_stock?.toString() || "",
+        category_id: product.category_id || "",
+        location: product.location || "",
+        batch_number: product.batch_number || "",
+        expiration_date: product.expiration_date || "",
+        is_combo: product.is_combo || false,
+        is_digital: product.is_digital || false,
+        currency: product.currency || "ARS",
+        tags: product.tags || [],
+        custom_fields: product.custom_fields || {},
+        digital_prices: product.digital_prices || [],
       });
+      setImagePreview(product.image_url || "");
+      setImageFile(null);
       
-      setWarehouseStockData({
-        [product.id]: stockByWarehouse
-      });
+      // Load custom field definitions if they exist
+      if (product.custom_field_definitions && Array.isArray(product.custom_field_definitions)) {
+        setCustomFields(product.custom_field_definitions);
+      } else {
+        // If no definitions stored, clear custom fields
+        setCustomFields([]);
+      }
+      
+      // Load warehouse stock data for this product
+      if (warehouses) {
+        const { data: warehouseStockData, error } = await supabase
+          .from("warehouse_stock")
+          .select("warehouse_id, stock")
+          .eq("product_id", product.id);
+        
+        if (error) {
+          console.error('Error loading warehouse stock:', error);
+          toast.error("Error al cargar datos de warehouse");
+          return;
+        }
+        
+        const stockByWarehouse: Record<string, number> = {};
+        warehouseStockData?.forEach(ws => {
+          stockByWarehouse[ws.warehouse_id] = ws.stock;
+        });
+        
+        setWarehouseStockData({
+          [product.id]: stockByWarehouse
+        });
+      }
+      
+      setIsDialogOpen(true);
+    } catch (error) {
+      console.error('Error in handleEdit:', error);
+      toast.error('Error al editar producto');
     }
-    
-    setIsDialogOpen(true);
   };
   
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -781,12 +1110,22 @@ export default function Products() {
     if (!adjustingProduct) return;
 
     try {
-      // Batch upsert instead of N SELECT+INSERT/UPDATE queries
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
       const upsertEntries = Object.entries(stockAdjustments)
         .filter(([_, newStockValue]) => newStockValue !== '' && newStockValue !== undefined)
         .map(([warehouseId, newStockValue]) => {
-          const newStock = parseInt(newStockValue);
+          // Validar que sea número entero válido (no "abc", no decimales)
+          const stockStr = newStockValue.toString().trim();
+          if (!/^\d+$/.test(stockStr)) {
+            console.warn(`Invalid stock value for warehouse ${warehouseId}: ${stockStr}`);
+            return null;
+          }
+          
+          const newStock = parseInt(stockStr, 10);
           if (isNaN(newStock) || newStock < 0) return null;
+          
           return {
             warehouse_id: warehouseId,
             product_id: adjustingProduct.id,
@@ -798,24 +1137,60 @@ export default function Products() {
         .filter(Boolean);
 
       if (upsertEntries.length > 0) {
-        const { error } = await supabase
-          .from("warehouse_stock")
-          .upsert(upsertEntries, { onConflict: 'warehouse_id,product_id' });
-        if (error) throw error;
+        const txContext = createTransactionContext(user.id, currentCompany!.id);
+        const result = await upsertWithConflictHandling(
+          'warehouse_stock',
+          upsertEntries,
+          ['warehouse_id', 'product_id'],
+          txContext
+        );
+
+        if (!result.success) {
+          throw new Error(result.error);
+        }
       }
 
-      // Recalculate total stock
-      const { data: allStocks } = await supabase
+      // Validar y recalcular stock total
+      const { data: allStocks, error: fetchError } = await supabase
         .from("warehouse_stock")
         .select("stock")
         .eq("product_id", adjustingProduct.id);
 
-      const totalStock = allStocks?.reduce((sum, s) => sum + s.stock, 0) || 0;
+      if (fetchError) throw fetchError;
 
-      await supabase
+      const totalStock = (allStocks || []).reduce((sum, s) => sum + (s.stock || 0), 0);
+      const consistency = await validateStockConsistency(
+        adjustingProduct.id,
+        totalStock,
+        currentCompany!.id
+      );
+
+      if (!consistency.isConsistent) {
+        console.warn('Stock inconsistency detected after adjustment:', consistency);
+      }
+
+      // Actualizar el stock total del producto
+      const { error: updateError } = await supabase
         .from("products")
-        .update({ stock: totalStock })
+        .update({ stock: totalStock, updated_at: new Date().toISOString() })
         .eq("id", adjustingProduct.id);
+
+      if (updateError) throw updateError;
+
+      // Log auditoría
+      await auditLogger.log({
+        action: AuditActionType.ADJUST_STOCK,
+        resourceType: 'product',
+        resourceId: adjustingProduct.id,
+        userId: user.id,
+        companyId: currentCompany!.id,
+        metadata: {
+          productName: adjustingProduct.name,
+          totalStockAfter: totalStock,
+          adjustmentCount: upsertEntries.length,
+        },
+        status: 'success',
+      });
 
       toast.success("Stock ajustado exitosamente");
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -824,7 +1199,10 @@ export default function Products() {
       setIsStockAdjustDialogOpen(false);
       setStockAdjustments({});
     } catch (error: any) {
-      toast.error(error.message || "Error al ajustar stock");
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error adjusting stock:`, error);
     }
   };
 
@@ -846,41 +1224,87 @@ export default function Products() {
     setSelectedProducts(newSelected);
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!products || products.length === 0) {
       toast.error("No hay productos para exportar");
       return;
     }
 
-    const csvData = products.map(p => {
-      const row: any = {
-        nombre: p.name,
-        categoria: p.category || "",
-        codigo_barras: p.barcode || "",
-        sku: p.sku || "",
-        precio: p.price,
-        costo: p.cost || "",
-        stock: p.stock,
-        stock_minimo: p.min_stock || "",
-      };
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) {
+        throw new Error('Usuario no autenticado');
+      }
+      const user = authData.user;
 
-      // Add warehouse columns if warehouses exist
-      if (warehouses) {
-        warehouses.forEach(w => {
-          row[`deposito_${w.code}`] = 0;
-        });
+      // Fetch category names for all products
+      const categoryIds = [...new Set((products as any[]).map(p => p.category_id).filter(Boolean))];
+      let categoryMap: Record<string, string> = {};
+      
+      if (categoryIds.length > 0) {
+        try {
+          const { data: categories, error: catError } = await supabase
+            .from("product_categories" as any)
+            .select("id, name")
+            .in("id", categoryIds);
+          
+          if (!catError && categories) {
+            (categories as any[]).forEach(cat => {
+              categoryMap[cat.id] = cat.name;
+            });
+          }
+        } catch (err) {
+          console.warn("Error fetching categories for export:", err);
+        }
       }
 
-      return row;
-    });
+      const csvData = (products as any[]).map(p => {
+        const row: any = {
+          nombre: p.name,
+          categoria: p.category_id ? (categoryMap[p.category_id] || "") : "",
+          codigo_barras: p.barcode || "",
+          sku: p.sku || "",
+          precio: p.price,
+          costo: p.cost || "",
+          stock: p.stock,
+          stock_minimo: p.min_stock || "",
+        };
 
-    const csv = Papa.unparse(csvData);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `productos_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    toast.success("Productos exportados exitosamente");
+        if (warehouses) {
+          warehouses.forEach(w => {
+            row[`deposito_${w.code}`] = 0;
+          });
+        }
+
+        return row;
+      });
+
+      const csv = Papa.unparse(csvData);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `productos_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+
+      // Log auditoría de exportación
+      await auditLogger.log({
+        action: AuditActionType.EXPORT,
+        resourceType: 'product',
+        resourceId: 'batch-export',
+        userId: user.id,
+        companyId: currentCompany!.id,
+        metadata: {
+          totalExported: products.length,
+          exportDate: new Date().toISOString(),
+        },
+        status: 'success',
+      });
+
+      toast.success("Productos exportados exitosamente");
+    } catch (error) {
+      console.error('Error exporting products:', error);
+      toast.error("Error al exportar productos");
+    }
   };
 
   const handleImportCSV = () => {
@@ -908,10 +1332,16 @@ export default function Products() {
           return;
         }
 
-        // Validate all rows first, then batch insert (instead of N individual inserts)
-        const validProducts: any[] = [];
-        const rowWarehouseData: Map<number, { row: any; validated: any }> = new Map();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          toast.error("Usuario no autenticado");
+          return;
+        }
 
+        const validProducts: any[] = [];
+        const productRowMapping: Map<string, { row: any; validated: any }> = new Map();
+
+        // Validar todos los rows primero
         for (let i = 0; i < data.length; i++) {
           const row = data[i];
           try {
@@ -931,18 +1361,25 @@ export default function Products() {
               sku: row.sku?.trim() || undefined,
             });
 
+            const productKey = `${validatedData.barcode || ''}_${validatedData.sku || ''}_${validatedData.name}`;
+            
+            // Generar SKU automáticamente si no se proporciona
+            const skuForProduct = validatedData.sku || generateSKU(validatedData.name, "");
+            
             validProducts.push({
               name: validatedData.name,
               barcode: validatedData.barcode || null,
-              sku: validatedData.sku || null,
+              sku: skuForProduct,
               price: validatedData.price,
               cost: validatedData.cost ?? 0,
               stock: validatedData.stock,
               min_stock: validatedData.min_stock ?? 0,
-              category: validatedData.category || null,
+              category_id: validatedData.category_id || null,
+              tags: [],
+              custom_fields: {},
               company_id: currentCompany?.id,
             });
-            rowWarehouseData.set(validProducts.length - 1, { row, validated: validatedData });
+            productRowMapping.set(productKey, { row, validated: validatedData });
           } catch (error: any) {
             errorCount++;
             const errorMsg = error instanceof z.ZodError
@@ -952,25 +1389,45 @@ export default function Products() {
           }
         }
 
-        // Batch insert all valid products in one query
+        // Batch insert todas los productos válidos con transacción
         if (validProducts.length > 0) {
-          const { data: insertedProducts, error: insertError } = await supabase
-            .from("products")
-            .insert(validProducts)
-            .select();
+          const txContext = createTransactionContext(user.id, currentCompany!.id);
+          
+          // Validator para chequear unicidad
+          const validator = async (product: any) => {
+            const uniqueness = await validateProductUniqueness(currentCompany!.id, {
+              sku: product.sku,
+              barcode: product.barcode,
+            });
+            return {
+              valid: uniqueness.isValid,
+              error: uniqueness.errors.length > 0 ? uniqueness.errors[0] : undefined,
+            };
+          };
 
-          if (insertError) {
-            errors.push(`Error al insertar productos: ${insertError.message}`);
-            errorCount += validProducts.length;
-          } else {
-            successCount = insertedProducts?.length || 0;
+          const insertResult = await batchInsertWithValidation(
+            'products',
+            validProducts,
+            txContext,
+            (product) => {
+              // Validación básica en lote
+              if (!product.name || product.price <= 0) {
+                return { valid: false, error: 'Nombre y precio requeridos' };
+              }
+              return { valid: true };
+            }
+          );
 
-            // Batch insert all warehouse stock entries in one query
-            if (warehouses && insertedProducts) {
+          if (insertResult.success && insertResult.data) {
+            successCount = insertResult.itemsProcessed || 0;
+            
+            // Batch insert warehouse stock entries
+            if (warehouses && insertResult.data.length > 0) {
               const allWarehouseEntries: any[] = [];
 
-              insertedProducts.forEach((product, idx) => {
-                const warehouseInfo = rowWarehouseData.get(idx);
+              insertResult.data.forEach((product: any) => {
+                const productKey = `${product.barcode || ''}_${product.sku || ''}_${product.name}`;
+                const warehouseInfo = productRowMapping.get(productKey);
                 if (!warehouseInfo) return;
                 const { row, validated } = warehouseInfo;
 
@@ -991,10 +1448,39 @@ export default function Products() {
               });
 
               if (allWarehouseEntries.length > 0) {
-                await supabase.from("warehouse_stock").insert(allWarehouseEntries);
+                const warehouseResult = await batchInsertWithValidation(
+                  'warehouse_stock',
+                  allWarehouseEntries,
+                  txContext
+                );
+                
+                if (!warehouseResult.success) {
+                  console.warn('Some warehouse stock entries failed:', warehouseResult.error);
+                }
               }
             }
+          } else {
+            errors.push(`Error al insertar productos: ${insertResult.error}`);
+            errorCount += validProducts.length;
           }
+        }
+
+        // Log auditoría de importación
+        if (successCount > 0) {
+          await auditLogger.log({
+            action: AuditActionType.IMPORT,
+            resourceType: 'product',
+            resourceId: 'batch-import',
+            userId: user.id,
+            companyId: currentCompany!.id,
+            metadata: {
+              totalRows: data.length,
+              successCount,
+              errorCount,
+              fileName: importFile.name,
+            },
+            status: successCount > 0 ? 'success' : 'error',
+          });
         }
 
         queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -1026,29 +1512,62 @@ export default function Products() {
     if (massEditData.price) updates.price = parseFloat(massEditData.price);
     if (massEditData.cost) updates.cost = parseFloat(massEditData.cost);
     if (massEditData.stock) updates.stock = parseInt(massEditData.stock);
-    if (massEditData.category) updates.category = massEditData.category;
+    if (massEditData.category_id) updates.category_id = massEditData.category_id;
 
     if (Object.keys(updates).length === 0) {
       toast.error("Ingresa al menos un campo para actualizar");
       return;
     }
 
+    // Validar los datos antes de actualizar
+    const validationResult = validateBulkUpdateData(updates);
+    if (!validationResult.isValid) {
+      toast.error(`Error de validación: ${validationResult.errors.join(', ')}`);
+      return;
+    }
+
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
       const productIds = Array.from(selectedProducts);
+      const txContext = createTransactionContext(user.id, currentCompany!.id);
+      
+      // Actualizar en la base de datos
       const { error } = await supabase
         .from("products")
-        .update(updates)
-        .in("id", productIds);
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .in("id", productIds)
+        .eq("company_id", currentCompany!.id);
 
       if (error) throw error;
+
+      // Log auditoría de actualización masiva
+      await auditLogger.log({
+        action: AuditActionType.BULK_UPDATE,
+        resourceType: 'product',
+        resourceId: productIds.join(','),
+        userId: user.id,
+        companyId: currentCompany!.id,
+        changes: updates,
+        metadata: {
+          transactionId: txContext.transactionId,
+          totalUpdated: productIds.length,
+          fields: Object.keys(updates),
+        },
+        status: 'success',
+      });
 
       toast.success(`${productIds.length} productos actualizados exitosamente`);
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setIsMassEditDialogOpen(false);
-      setMassEditData({ price: "", cost: "", stock: "", category: "" });
+      setMassEditData({ price: "", cost: "", stock: "", category_id: "" });
       setSelectedProducts(new Set());
     } catch (error: any) {
-      toast.error(error.message || "Error al actualizar productos");
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error in mass edit:`, error);
     }
   };
 
@@ -1059,20 +1578,28 @@ export default function Products() {
     }
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
       const productIds = Array.from(selectedProducts);
-      const { error } = await supabase
-        .from("products")
-        .delete()
-        .in("id", productIds);
+      const txContext = createTransactionContext(user.id, currentCompany!.id);
+      
+      // Usar soft delete para mantener integridad histórica
+      const result = await softDeleteBatch('products', productIds, txContext);
 
-      if (error) throw error;
+      if (!result.success) {
+        throw new Error(result.error);
+      }
 
-      toast.success(`${productIds.length} productos eliminados exitosamente`);
+      toast.success(`${result.itemsProcessed} productos eliminados exitosamente`);
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setIsDeleteDialogOpen(false);
       setSelectedProducts(new Set());
     } catch (error: any) {
-      toast.error(error.message || "Error al eliminar productos");
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error in mass delete:`, error);
     }
   };
 
@@ -1085,6 +1612,12 @@ export default function Products() {
     const percentage = parseFloat(adjustmentPercentage);
     if (isNaN(percentage)) {
       toast.error("Porcentaje inválido");
+      return;
+    }
+
+    // Validar que el porcentaje esté en un rango razonable (-99 a 10000)
+    if (percentage < -99 || percentage > 10000) {
+      toast.error("El porcentaje debe estar entre -99% y 10000%");
       return;
     }
 
@@ -1130,31 +1663,89 @@ export default function Products() {
     setIsApplyingAdjustments(true);
     
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const txContext = createTransactionContext(user.id, currentCompany!.id);
       let successCount = 0;
       let errorCount = 0;
       const errors: string[] = [];
+      const auditChanges: Record<string, any> = {};
       
-      // Parallel updates instead of sequential N queries
-      const now = new Date().toISOString();
-      const results = await Promise.all(
-        previewAdjustments.map(adjustment =>
-          supabase
-            .from("products")
-            .update({ price: adjustment.newPrice, updated_at: now })
-            .eq("id", adjustment.id)
-            .eq("company_id", currentCompany?.id)
-            .then(({ error }) => ({ adjustment, error }))
-        )
-      );
-
-      for (const { adjustment, error } of results) {
-        if (error) {
-          console.error(`Error actualizando producto ${adjustment.name}:`, error);
-          errors.push(`${adjustment.name}: ${error.message}`);
-          errorCount++;
-        } else {
-          successCount++;
+      // Validar cambios de precio antes de aplicar
+      for (const adjustment of previewAdjustments) {
+        const oldProduct = products?.find(p => p.id === adjustment.id);
+        if (oldProduct) {
+          const validation = validatePriceChange(oldProduct.price, adjustment.newPrice);
+          if (!validation.isValid) {
+            errors.push(`${adjustment.name}: ${validation.error}`);
+            errorCount++;
+            continue;
+          }
         }
+      }
+
+      if (errorCount > 0) {
+        throw new Error(`${errorCount} productos tienen cambios de precio inválidos`);
+      }
+
+      // Actualizar precios en paralelo (con límite de concurrencia)
+      const maxConcurrency = 10;
+      const now = new Date().toISOString();
+      
+      for (let i = 0; i < previewAdjustments.length; i += maxConcurrency) {
+        const batch = previewAdjustments.slice(i, i + maxConcurrency);
+        const results = await Promise.all(
+          batch.map(adjustment =>
+            supabase
+              .from("products")
+              .update({ price: adjustment.newPrice, updated_at: now })
+              .eq("id", adjustment.id)
+              .eq("company_id", currentCompany!.id)
+              .select()
+              .then(({ data, error }) => ({ adjustment, data, error }))
+          )
+        );
+
+        for (const { adjustment, data, error } of results) {
+          if (error) {
+            console.error(`Error updating ${adjustment.name}:`, error);
+            errors.push(`${adjustment.name}: ${error.message}`);
+            errorCount++;
+          } else {
+            successCount++;
+            const oldProduct = products?.find(p => p.id === adjustment.id);
+            if (oldProduct) {
+              auditChanges[adjustment.id] = {
+                oldPrice: oldProduct.price,
+                newPrice: adjustment.newPrice,
+                percentageChange: ((adjustment.newPrice - oldProduct.price) / oldProduct.price) * 100,
+                currency: adjustmentCurrency,
+              };
+            }
+          }
+        }
+      }
+
+      // Log auditoría de ajuste masivo de precios
+      if (successCount > 0) {
+        await auditLogger.log({
+          action: AuditActionType.ADJUST_PRICE,
+          resourceType: 'product',
+          resourceId: Object.keys(auditChanges).join(','),
+          userId: user.id,
+          companyId: currentCompany!.id,
+          changes: auditChanges,
+          metadata: {
+            transactionId: txContext.transactionId,
+            totalAttempted: previewAdjustments.length,
+            successCount,
+            failCount: errorCount,
+            percentageApplied: parseFloat(adjustmentPercentage),
+            currencyAdjusted: adjustmentCurrency,
+          },
+          status: errorCount === 0 ? 'success' : 'error',
+        });
       }
 
       if (successCount > 0) {
@@ -1162,7 +1753,7 @@ export default function Products() {
       }
       if (errorCount > 0) {
         console.error("Errores detallados:", errors);
-        toast.error(`❌ ${errorCount} productos no pudieron actualizarse. Revisa la consola.`);
+        toast.error(`❌ ${errorCount} productos no pudieron actualizarse`);
       }
       
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -1173,8 +1764,10 @@ export default function Products() {
         setAdjustmentPercentage('');
       }
     } catch (error: any) {
-      console.error("Error en applyPriceAdjustments:", error);
-      toast.error(error.message || "Error al ajustar precios");
+      const errorCode = classifyError(error);
+      const userMessage = getUserFriendlyError(error);
+      toast.error(userMessage);
+      console.error(`[${errorCode}] Error applying price adjustments:`, error);
     } finally {
       setIsApplyingAdjustments(false);
     }
@@ -1204,11 +1797,11 @@ export default function Products() {
               <span className="hidden sm:inline">Ver Reportes</span>
             </Button>
             {canEdit && (
-              <Button 
+              <Button
                 variant="outline" 
                 size="sm"
                 onClick={() => setIsCurrencyAdjustDialogOpen(true)}
-                className="border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+                className="border-blue-500/50 text-blue-600 hover:bg-blue-700 hover:text-white dark:hover:bg-blue-700 dark:hover:text-white"
               >
                 <DollarSign className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Ajustar Cotización</span>
@@ -1263,7 +1856,17 @@ export default function Products() {
           </Dialog>
           )}
           {canCreate && (
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog 
+              open={isDialogOpen} 
+              onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (!open) {
+                  resetForm();
+                  setEditingProduct(null);
+                  setCustomFields([]);
+                }
+              }}
+            >
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-1 sm:gap-2">
                   <Plus className="h-4 w-4" />
@@ -1302,19 +1905,35 @@ export default function Products() {
                     <Input
                       id="name"
                       value={formData.name}
-                      onChange={(e) => { setFormData({ ...formData, name: e.target.value }); if (formErrors.name) setFormErrors((p) => ({ ...p, name: "" })); }}
-                      className={formErrors.name ? "border-destructive" : ""}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
                     />
-                    {formErrors.name && <p className="text-sm text-destructive mt-1">{formErrors.name}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="category">Categoría</Label>
-                    <Input
-                      id="category"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      placeholder="Ej: Electrónica, Alimentos, etc."
-                    />
+                    <div className="flex gap-2">
+                      <Select value={formData.category_id || ""} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Selecciona una categoría" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories?.map((category: any) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsAddCategoryDialogOpen(true)}
+                        className="whitespace-nowrap"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="barcode">Código de Barras</Label>
@@ -1326,13 +1945,134 @@ export default function Products() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="sku">SKU (Código Interno)</Label>
-                    <Input
-                      id="sku"
-                      value={formData.sku}
-                      onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                      placeholder="Código único del producto"
-                    />
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="sku" className="flex items-center gap-2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex items-center gap-1">
+                                SKU (Código Interno)
+                                <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Código único para identificar el producto.</p>
+                              <p className="text-xs mt-1">Si dejas vacío, se genera automáticamente.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </Label>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        id="sku"
+                        value={formData.sku}
+                        onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                        placeholder="Dejar vacío para generar automáticamente"
+                        className="flex-1"
+                      />
+                      {formData.name && !formData.sku && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const generated = generateSKU(formData.name, "");
+                            setFormData({ ...formData, sku: generated });
+                            toast.success(`SKU generado: ${generated}`);
+                          }}
+                          className="whitespace-nowrap"
+                        >
+                          Generar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Etiquetas */}
+                  <div className="space-y-2">
+                    <Label htmlFor="tags" className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">Tag</Badge>
+                      Etiquetas
+                    </Label>
+                    <div className="space-y-2">
+                      {formData.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 p-2 bg-muted/30 rounded-lg min-h-[2.5rem]">
+                          {formData.tags.map((tag) => {
+                            const colors = [
+                              "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200",
+                              "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200",
+                              "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-200",
+                              "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200",
+                              "bg-pink-100 text-pink-800 dark:bg-pink-950 dark:text-pink-200",
+                              "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200",
+                            ];
+                            const color = colors[formData.tags.indexOf(tag) % colors.length];
+                            return (
+                              <Badge key={tag} variant="secondary" className={`${color} gap-1 px-2 py-1`}>
+                                {tag}
+                                <button
+                                  type="button"
+                                  onClick={() => removeTag(tag)}
+                                  className="ml-1 hover:opacity-70"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Input
+                          id="tags"
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addTag(tagInput);
+                            }
+                          }}
+                          placeholder="Escribe una etiqueta y presiona Enter"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addTag(tagInput)}
+                          className="whitespace-nowrap"
+                        >
+                          Agregar
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Campos Personalizados */}
+                  <div className="space-y-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsCustomFieldsDialogOpen(true)}
+                      className="w-full gap-2"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Gestionar Campos Personalizados ({customFields.length})
+                    </Button>
+                    {customFields.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => customFieldsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                        className="w-full gap-2"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Ver Campos Personalizados
+                      </Button>
+                    )}
                   </div>
                   </div>
                   
@@ -1383,6 +2123,33 @@ export default function Products() {
                   </div>
                 </div>
 
+                {/* Tipo de Producto */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg bg-blue-50/50 dark:bg-blue-950/30">
+                    <div className="space-y-1">
+                      <Label htmlFor="is_digital" className="text-sm font-medium cursor-pointer">
+                        Este es un producto digital
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Los productos digitales no tienen stock físico. Pueden tener múltiples opciones de precios (ej: Basic, Pro, Enterprise).
+                      </p>
+                    </div>
+                    <Switch
+                      id="is_digital"
+                      checked={formData.is_digital}
+                      onCheckedChange={(checked) => {
+                        setFormData({ 
+                          ...formData, 
+                          is_digital: checked,
+                          stock: checked ? "999999" : "0",
+                          min_stock: checked ? "0" : ""
+                        });
+                        setDigitalPriceTier({name: "", price: ""});
+                      }}
+                    />
+                  </div>
+                </div>
+
                 {/* Precios y Stock */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b">
@@ -1390,83 +2157,196 @@ export default function Products() {
                       <DollarSign className="h-4 w-4 text-green-600 dark:text-green-500" />
                     </div>
                     <h3 className="text-sm font-semibold">
-                      Precios y Stock
+                      Precios {formData.is_digital && "(Producto Digital)"} y Stock
                     </h3>
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="price" className="flex items-center gap-1">
-                      Precio de Venta <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      step="0.01"
-                      value={formData.price}
-                      onChange={(e) => { setFormData({ ...formData, price: e.target.value }); if (formErrors.price) setFormErrors((p) => ({ ...p, price: "" })); }}
-                      placeholder="0.00"
-                      className={formErrors.price ? "border-destructive" : ""}
-                    />
-                    {formErrors.price && <p className="text-sm text-destructive mt-1">{formErrors.price}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cost">Costo (Opcional)</Label>
-                    <Input
-                      id="cost"
-                      type="number"
-                      step="0.01"
-                      value={formData.cost}
-                      onChange={(e) => { setFormData({ ...formData, cost: e.target.value }); if (formErrors.cost) setFormErrors((p) => ({ ...p, cost: "" })); }}
-                      placeholder="0.00"
-                      className={formErrors.cost ? "border-destructive" : ""}
-                    />
-                    {formErrors.cost && <p className="text-sm text-destructive mt-1">{formErrors.cost}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="currency">Moneda</Label>
-                    <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ARS">🇦🇷 ARS (Peso Argentino)</SelectItem>
-                        <SelectItem value="USD">🇺🇸 USD (Dólar)</SelectItem>
-                        <SelectItem value="EUR">🇪🇺 EUR (Euro)</SelectItem>
-                        <SelectItem value="BRL">🇧🇷 BRL (Real)</SelectItem>
-                        <SelectItem value="CLP">🇨🇱 CLP (Peso Chileno)</SelectItem>
-                        <SelectItem value="UYU">🇺🇾 UYU (Peso Uruguayo)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="stock" className="flex items-center gap-1">
-                      Cantidad en Stock <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="stock"
-                      type="number"
-                      value={formData.stock}
-                      onChange={(e) => { setFormData({ ...formData, stock: e.target.value }); if (formErrors.stock) setFormErrors((p) => ({ ...p, stock: "" })); }}
-                      placeholder="0"
-                      className={formErrors.stock ? "border-destructive" : ""}
-                    />
-                    {formErrors.stock && <p className="text-sm text-destructive mt-1">{formErrors.stock}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="min_stock">Stock Mínimo (Alerta)</Label>
-                    <Input
-                      id="min_stock"
-                      type="number"
-                      value={formData.min_stock}
-                      onChange={(e) => { setFormData({ ...formData, min_stock: e.target.value }); if (formErrors.min_stock) setFormErrors((p) => ({ ...p, min_stock: "" })); }}
-                      placeholder="0"
-                      className={formErrors.min_stock ? "border-destructive" : ""}
-                    />
-                    {formErrors.min_stock && <p className="text-sm text-destructive mt-1">{formErrors.min_stock}</p>}
-                  </div>
-                  </div>
+                  
+                  {/* Productos Digitales - Múltiples Precios */}
+                  {formData.is_digital ? (
+                    <div className="space-y-4 p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+                      <div className="space-y-2">
+                        <p className="text-sm font-semibold">Opciones de Precio</p>
+                        <p className="text-xs text-muted-foreground">Define hasta 3 opciones de precios diferentes (ej: Básico, Estándar, Premium)</p>
+                      </div>
+                      
+                      {/* Precio Base */}
+                      <div className="space-y-2 p-3 bg-white dark:bg-slate-950 rounded border">
+                        <Label className="text-sm font-medium">Opción Base (Requerida)</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Nombre"
+                            value="Acceso Standard"
+                            disabled
+                            className="flex-1"
+                          />
+                          <div className="flex gap-2 items-center">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={formData.price}
+                              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                              className="w-32"
+                              required
+                            />
+                            <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+                              <SelectTrigger className="w-24">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ARS">ARS</SelectItem>
+                                <SelectItem value="USD">USD</SelectItem>
+                                <SelectItem value="EUR">EUR</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Opciones Adicionales */}
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium">Opciones Adicionales (Máximo 2)</p>
+                        {formData.digital_prices && formData.digital_prices.map((tier: any, idx: number) => (
+                          <div key={idx} className="flex gap-2 items-center p-3 bg-white dark:bg-slate-950 rounded border">
+                            <Input
+                              placeholder="Nombre (ej: Pro)"
+                              value={tier.name}
+                              onChange={(e) => {
+                                const newPrices = [...formData.digital_prices];
+                                newPrices[idx].name = e.target.value;
+                                setFormData({ ...formData, digital_prices: newPrices });
+                              }}
+                              className="flex-1"
+                            />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={tier.price}
+                              onChange={(e) => {
+                                const newPrices = [...formData.digital_prices];
+                                newPrices[idx].price = e.target.value;
+                                setFormData({ ...formData, digital_prices: newPrices });
+                              }}
+                              className="w-32"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const nPrices = formData.digital_prices.filter((_: any, i: number) => i !== idx);
+                                setFormData({ ...formData, digital_prices: nPrices });
+                              }}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        
+                        {formData.digital_prices.length < 2 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                digital_prices: [...(formData.digital_prices || []), {name: "", price: ""}]
+                              });
+                            }}
+                            className="w-full"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Agregar Opción
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="price" className="flex items-center gap-1">
+                            Precio de Venta <span className="text-destructive">*</span>
+                          </Label>
+                          <Input
+                            id="price"
+                            type="number"
+                            step="0.01"
+                            value={formData.price}
+                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                            required
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="cost">Costo (Opcional)</Label>
+                          <Input
+                            id="cost"
+                            type="number"
+                            step="0.01"
+                            value={formData.cost}
+                            onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="currency">Moneda</Label>
+                          <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ARS">🇦🇷 ARS</SelectItem>
+                              <SelectItem value="USD">🇺🇸 USD</SelectItem>
+                              <SelectItem value="EUR">🇪🇺 EUR</SelectItem>
+                              <SelectItem value="BRL">🇧🇷 BRL</SelectItem>
+                              <SelectItem value="CLP">🇨🇱 CLP</SelectItem>
+                              <SelectItem value="UYU">🇺🇾 UYU</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {editingProduct && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full gap-2 text-blue-600 hover:text-blue-700 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-950/30"
+                          onClick={() => handlePriceListEdit(editingProduct)}
+                        >
+                          <DollarSign className="h-4 w-4" />
+                          Gestionar Lista de Precios
+                        </Button>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="stock" className="flex items-center gap-1">
+                            Cantidad en Stock <span className="text-destructive">*</span>
+                          </Label>
+                          <Input
+                            id="stock"
+                            type="number"
+                            value={formData.stock}
+                            onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                            required
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="min_stock">Stock Mínimo</Label>
+                          <Input
+                            id="min_stock"
+                            type="number"
+                            value={formData.min_stock}
+                            onChange={(e) => setFormData({ ...formData, min_stock: e.target.value })}
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Producto Combo */}
@@ -1513,6 +2393,102 @@ export default function Products() {
                       Información Adicional <span className="text-xs text-muted-foreground font-normal">(Opcional)</span>
                     </h3>
                   </div>
+
+                  {/* Campos Personalizados Dinámicos */}
+                  {customFields.length > 0 && (
+                    <div ref={customFieldsSectionRef} className="bg-muted/30 p-4 rounded-lg space-y-3 border border-dashed">
+                      <p className="text-sm font-medium">Campos Personalizados</p>
+                      <div className="space-y-3">
+                        {customFields.map((field) => (
+                          <div key={field.id} className="space-y-2">
+                            <Label htmlFor={field.id}>{field.name}</Label>
+                            {field.type === "text" && (
+                              <Input
+                                id={field.id}
+                                type="text"
+                                value={formData.custom_fields[field.id] || ""}
+                                onChange={(e) => setFormData({
+                                  ...formData,
+                                  custom_fields: {...formData.custom_fields, [field.id]: e.target.value}
+                                })}
+                                placeholder={field.name}
+                              />
+                            )}
+                            {field.type === "number" && (
+                              <Input
+                                id={field.id}
+                                type="number"
+                                value={formData.custom_fields[field.id] || ""}
+                                onChange={(e) => setFormData({
+                                  ...formData,
+                                  custom_fields: {...formData.custom_fields, [field.id]: e.target.value}
+                                })}
+                                placeholder={field.name}
+                              />
+                            )}
+                            {field.type === "textarea" && (
+                              <textarea
+                                id={field.id}
+                                value={formData.custom_fields[field.id] || ""}
+                                onChange={(e) => setFormData({
+                                  ...formData,
+                                  custom_fields: {...formData.custom_fields, [field.id]: e.target.value}
+                                })}
+                                placeholder={field.name}
+                                className="w-full px-3 py-2 text-sm border rounded-md border-input bg-background"
+                                rows={3}
+                              />
+                            )}
+                            {field.type === "select" && (
+                              <Select
+                                value={formData.custom_fields[field.id] || ""}
+                                onValueChange={(value) => setFormData({
+                                  ...formData,
+                                  custom_fields: {...formData.custom_fields, [field.id]: value}
+                                })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={`Selecciona ${field.name}`} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {field.options?.map((option) => (
+                                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                            {field.type === "checkbox" && (
+                              <div className="flex items-center gap-2 p-2 border rounded">
+                                <input
+                                  id={field.id}
+                                  type="checkbox"
+                                  checked={formData.custom_fields[field.id] === true}
+                                  onChange={(e) => setFormData({
+                                    ...formData,
+                                    custom_fields: {...formData.custom_fields, [field.id]: e.target.checked}
+                                  })}
+                                  className="rounded"
+                                />
+                                <Label htmlFor={field.id} className="m-0 cursor-pointer">{field.name}</Label>
+                              </div>
+                            )}
+                            {field.type === "date" && (
+                              <Input
+                                id={field.id}
+                                type="date"
+                                value={formData.custom_fields[field.id] || ""}
+                                onChange={(e) => setFormData({
+                                  ...formData,
+                                  custom_fields: {...formData.custom_fields, [field.id]: e.target.value}
+                                })}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="location">Ubicación/Almacén</Label>
@@ -1722,12 +2698,19 @@ export default function Products() {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="mass-category">Categoría</Label>
-                          <Input
-                            id="mass-category"
-                            placeholder="Dejar vacío para no modificar"
-                            value={massEditData.category}
-                            onChange={(e) => setMassEditData({ ...massEditData, category: e.target.value })}
-                          />
+                          <Select value={massEditData.category_id || ""} onValueChange={(value) => setMassEditData({ ...massEditData, category_id: value })}>
+                            <SelectTrigger id="mass-category">
+                              <SelectValue placeholder="Dejar vacío para no modificar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="">Sin categoría</SelectItem>
+                              {categories?.map((cat: any) => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  {cat.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" onClick={() => setIsMassEditDialogOpen(false)}>
@@ -1773,29 +2756,121 @@ export default function Products() {
 
         <Card className="shadow-soft">
           <CardHeader>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar productos..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+            <div className="flex flex-col gap-3">
+              {/* Búsqueda y Botón de Filtros */}
+              <div className="flex flex-col sm:flex-row gap-2 items-center">
+                <div className="relative flex-1 w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar productos..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <Select value={categoryFilter || "ALL"} onValueChange={(value) => setCategoryFilter(value === "ALL" ? "" : value)}>
+                    <SelectTrigger className="flex-1 sm:w-[200px]">
+                      <SelectValue placeholder="Categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Todas</SelectItem>
+                      {categories?.map((cat: any) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+                    title="Abrir filtros avanzados"
+                    className={isFiltersOpen ? "bg-primary text-primary-foreground" : ""}
+                  >
+                    <Sliders className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <Select value={categoryFilter || "ALL"} onValueChange={(value) => setCategoryFilter(value === "ALL" ? "" : value)}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="Todas las categorías" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todas las categorías</SelectItem>
-                  {products && Array.from(new Set(products.filter(p => p.category).map(p => p.category))).sort().map(category => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+
+              {/* Panel de Filtros Desplegable */}
+              {isFiltersOpen && (
+                <Collapsible defaultOpen open={isFiltersOpen} onOpenChange={setIsFiltersOpen} className="w-full">
+                  <CollapsibleContent className="space-y-3 pt-3 border-t">
+                    {/* Filtro de Tipo */}
+                    <div className="flex flex-wrap gap-2">
+                      <div className="text-xs font-medium text-muted-foreground pt-1">Tipo:</div>
+                      {["all", "physical", "digital", "combo"].map((type) => (
+                        <Button
+                          key={type}
+                          variant={filterType === type ? "default" : "outline"}
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => setFilterType(type as any)}
+                        >
+                          {type === "all" && "Todos"}
+                          {type === "physical" && "📦 Físicos"}
+                          {type === "digital" && "💻 Digitales"}
+                          {type === "combo" && "🎁 Combos"}
+                        </Button>
+                      ))}
+                    </div>
+
+                    {/* Filtro de Stock */}
+                    <div className="flex flex-wrap gap-2">
+                      <div className="text-xs font-medium text-muted-foreground pt-1">Stock:</div>
+                      {[
+                        { value: "all", label: "Todos" },
+                        { value: "low", label: "⚠️ Bajo" },
+                        { value: "out", label: "💔 Agotado" }
+                      ].map((status) => (
+                        <Button
+                          key={status.value}
+                          variant={filterStockStatus === status.value ? "default" : "outline"}
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => setFilterStockStatus(status.value as any)}
+                        >
+                          {status.label}
+                        </Button>
+                      ))}
+                    </div>
+
+                    {/* Rango de Precios */}
+                    <div className="flex flex-col gap-2">
+                      <div className="text-xs font-medium text-muted-foreground">Rango de Precios: ${priceRange[0]} - ${priceRange[1]}</div>
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          type="number"
+                          placeholder="Min"
+                          value={priceRange[0]}
+                          onChange={(e) => setPriceRange([parseInt(e.target.value) || 0, priceRange[1]])}
+                          className="w-24 text-xs"
+                          min="0"
+                        />
+                        <span className="text-muted-foreground">-</span>
+                        <Input
+                          type="number"
+                          placeholder="Max"
+                          value={priceRange[1]}
+                          onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value) || 10000])}
+                          className="w-24 text-xs"
+                          min="0"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPriceRange([0, 10000])}
+                          className="text-xs"
+                        >
+                          Reset
+                        </Button>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
             </div>
           </CardHeader>
           <CardContent className="p-2 sm:p-6 overflow-x-auto">
@@ -1809,10 +2884,61 @@ export default function Products() {
                     />
                   </TableHead>
                   <TableHead className="w-8 sm:w-12 hidden sm:table-cell"></TableHead>
-                  <TableHead className="min-w-[120px]">Nombre</TableHead>
+                  <TableHead 
+                    className="min-w-[120px] cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => {
+                      if (sortBy === "name") {
+                        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortBy("name");
+                        setSortDirection("asc");
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      Nombre
+                      {sortBy === "name" && (
+                        <span className="text-xs">{sortDirection === "asc" ? "▲" : "▼"}</span>
+                      )}
+                    </div>
+                  </TableHead>
                   <TableHead className="hidden md:table-cell">Categoría</TableHead>
-                  <TableHead className="min-w-[80px]">Precio</TableHead>
-                  <TableHead className="hidden sm:table-cell">Stock</TableHead>
+                  <TableHead 
+                    className="min-w-[80px] cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => {
+                      if (sortBy === "price") {
+                        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortBy("price");
+                        setSortDirection("asc");
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      Precio
+                      {sortBy === "price" && (
+                        <span className="text-xs">{sortDirection === "asc" ? "▲" : "▼"}</span>
+                      )}
+                    </div>
+                  </TableHead>
+                  <TableHead 
+                    className="hidden sm:table-cell cursor-pointer hover:bg-muted/50 select-none"
+                    onClick={() => {
+                      if (sortBy === "stock") {
+                        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortBy("stock");
+                        setSortDirection("asc");
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      Stock
+                      {sortBy === "stock" && (
+                        <span className="text-xs">{sortDirection === "asc" ? "▲" : "▼"}</span>
+                      )}
+                    </div>
+                  </TableHead>
                   <TableHead className="hidden lg:table-cell">Estado</TableHead>
                   <TableHead className="text-right min-w-[80px]">Acc.</TableHead>
                 </TableRow>
@@ -1878,10 +3004,45 @@ export default function Products() {
                           <span className="text-muted-foreground text-xs sm:text-sm">{product.category || "—"}</span>
                         </TableCell>
                         <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-green-600 dark:text-green-500 text-xs sm:text-sm">
-                              ${Number(product.price).toFixed(0)}
-                            </span>
+                          <div className="flex flex-col gap-1">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-2 cursor-help">
+                                    <span className="font-semibold text-green-600 dark:text-green-500 text-xs sm:text-sm">
+                                      {formatPriceDisplay(product)}
+                                    </span>
+                                    {hasMultiplePrices(product) && (
+                                      <Badge variant="secondary" className="text-xs gap-1">
+                                        <DollarSign className="h-2.5 w-2.5" />
+                                        Listas
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent className="w-64">
+                                  <div className="space-y-2">
+                                    <p className="font-semibold">Precio Base</p>
+                                    <p className="text-lg">${Number(product.price).toFixed(2)}</p>
+                                    {productPrices && productPrices.filter((pp: any) => pp.product_id === product.id).length > 0 && (
+                                      <div className="pt-2 border-t border-slate-600">
+                                        <p className="font-semibold mb-2">Listas de Precios</p>
+                                        <div className="space-y-1 text-xs">
+                                          {productPrices
+                                            .filter((pp: any) => pp.product_id === product.id)
+                                            .map((pp: any) => (
+                                              <div key={pp.id} className="flex justify-between gap-2">
+                                                <span className="text-slate-300">{pp.price_lists?.name}:</span>
+                                                <span className="font-medium">${Number(pp.price).toFixed(2)}</span>
+                                              </div>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </div>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
@@ -2022,24 +3183,64 @@ export default function Products() {
                           </div>
                         </TableCell>
                       </TableRow>
-                      {isExpanded && productWarehouseStock.length > 0 && (
+                      {isExpanded && (
                         <TableRow>
                           <TableCell colSpan={8} className="bg-muted/30">
-                            <div className="p-4 space-y-2">
-                              <h4 className="font-semibold text-sm">Stock por Depósito</h4>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {productWarehouseStock.map((ws: any) => (
-                                  <div key={ws.id} className="flex items-center justify-between p-2 bg-background rounded border">
-                                    <div>
-                                      <div className="font-medium text-sm">{ws.warehouses.code}</div>
-                                      <div className="text-xs text-muted-foreground">{ws.warehouses.name}</div>
-                                    </div>
-                                    <Badge variant={getStockBadgeColor(ws.stock, ws.min_stock)}>
-                                      {ws.stock}
-                                    </Badge>
+                            <div className="p-4 space-y-6">
+                              {/* Stock por Depósito */}
+                              {productWarehouseStock.length > 0 && (
+                                <div className="space-y-3">
+                                  <h4 className="font-semibold text-sm flex items-center gap-2">
+                                    <Package className="h-4 w-4" />
+                                    Stock por Depósito
+                                  </h4>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    {productWarehouseStock.map((ws: any) => (
+                                      <div key={ws.id} className="flex items-center justify-between p-2 bg-background rounded border hover:border-primary/50 transition-colors">
+                                        <div>
+                                          <div className="font-medium text-sm">{ws.warehouses.code}</div>
+                                          <div className="text-xs text-muted-foreground">{ws.warehouses.name}</div>
+                                        </div>
+                                        <Badge variant={getStockBadgeColor(ws.stock, ws.min_stock)}>
+                                          {ws.stock}
+                                        </Badge>
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
-                              </div>
+                                </div>
+                              )}
+
+                              {/* Precios por Lista */}
+                              {productPrices && productPrices.filter((pp: any) => pp.product_id === product.id).length > 0 && (
+                                <div className="space-y-3 pt-4 border-t">
+                                  <h4 className="font-semibold text-sm flex items-center gap-2">
+                                    <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                    Precios Especiales
+                                  </h4>
+                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    <div className="p-3 bg-background rounded border border-green-200 dark:border-green-900/50">
+                                      <div className="text-xs text-muted-foreground">Precio Base</div>
+                                      <div className="text-xl font-bold text-green-600 dark:text-green-500">
+                                        ${Number(product.price).toFixed(2)}
+                                      </div>
+                                    </div>
+                                    {productPrices
+                                      .filter((pp: any) => pp.product_id === product.id)
+                                      .map((pp: any) => {
+                                        const diff = ((pp.price - product.price) / product.price * 100).toFixed(0);
+                                        return (
+                                          <div key={pp.id} className="p-3 bg-background rounded border hover:border-blue-300 dark:hover:border-blue-700 transition-colors">
+                                            <div className="text-xs text-muted-foreground">{pp.price_lists?.name}</div>
+                                            <div className="text-lg font-bold">${Number(pp.price).toFixed(2)}</div>
+                                            <div className={`text-xs font-medium mt-1 ${parseInt(diff) < 0 ? 'text-orange-600 dark:text-orange-500' : 'text-green-600 dark:text-green-500'}`}>
+                                              {parseInt(diff) < 0 ? '↓' : '↑'} {Math.abs(parseInt(diff))}%
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -2105,68 +3306,284 @@ export default function Products() {
 
         {/* Diálogo de Precios por Lista */}
         <Dialog open={isPriceListDialogOpen} onOpenChange={setIsPriceListDialogOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>Precios por Lista - {priceListProduct?.name}</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-blue-600" />
+                Gestionar Precios - {priceListProduct?.name}
+              </DialogTitle>
               <DialogDescription>
-                Define precios específicos para cada lista de precios. El precio base del producto es ${priceListProduct?.price}
+                Configura el precio base y precios especiales para cada lista de precios
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="border rounded-lg p-4 bg-muted/30">
-                <p className="text-sm font-medium mb-2">Precio Base (por defecto)</p>
-                <p className="text-2xl font-bold">${priceListProduct?.price}</p>
+            <div className="space-y-6">
+              {/* Guía Rápida */}
+              <div className="bg-amber-50/50 dark:bg-amber-950/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800 text-sm">
+                <div className="flex gap-2">
+                  <Info className="h-4 w-4 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-amber-900 dark:text-amber-100 text-xs">
+                    <p className="font-medium">💡 Tip:</p>
+                    <p>El precio base se usa por defecto. Las listas de precios son útiles para clientes mayoristas, promociones o distribuidores con precios especiales.</p>
+                  </div>
+                </div>
               </div>
 
+              {/* Precio Base */}
+              <div className="bg-gradient-to-r from-blue-50 to-blue-50/50 dark:from-blue-950/30 dark:to-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Precio Base (Por defecto)</p>
+                      <p className="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-2">
+                        ${Number(priceListProduct?.price).toFixed(2)}
+                      </p>
+                    </div>
+                    <Info className="h-5 w-5 text-blue-500 opacity-50" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Este precio se usa cuando no hay una lista específica configurada
+                  </p>
+                </div>
+              </div>
+
+              {/* Listas de Precios */}
               {priceLists && priceLists.length > 0 ? (
                 <div className="space-y-3">
-                  <Label className="text-base font-semibold">Precios por Lista</Label>
-                  {priceLists.map((priceList: any) => {
-                    const existingPrice = productPrices?.find((pp: any) => pp.price_list_id === priceList.id);
-                    return (
-                      <div key={priceList.id} className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          {priceList.name}
-                          {priceList.is_default && <Badge variant="secondary">Por defecto</Badge>}
-                          {existingPrice && (
-                            <span className="text-sm text-muted-foreground">
-                              (Actual: ${existingPrice.price})
-                            </span>
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    <Badge variant="outline">
+                      <DollarSign className="h-3 w-3 mr-1" />
+                      {productPrices?.filter((pp: any) => pp.product_id === priceListProduct.id).length || 0} Listas Configuradas
+                    </Badge>
+                  </div>
+                  
+                  <div className="grid gap-3">
+                    {priceLists.map((priceList: any) => {
+                      const existingPrice = productPrices?.find((pp: any) => pp.product_id === priceListProduct.id && pp.price_list_id === priceList.id);
+                      const inputValue = priceListPrices[priceList.id];
+                      const displayPrice = inputValue ? parseFloat(inputValue) : existingPrice?.price;
+                      const percentDiff = displayPrice && priceListProduct?.price 
+                        ? (((displayPrice - priceListProduct.price) / priceListProduct.price) * 100).toFixed(1)
+                        : null;
+                      
+                      return (
+                        <div key={priceList.id} className="border rounded-lg p-4 space-y-3 hover:bg-muted/40 transition-colors dark:hover:bg-muted/20">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <Label className="text-base font-semibold flex items-center gap-2">
+                                {priceList.name}
+                                {priceList.is_default && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Por defecto
+                                  </Badge>
+                                )}
+                              </Label>
+                              {existingPrice && !inputValue && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Precio actual: ${Number(existingPrice.price).toFixed(2)}
+                                </p>
+                              )}
+                            </div>
+                            {displayPrice && percentDiff && (
+                              <div className={`text-right text-sm font-medium ${
+                                parseFloat(percentDiff) < 0 
+                                  ? 'text-orange-600 dark:text-orange-500' 
+                                  : 'text-green-600 dark:text-green-500'
+                              }`}>
+                                {parseFloat(percentDiff) < 0 ? '↓' : '↑'} {Math.abs(parseFloat(percentDiff))}%
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex items-end gap-3">
+                            <div className="flex-1">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder={existingPrice ? String(existingPrice.price) : "Ingresa el precio"}
+                                value={priceListPrices[priceList.id] || ""}
+                                onChange={(e) => setPriceListPrices({
+                                  ...priceListPrices,
+                                  [priceList.id]: e.target.value
+                                })}
+                                className="text-lg font-semibold"
+                              />
+                            </div>
+                            {displayPrice && (
+                              <div className="px-3 py-2 bg-muted rounded text-center">
+                                <p className="text-xs text-muted-foreground">Total</p>
+                                <p className="text-lg font-bold">${Number(displayPrice).toFixed(2)}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {displayPrice && priceListProduct?.cost && displayPrice > priceListProduct.cost && (
+                            <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-500 bg-green-50 dark:bg-green-950/30 px-3 py-2 rounded">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Margen: {((((displayPrice - priceListProduct.cost) / displayPrice) * 100)).toFixed(1)}%
+                            </div>
                           )}
-                        </Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder={existingPrice ? String(existingPrice.price) : "Precio en esta lista"}
-                          value={priceListPrices[priceList.id] || ""}
-                          onChange={(e) => setPriceListPrices({
-                            ...priceListPrices,
-                            [priceList.id]: e.target.value
-                          })}
-                        />
-                      </div>
-                    );
-                  })}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
-                <div className="text-center py-6 text-muted-foreground">
-                  <DollarSign className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No hay listas de precios configuradas</p>
-                  <p className="text-sm">Crea listas de precios en Configuración</p>
+                <div className="text-center py-10 text-muted-foreground bg-muted/30 rounded-lg">
+                  <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-25" />
+                  <p className="font-medium">No hay listas de precios configuradas</p>
+                  <p className="text-sm mt-1">Crea listas de precios en Configuración para gestionar precios diferentes</p>
                 </div>
               )}
 
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => {
-                  setIsPriceListDialogOpen(false);
-                  setPriceListPrices({});
-                }}>
-                  Cancelar
-                </Button>
-                <Button onClick={submitPriceListUpdates}>
-                  Guardar Precios
-                </Button>
+              {/* Resumen */}
+              {priceLists && priceLists.length > 0 && (
+                <div className="bg-muted/50 p-4 rounded-lg border space-y-2">
+                  <p className="text-sm font-semibold">📊 Resumen de Precios</p>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Precio Base</p>
+                      <p className="font-semibold">${Number(priceListProduct?.price).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Costo del Producto</p>
+                      <p className="font-semibold">${Number(priceListProduct?.cost || 0).toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Margen Base</p>
+                      <p className="font-semibold text-green-600 dark:text-green-500">
+                        {priceListProduct?.cost && priceListProduct.price > priceListProduct.cost
+                          ? `${(((priceListProduct.price - priceListProduct.cost) / priceListProduct.price) * 100).toFixed(1)}%`
+                          : '—'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button variant="outline" onClick={() => {
+                setIsPriceListDialogOpen(false);
+                setPriceListPrices({});
+              }}>
+                Cancelar
+              </Button>
+              <Button onClick={submitPriceListUpdates} className="gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                Guardar Precios
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Custom Fields Management Dialog */}
+        <Dialog open={isCustomFieldsDialogOpen} onOpenChange={setIsCustomFieldsDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                Gestionar Campos Personalizados
+              </DialogTitle>
+              <DialogDescription>
+                Crea campos adicionales para almacenar información personalizada de tus productos
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6">
+              {/* Crear Nuevo Campo */}
+              <div className="space-y-4 p-4 border-2 border-dashed rounded-lg bg-muted/30">
+                <h4 className="font-semibold text-sm">➕ Crear Nuevo Campo</h4>
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="field-name">Nombre del Campo</Label>
+                    <Input
+                      id="field-name"
+                      value={newCustomField.name}
+                      onChange={(e) => setNewCustomField({...newCustomField, name: e.target.value})}
+                      placeholder="Ej: Proveedore, Color, Tamaño"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="field-type">Tipo de Campo</Label>
+                    <Select value={newCustomField.type} onValueChange={(value) => setNewCustomField({...newCustomField, type: value as any})}>
+                      <SelectTrigger id="field-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="text">📝 Texto</SelectItem>
+                        <SelectItem value="number">🔢 Número</SelectItem>
+                        <SelectItem value="textarea">📄 Texto Largo</SelectItem>
+                        <SelectItem value="select">📋 Selección (Dropdown)</SelectItem>
+                        <SelectItem value="checkbox">☑️ Checkbox</SelectItem>
+                        <SelectItem value="date">📅 Fecha</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {(newCustomField.type === "select") && (
+                    <div className="space-y-2">
+                      <Label htmlFor="field-options">Opciones (separadas por comas)</Label>
+                      <Input
+                        id="field-options"
+                        value={newCustomField.options}
+                        onChange={(e) => setNewCustomField({...newCustomField, options: e.target.value})}
+                        placeholder="Ej: Rojo, Azul, Verde"
+                      />
+                      <p className="text-xs text-muted-foreground">Ingresa las opciones separadas por comas</p>
+                    </div>
+                  )}
+                  <Button onClick={addCustomField} className="w-full gap-2">
+                    <Plus className="h-4 w-4" />
+                    Agregar Campo
+                  </Button>
+                </div>
               </div>
+
+              {/* Campos Existentes */}
+              {customFields.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm">📊 Campos Existentes ({customFields.length})</h4>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {customFields.map((field) => (
+                      <div key={field.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{field.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Tipo: {field.type === "text" && "Texto"}
+                            {field.type === "number" && "Número"}
+                            {field.type === "textarea" && "Texto Largo"}
+                            {field.type === "select" && `Selección (${field.options?.length || 0} opciones)`}
+                            {field.type === "checkbox" && "Checkbox"}
+                            {field.type === "date" && "Fecha"}
+                          </p>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removeCustomField(field.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {customFields.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="h-12 w-12 mx-auto mb-2 opacity-25" />
+                  <p className="font-medium">No hay campos personalizados aún</p>
+                  <p className="text-sm">Crea uno para empezar</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsCustomFieldsDialogOpen(false)}>
+                Cerrar
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -2348,6 +3765,63 @@ export default function Products() {
                   <p>Haz clic en "Preview" para ver los cambios antes de aplicarlos</p>
                 </div>
               )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Category Dialog */}
+        <Dialog open={isAddCategoryDialogOpen} onOpenChange={setIsAddCategoryDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nueva Categoría</DialogTitle>
+              <DialogDescription>
+                Crea una nueva categoría de productos
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-category-name">Nombre de la Categoría</Label>
+                <Input
+                  id="new-category-name"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Ej: Electrónica, Alimentos, Ropa, etc."
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && newCategoryName.trim()) {
+                      createCategoryMutation.mutate(newCategoryName);
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsAddCategoryDialogOpen(false)}
+                  disabled={createCategoryMutation.isPending}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={() => {
+                    if (newCategoryName.trim()) {
+                      createCategoryMutation.mutate(newCategoryName);
+                    }
+                  }}
+                  disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
+                >
+                  {createCategoryMutation.isPending ? (
+                    <>
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
+                      Creando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crear Categoría
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

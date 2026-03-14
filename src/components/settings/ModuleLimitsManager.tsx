@@ -23,9 +23,11 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Edit, Save, X, Package, Users, FileText, Database } from "lucide-react";
+import { Edit, Save, X, Package, Users, FileText, Database, AlertCircle } from "lucide-react";
 import { PlatformModuleExtended, ModuleLimits } from "@/integrations/supabase/types.modules";
 import { Textarea } from "@/components/ui/textarea";
+import { validateNumber, validateString, validateUUID } from "@/lib/validators";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function ModuleLimitsManager() {
   const queryClient = useQueryClient();
@@ -37,6 +39,7 @@ export function ModuleLimitsManager() {
     required_modules: [] as string[],
     incompatible_with: [] as string[]
   });
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   // Fetch all modules
   const { data: modules, isLoading } = useQuery({
@@ -96,6 +99,36 @@ export function ModuleLimitsManager() {
 
   const handleSaveModule = () => {
     if (!selectedModule) return;
+
+    // Validate module ID
+    const idValidation = validateUUID(selectedModule.id);
+    if (!idValidation.valid) {
+      setValidationError("ID de módulo inválido");
+      return;
+    }
+
+    // Validate module code
+    const codeValidation = validateString(selectedModule.code, { required: true, min: 1, max: 100 });
+    if (!codeValidation.valid) {
+      setValidationError("Código de módulo inválido");
+      return;
+    }
+
+    // Validate numeric limits if they exist
+    if (limits) {
+      for (const [key, value] of Object.entries(limits)) {
+        if (value !== null && value !== undefined) {
+          const numValidation = validateNumber(String(value), { min: 0, max: 999999 });
+          if (!numValidation.valid) {
+            setValidationError(`Límite inválido para ${key}: debe ser un número entre 0 y 999999`);
+            return;
+          }
+        }
+      }
+    }
+
+    // Clear any previous validation errors
+    setValidationError(null);
     
     updateModuleMutation.mutate({
       moduleId: selectedModule.id,
@@ -259,6 +292,12 @@ export function ModuleLimitsManager() {
           </DialogHeader>
 
           <div className="space-y-6">
+            {validationError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{validationError}</AlertDescription>
+              </Alert>
+            )}
             {/* Limits Section */}
             <div className="space-y-4">
               <h3 className="font-semibold text-sm">Límites de Uso</h3>

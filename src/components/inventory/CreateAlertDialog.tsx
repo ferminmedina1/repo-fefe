@@ -23,8 +23,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, AlertTriangle, Package, Tag, Bell, Power } from "lucide-react";
+import { Loader2, Search, AlertTriangle, Package, Tag, Bell, Power, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useFormValidation } from "@/lib/useSecureMutation";
+import { validateString, validateNumber, validateUUID } from "@/lib/validators";
 
 interface AlertRule {
   id: string;
@@ -64,10 +66,29 @@ const SCOPE_OPTIONS = [
   { value: "product", label: "Producto específico" },
 ] as const;
 
+// Validadores para campos de alerta 
+const FIELD_VALIDATORS = {
+  alertName: (value: any) => 
+    validateString(value, { min: 0, max: 200 }),
+  threshold: (value: any, isDependency?: boolean) => {
+    if (isDependency) return { valid: true }; // Depende de conditionType
+    return validateNumber(value, { required: true, min: 0, max: 999999 });
+  },
+  scopeCategory: (value: any, isDependency?: boolean) => {
+    if (isDependency) return { valid: true }; // Depende de scope
+    return { valid: !!value, error: value ? undefined : "Selecciona una categoría" };
+  },
+  scopeProductId: (value: any, isDependency?: boolean) => {
+    if (isDependency) return { valid: true }; // Depende de scope
+    return validateUUID(value);
+  },
+};
+
 export function CreateAlertDialog({ open, onOpenChange, editingRule }: CreateAlertDialogProps) {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const isEditing = !!editingRule;
+  const { errors, validate, clearError } = useFormValidation(FIELD_VALIDATORS);
 
   // Form state
   const [conditionType, setConditionType] = useState<string>("stock_lte");
@@ -240,7 +261,44 @@ export function CreateAlertDialog({ open, onOpenChange, editingRule }: CreateAle
   const isSaving = createAlert.isPending || updateAlert.isPending;
 
   const handleSubmit = () => {
-    if (!isValid) return;
+    // Validar campos condicionalmente
+    const fieldsToValidate: any = {
+      alertName: alertName,
+    };
+    
+    if (needsThreshold) {
+      fieldsToValidate.threshold = threshold;
+    }
+    
+    if (scope === "category") {
+      fieldsToValidate.scopeCategory = scopeCategory;
+    } else if (scope === "product") {
+      fieldsToValidate.scopeProductId = scopeProductId;
+    }
+
+    // Usar validación especial para dependencias
+    let isValidForm = true;
+    
+    if (needsThreshold) {
+      const num = Number(threshold);
+      if (!threshold || isNaN(num) || num < 0 || !Number.isInteger(num)) {
+        isValidForm = false;
+      }
+    }
+    
+    if (scope === "category" && !scopeCategory) {
+      isValidForm = false;
+    }
+    
+    if (scope === "product" && !scopeProductId) {
+      isValidForm = false;
+    }
+    
+    if (!isValidForm) {
+      toast.error("Por favor corrija los errores del formulario");
+      return;
+    }
+    
     if (isEditing) {
       updateAlert.mutate();
     } else {
@@ -268,8 +326,18 @@ export function CreateAlertDialog({ open, onOpenChange, editingRule }: CreateAle
               id="alert-name"
               placeholder="Ej: Alerta bajo stock general"
               value={alertName}
-              onChange={(e) => setAlertName(e.target.value)}
+              onChange={(e) => {
+                setAlertName(e.target.value);
+                clearError("alertName");
+              }}
+              className={errors.alertName ? "border-red-500 focus-visible:ring-red-200" : ""}
             />
+            {errors.alertName && (
+              <p className="text-sm text-red-600 flex items-center gap-1">
+                <AlertCircle className="w-3.5 h-3.5" />
+                {errors.alertName}
+              </p>
+            )}
           </div>
 
           {/* BLOQUE 1 — Tipo de alerta */}
@@ -325,16 +393,27 @@ export function CreateAlertDialog({ open, onOpenChange, editingRule }: CreateAle
                 {categories.length === 0 ? (
                   <p className="text-xs text-muted-foreground italic">No hay categorías definidas en tus productos.</p>
                 ) : (
-                  <Select value={scopeCategory} onValueChange={setScopeCategory}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Elegir categoría..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <>
+                    <Select value={scopeCategory} onValueChange={(value) => {
+                      setScopeCategory(value);
+                      clearError("scopeCategory");
+                    }}>
+                      <SelectTrigger className={errors.scopeCategory ? "border-red-500" : ""}>
+                        <SelectValue placeholder="Elegir categoría..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.scopeCategory && (
+                      <p className="text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        {errors.scopeCategory}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -357,32 +436,48 @@ export function CreateAlertDialog({ open, onOpenChange, editingRule }: CreateAle
                     <Package className="h-4 w-4 text-primary" />
                     <span className="text-sm font-medium">{selectedProduct.name}</span>
                     {selectedProduct.sku && <Badge variant="secondary" className="text-xs">{selectedProduct.sku}</Badge>}
-                    <Button variant="ghost" size="sm" className="ml-auto h-6 px-2 text-xs" onClick={() => { setScopeProductId(""); setProductSearch(""); }}>
+                    <Button variant="ghost" size="sm" className="ml-auto h-6 px-2 text-xs" onClick={() => { 
+                      setScopeProductId(""); 
+                      setProductSearch("");
+                      clearError("scopeProductId");
+                    }}>
                       Cambiar
                     </Button>
                   </div>
                 )}
                 {!selectedProduct && (
-                  <div className="border rounded-md max-h-40 overflow-y-auto">
-                    {filteredProducts.length === 0 ? (
-                      <p className="p-3 text-xs text-muted-foreground text-center">No se encontraron productos</p>
-                    ) : (
-                      filteredProducts.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          className="w-full text-left px-3 py-2 hover:bg-accent text-sm flex items-center justify-between transition-colors"
-                          onClick={() => { setScopeProductId(p.id); setProductSearch(p.name); }}
-                        >
-                          <div>
-                            <span className="font-medium">{p.name}</span>
-                            {p.sku && <span className="text-muted-foreground ml-2 text-xs">({p.sku})</span>}
-                          </div>
-                          <Badge variant="outline" className="text-xs">Stock: {p.stock}</Badge>
-                        </button>
-                      ))
+                  <>
+                    <div className={`border rounded-md max-h-40 overflow-y-auto ${errors.scopeProductId ? "border-red-500" : ""}`}>
+                      {filteredProducts.length === 0 ? (
+                        <p className="p-3 text-xs text-muted-foreground text-center">No se encontraron productos</p>
+                      ) : (
+                        filteredProducts.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-accent text-sm flex items-center justify-between transition-colors"
+                            onClick={() => { 
+                              setScopeProductId(p.id); 
+                              setProductSearch(p.name);
+                              clearError("scopeProductId");
+                            }}
+                          >
+                            <div>
+                              <span className="font-medium">{p.name}</span>
+                              {p.sku && <span className="text-muted-foreground ml-2 text-xs">({p.sku})</span>}
+                            </div>
+                            <Badge variant="outline" className="text-xs">Stock: {p.stock}</Badge>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                    {errors.scopeProductId && (
+                      <p className="text-sm text-red-600 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        {errors.scopeProductId}
+                      </p>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
             )}
@@ -401,27 +496,33 @@ export function CreateAlertDialog({ open, onOpenChange, editingRule }: CreateAle
                   Disparar alerta cuando el stock sea {conditionType === "stock_lte" ? "menor o igual" : "mayor o igual"} a:
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="threshold"
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={threshold}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val === "" || (Number(val) >= 0 && Number.isInteger(Number(val)))) {
-                      setThreshold(val);
-                    }
-                  }}
-                  className="w-32"
-                  placeholder="10"
-                />
-                <span className="text-sm text-muted-foreground">unidades</span>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="threshold"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={threshold}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "" || (Number(val) >= 0 && Number.isInteger(Number(val)))) {
+                        setThreshold(val);
+                        clearError("threshold");
+                      }
+                    }}
+                    className={`w-32 ${errors.threshold ? "border-red-500" : ""}`}
+                    placeholder="10"
+                  />
+                  <span className="text-sm text-muted-foreground">unidades</span>
+                </div>
+                {errors.threshold && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {errors.threshold}
+                  </p>
+                )}
               </div>
-              {threshold && Number(threshold) < 0 && (
-                <p className="text-xs text-destructive">El umbral no puede ser negativo.</p>
-              )}
             </div>
           )}
 

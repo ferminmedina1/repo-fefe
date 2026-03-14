@@ -173,7 +173,11 @@ function CompanyCheck({ children }: { children: React.ReactNode }) {
     return <div className="flex items-center justify-center min-h-screen">Sin empresa seleccionada...</div>;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+    </>
+  );
 }
 
 // Protected route that only checks authentication (no company check)

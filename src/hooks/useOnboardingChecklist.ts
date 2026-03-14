@@ -71,10 +71,20 @@ export function useOnboardingChecklist() {
   const dismissOnboarding = useCallback(async () => {
     if (!companyId) return;
     setDismissed(true);
-    await supabase
-      .from("company_onboarding")
-      .update({ onboarding_dismissed: true })
-      .eq("company_id", companyId);
+    try {
+      const { error } = await supabase
+        .from("company_onboarding")
+        .update({ onboarding_dismissed: true })
+        .eq("company_id", companyId);
+      if (error) {
+        console.error('[Onboarding] Failed to persist dismiss:', error);
+        // Rollback optimistic update so user can retry
+        setDismissed(false);
+      }
+    } catch (e) {
+      console.error('[Onboarding] Dismiss error:', e);
+      setDismissed(false);
+    }
   }, [companyId]);
 
   const checklist = niche ? ONBOARDING_CHECKLISTS[niche] : null;

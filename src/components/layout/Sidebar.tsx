@@ -53,13 +53,12 @@ import { useActiveModules } from "@/hooks/useActiveModules";
 import { usePermissions, Module } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useCompany } from "@/contexts/CompanyContext";
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useSidebar } from "@/components/ui/sidebar";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Sidebar as UISidebar } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AvailableModulesDialog } from "./AvailableModulesDialog";
@@ -83,41 +82,9 @@ export function Sidebar() {
   const { isPlatformAdmin } = usePlatformAdmin();
   const { currentCompany } = useCompany();
   
-  const { open, isMobile, openMobile, setOpenMobile } = useSidebar();
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showModulesDialog, setShowModulesDialog] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    const stored = localStorage.getItem("sidebar-width");
-    return stored ? parseInt(stored, 10) : 256;
-  });
-  const isResizing = useRef(false);
-
-  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizing.current = true;
-    const startX = e.clientX;
-    const startWidth = sidebarWidth;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!isResizing.current) return;
-      const next = Math.max(180, Math.min(360, startWidth + (ev.clientX - startX)));
-      setSidebarWidth(next);
-    };
-    const onMouseUp = (ev: MouseEvent) => {
-      isResizing.current = false;
-      const final = Math.max(180, Math.min(360, startWidth + (ev.clientX - startX)));
-      localStorage.setItem("sidebar-width", String(final));
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-    };
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  }, [sidebarWidth]);
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('sidebar-favorites');
     return saved ? JSON.parse(saved) : ['/pos', '/sales', '/products'];
@@ -267,43 +234,7 @@ export function Sidebar() {
         },
       ],
     },
-// CRM
-        {
-          section: "CRM",
-          items: [
-            {
-            title: "CRM",
-          href: "/crm",
-          icon: FileText,
-          children: [
-            {
-              title: "Oportunidades",
-              href: "/opportunities",
-              icon: Target,
-              module: "opportunities",
-            },
-            {
-              title: "Pipelines",
-              href: "/pipelines",
-              icon: TrendingUp,
-              module: "pipelines",
-            },
-            {
-              title: "Reporting",
-              href: "/crm-reports",
-              icon: BarChart3,
-              module: "opportunities",
-            },
-            {
-              title: "Roles CRM",
-              href: "/settings/crm-roles",
-              icon: Shield,
-              module: "opportunities",
-            },
-          ],
-        },
-      ],
-    },
+
     // Inventario
     {
       section: "Inventario",
@@ -833,28 +764,8 @@ export function Sidebar() {
   }, [favorites, navItems]);
 
   return (
-    <>
-      {/* Mobile backdrop */}
-      {isMobile && openMobile && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50"
-          onClick={() => setOpenMobile(false)}
-        />
-      )}
-
-      <aside
-        className={cn(
-          "flex flex-col border-r border-sidebar-border shrink-0",
-          isMobile
-            ? cn(
-                "fixed left-0 top-0 h-screen z-50 transition-transform duration-200",
-                openMobile ? "translate-x-0" : "-translate-x-full"
-              )
-            : cn("h-screen sticky top-0 overflow-hidden transition-all duration-200", !open && "w-0 border-0")
-        )}
-        style={{ width: isMobile ? sidebarWidth : open ? sidebarWidth : 0 }}
-      >
-      <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95 relative" style={{ width: sidebarWidth }}>
+    <UISidebar collapsible="offcanvas" className="border-r border-sidebar-border w-64">
+      <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95">
         {/* Header - Premium */}
         <div className="px-5 py-5 border-b border-primary/20 relative overflow-hidden group" style={{animation: 'gradientShift 8s infinite ease-in-out'}}>
           <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 -z-10"></div>
@@ -866,16 +777,19 @@ export function Sidebar() {
           </div>
           
           <div className="flex items-center gap-4 relative z-10">
-            <div className="p-3 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/40 shadow-lg shadow-primary/20 backdrop-blur-sm transition-all duration-1000" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
+            <button
+              className="p-3 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/40 shadow-lg shadow-primary/20 backdrop-blur-sm transition-all duration-1000 hover:scale-110 hover:shadow-lg hover:shadow-primary/40 cursor-pointer active:scale-95"
+              style={{animation: 'softGlow 4s infinite ease-in-out'}}
+            >
               <img 
                 src={currentCompany?.logo_url || "/landing/images/logo_transparente_hd.png"} 
-                alt={currentCompany?.name || "Ventify"} 
+                alt={currentCompany?.name || "Ventify Space"} 
                 className="w-10 h-10 drop-shadow-lg object-contain" 
               />
-            </div>
+            </button>
             <div className="flex-1 min-w-0">
               <span className="text-base font-bold text-white block truncate">{currentCompany?.name || 'Tienda.Space'}</span>
-              <p className="text-xs text-primary/80 font-medium">Ventify</p>
+              <p className="text-xs text-primary/80 font-medium">Ventify Space</p>
             </div>
           </div>
           
@@ -949,92 +863,74 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Footer compacto */}
-        <div className="px-3 py-2 border-t">
-          <div className="flex items-center gap-1.5">
-            {/* Asistente IA - pill compacto */}
-            <Link
-              to="/ai-assistant"
-              className="flex flex-1 items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 font-semibold active:scale-[0.97]"
+        {/* Botón + Funcionalidades - Solo visible si no es platform admin */}
+        {!isPlatformAdmin && (
+          <div className="px-3 py-2 border-t">
+            <Button
+              onClick={() => setShowModulesDialog(true)}
+              variant="ghost"
+              size="sm"
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md border-dashed border border-primary/50 text-primary hover:bg-primary/5 hover:border-primary transition-all"
             >
-              <Sparkles className="w-3.5 h-3.5 shrink-0" />
-              <span>Asistente IA</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span className="font-medium">Más Funcionalidades</span>
+            </Button>
+          </div>
+        )}
+
+        {/* Footer - Touch-friendly */}
+        <div className="px-3 py-3 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-2">
+          <Link
+            to="/ai-assistant"
+            className="flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-md hover:shadow-lg active:scale-[0.98]"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span className="font-semibold">Asistente IA</span>
+          </Link>
+
+          <div className="flex gap-2">
+            <Link to="/platform-support" className="flex-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all active:scale-[0.98]"
+              >
+                <LifeBuoy className="w-3.5 h-3.5" />
+                <span>Soporte</span>
+              </Button>
             </Link>
 
-            <TooltipProvider delayDuration={300}>
-              {/* Más Funcionalidades */}
-              {!isPlatformAdmin && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={() => setShowModulesDialog(true)}
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-primary hover:bg-primary/10 border border-dashed border-primary/50 hover:border-primary rounded-md"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top"><p>Más Funcionalidades</p></TooltipContent>
-                </Tooltip>
-              )}
+            <Link to="/bot-requests" className="flex-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-purple-500/50 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 transition-all active:scale-[0.98]"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Contáctanos</span>
+              </Button>
+            </Link>
+          </div>
 
-              {/* Soporte */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link to="/platform-support">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-md"
-                    >
-                      <LifeBuoy className="w-3.5 h-3.5" />
-                    </Button>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="top"><p>Soporte</p></TooltipContent>
-              </Tooltip>
-
-              {/* Contáctanos */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link to="/bot-requests">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 rounded-md"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5" />
-                    </Button>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="top"><p>Contáctanos</p></TooltipContent>
-              </Tooltip>
-
-              {/* Salir */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={async () => {
-                      const { error } = await supabase.auth.signOut();
-                      if (error) {
-                        toast.error("Error al cerrar sesión");
-                        console.error(error);
-                      } else {
-                        toast.success("Sesión cerrada correctamente");
-                        navigate("/auth");
-                      }
-                    }}
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0 text-destructive hover:bg-destructive hover:text-destructive-foreground rounded-md"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top"><p>Salir</p></TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <div className="flex gap-2">
+            <Button
+              onClick={async () => {
+                const { error } = await supabase.auth.signOut();
+                if (error) {
+                  toast.error("Error al cerrar sesión");
+                  console.error(error);
+                } else {
+                  toast.success("Sesión cerrada correctamente");
+                  navigate("/auth");
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="flex-1 h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all active:scale-[0.98]"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Salir</span>
+            </Button>
           </div>
         </div>
 
@@ -1045,17 +941,9 @@ export function Sidebar() {
           activeModules={activeModules.data || []}
         />
 
-        {/* Resize handle */}
-        <div
-          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize z-50 group flex items-center justify-center"
-          onMouseDown={handleResizeMouseDown}
-          title="Arrastrar para redimensionar"
-        >
-          <div className="w-0.5 h-10 rounded-full bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-150" />
-        </div>
+
       </div>
-      </aside>
-    </>
+    </UISidebar>
   );
 }
 

@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { useSecureMutation } from "@/lib/useSecureMutation";
+import { validateUUID } from "@/lib/validators";
 
 interface PaymentMethod {
   id: string;
@@ -69,6 +71,14 @@ export function PaymentMethodsManager({
 
   const handleSetDefault = async (methodId: string) => {
     try {
+      // Validate UUID
+      const validation = validateUUID(methodId);
+      if (!validation.valid) {
+        toast.error("ID de método inválido");
+        console.error("Invalid payment method ID:", methodId);
+        return;
+      }
+
       const { error } = await supabase
         .from("company_payment_methods")
         .update({ is_default: false })
@@ -93,6 +103,14 @@ export function PaymentMethodsManager({
 
   const handleDelete = async (methodId: string) => {
     try {
+      // Validate UUID
+      const validation = validateUUID(methodId);
+      if (!validation.valid) {
+        toast.error("ID de método inválido");
+        console.error("Invalid payment method ID:", methodId);
+        return;
+      }
+
       const { error } = await supabase.functions.invoke("delete-payment-method", {
         body: { method_id: methodId },
       });

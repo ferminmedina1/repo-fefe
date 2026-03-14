@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Camera, X } from "lucide-react";
+import { Camera, X, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { validateString } from "@/lib/validators";
+import { toast } from "sonner";
 
 interface BarcodeScannerProps {
   onScan: (code: string) => void;
@@ -30,7 +32,16 @@ export function BarcodeScanner({ onScan }: BarcodeScannerProps) {
 
       scanner.render(
         (decodedText) => {
-          onScan(decodedText);
+          // Validate the scanned barcode
+          const validation = validateString(decodedText, { required: true, min: 1, max: 500 });
+          if (!validation.valid) {
+            toast.error("Código de barras inválido", { description: validation.error });
+            return;
+          }
+
+          // Sanitize and pass to handler
+          const sanitizedCode = decodedText.trim();
+          onScan(sanitizedCode);
           setIsOpen(false);
           scanner.clear();
           setIsScanning(false);
