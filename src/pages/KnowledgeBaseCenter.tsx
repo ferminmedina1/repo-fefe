@@ -201,13 +201,14 @@ export default function KnowledgeBase() {
                                 </div>
                               );
                             }
-                            if (line.startsWith('1. ') || line.match(/^\d+\./)) {
+                            if (line.match(/^\d+\./)) {
+                              const numberMatch = line.match(/^\d+/);
+                              const number = numberMatch ? numberMatch[0] : '';
+                              const text = line.replace(/^\d+\.\s/, '');
                               return (
                                 <div key={lineIdx} className="flex gap-3 text-muted-foreground">
-                                  <span className="font-semibold text-primary">
-                                    {line.match(/^\d+/)?.[0]}
-                                  </span>
-                                  <span>{line.replace(/^\d+\.\s/, '')}</span>
+                                  <span className="font-semibold text-primary">{number}</span>
+                                  <span>{text}</span>
                                 </div>
                               );
                             }
@@ -218,7 +219,7 @@ export default function KnowledgeBase() {
                                 </p>
                               );
                             }
-                            return null;
+                            return <div key={lineIdx} />;
                           })}
                         </div>
                       ))}
