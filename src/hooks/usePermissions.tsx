@@ -14,6 +14,8 @@ export type Module =
   | "customers"
   | "accounts_receivable"
   | "customer_support"
+  | "opportunities"
+  | "pipelines"
   | "products"
   | "inventory_alerts"
   | "warehouses"
@@ -83,6 +85,8 @@ const ALL_MODULES: Module[] = [
   "customers",
   "accounts_receivable",
   "customer_support",
+  "opportunities",
+  "pipelines",
   "products",
   "inventory_alerts",
   "warehouses",
@@ -170,6 +174,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, Partial<RolePermissionDef
         "reservations",
         "customers",
         "accounts_receivable",
+        "opportunities",
+        "pipelines",
         "products",
         "inventory_alerts",
         "warehouses",

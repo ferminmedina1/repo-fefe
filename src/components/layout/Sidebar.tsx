@@ -235,6 +235,45 @@ export function Sidebar() {
       ],
     },
 
+    // CRM
+    {
+      section: "CRM",
+      items: [
+        {
+          title: "CRM",
+          href: "/opportunities",
+          icon: Target,
+          children: [
+            {
+              title: "Oportunidades",
+              href: "/opportunities",
+              icon: Target,
+              module: "opportunities",
+            },
+            {
+              title: "Pipelines",
+              href: "/pipelines",
+              icon: TrendingUp,
+              module: "pipelines",
+            },
+            {
+              title: "Reportes CRM",
+              href: "/crm-reports",
+              icon: BarChart3,
+              module: "opportunities",
+            },
+            {
+              title: "Roles CRM",
+              href: "/settings/crm-roles",
+              icon: UserCheck,
+              module: "opportunities",
+              permission: "admin",
+            },
+          ],
+        },
+      ],
+    },
+
     // Inventario
     {
       section: "Inventario",
@@ -583,6 +622,8 @@ export function Sidebar() {
       'customers': 'customers',
       'accounts_receivable': 'accounts_receivable',
       'customer_support': 'customer_support',
+      'opportunities': 'opportunities',
+      'pipelines': 'pipelines',
       'inventory_alerts': 'inventory_alerts',
       'warehouses': 'warehouses',
       'warehouse_stock': 'warehouse_stock',
