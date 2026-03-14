@@ -3,9 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "20.x",
+    "npm": ">=10"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:hostinger": "npm install --no-save --include=optional @rollup/rollup-linux-x64-gnu@4.59.0 @swc/core-linux-x64-gnu@1.13.2 --no-audit --no-fund && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
