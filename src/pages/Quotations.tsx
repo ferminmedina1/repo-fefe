@@ -115,26 +115,34 @@ export default function Quotations() {
   });
 
   const { data: companySettings } = useQuery({
-    queryKey: ["company-settings"],
+    queryKey: ["company-settings", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return null;
+
       const { data, error } = await supabase
         .from("companies")
         .select("*")
+        .eq("id", currentCompany.id)
         .single();
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: exchangeRates } = useQuery({
-    queryKey: ["exchange-rates"],
+    queryKey: ["exchange-rates", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return [];
+
       const { data, error } = await supabase
         .from("exchange_rates")
-        .select("*");
+        .select("*")
+        .eq("company_id", currentCompany.id);
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: quotationItems } = useQuery({

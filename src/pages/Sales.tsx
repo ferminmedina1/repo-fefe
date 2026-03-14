@@ -32,10 +32,15 @@ export default function Sales() {
 
   const createDeliveryNoteMutation = useMutation({
     mutationFn: async (saleId: string) => {
+      if (!currentCompany?.id) {
+        throw new Error("Empresa no seleccionada");
+      }
+
       const { data: sale, error: saleError } = await supabase
         .from("sales")
         .select("*, sale_items(*), customer:customers(name)")
         .eq("id", saleId)
+        .eq("company_id", currentCompany.id)
         .single();
       
       if (saleError) throw saleError;
@@ -144,7 +149,7 @@ export default function Sales() {
   });
 
   const { data: saleDetails } = useQuery({
-    queryKey: ["sale-details", selectedSale?.id],
+    queryKey: ["sale-details", selectedSale?.id, currentCompany?.id],
     queryFn: async () => {
       if (!selectedSale?.id) return null;
       
@@ -156,6 +161,7 @@ export default function Sales() {
           sale_items(*)
         `)
         .eq("id", selectedSale.id)
+        .eq("company_id", currentCompany?.id)
         .single();
       
       if (error) throw error;

@@ -46,15 +46,19 @@ export default function DeliveryNotes() {
   });
 
   const { data: companySettings } = useQuery({
-    queryKey: ["company-settings"],
+    queryKey: ["company-settings", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return null;
+
       const { data, error } = await supabase
         .from("companies")
         .select("*")
+        .eq("id", currentCompany.id)
         .single();
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const updateStatusMutation = useMutation({

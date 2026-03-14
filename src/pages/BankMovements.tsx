@@ -103,8 +103,8 @@ export default function BankMovements() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-movements"] });
-      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-movements", currentCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", currentCompany?.id] });
       toast.success("Movimiento registrado");
       setIsDialogOpen(false);
       setFormData({
@@ -130,12 +130,13 @@ export default function BankMovements() {
           reconciled: true,
           reconciliation_date: new Date().toISOString(),
         })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("company_id", currentCompany?.id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-movements", currentCompany?.id] });
       toast.success("Movimiento conciliado");
     },
   });

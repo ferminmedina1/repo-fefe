@@ -55,17 +55,18 @@ export default function Expenses() {
 
   // Fetch categories
   const { data: categories } = useQuery({
-    queryKey: ["expense-categories"],
+    queryKey: ["expense-categories", currentCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("expense_categories")
         .select("*")
+        .eq("company_id", currentCompany?.id)
         .eq("active", true)
         .order("name");
       if (error) throw error;
       return data;
     },
-    enabled: canView,
+    enabled: canView && !!currentCompany?.id,
   });
 
   // Fetch suppliers
@@ -134,7 +135,7 @@ export default function Expenses() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["expenses", currentCompany?.id] });
       toast.success("Gasto registrado correctamente");
       setDialogOpen(false);
       setFormErrors({});

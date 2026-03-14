@@ -6,6 +6,14 @@ import DOMPurify from "https://esm.sh/dompurify@3.0.6";
 import { z } from "https://esm.sh/zod@3.22.4";
 import { Ratelimit } from "https://deno.land/x/upstash_ratelimit@1.0.0/mod.ts";
 
+// 10.1 - Import safe error logger (Task 10: Error Handling)
+import { 
+  SafeErrorLogger, 
+  ErrorCode, 
+  ErrorSeverity, 
+  generateRequestId 
+} from "./error-logger.ts";
+
 // 9.1 - CORS Restrictive Policy: Allowed origins from environment
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
   .split(",")
@@ -103,6 +111,9 @@ interface CRMMessageRequest {
 }
 
 serve(async (req: Request) => {
+  // 10.2 - Generate request ID for tracking and logging
+  const requestId = generateRequestId();
+  
   // 9.2 - Get request origin and validate against allowlist
   const requestOrigin = req.headers.get("Origin");
   const corsHeaders = getCorsHeaders(requestOrigin);
@@ -116,6 +127,9 @@ serve(async (req: Request) => {
     const authHeader = req.headers.get("Authorization") ?? "";
     const userId = extractUserIdFromJWT(authHeader);
     
+    // 10.2 - Initialize safe error logger with user context
+    const errorLogger = new SafeErrorLogger(requestId, userId);
+    
     if (userId) {
       try {
         const rateLimitResult = await ratelimit.limit(userId);
@@ -123,11 +137,12 @@ serve(async (req: Request) => {
         if (!rateLimitResult.success) {
           // Rate limited: return 429 with Retry-After header
           const retryAfter = Math.ceil((rateLimitResult.resetMs - Date.now()) / 1000);
+          const safeError = errorLogger.logRateLimitError(retryAfter);
+          
           return new Response(
             JSON.stringify({
-              error: "Límite de tasa excedido",
-              message: "Has excedido el límite de 10 solicitudes por minuto",
-              retryAfter,
+              error: safeError.error,
+              code: safeError.code,
             }),
             {
               status: 429,
@@ -135,6 +150,7 @@ serve(async (req: Request) => {
                 ...corsHeaders,
                 "Content-Type": "application/json",
                 "Retry-After": Math.max(1, retryAfter).toString(),
+                "X-Request-ID": requestId, // 10.2 - Track requests in logs
               },
             }
           );
@@ -160,18 +176,32 @@ serve(async (req: Request) => {
       // Handle Zod validation errors
       if (error instanceof z.ZodError) {
         const errorMessages = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(", ");
+        const safeError = errorLogger.logValidationError(errorMessages);
+        
         return new Response(JSON.stringify({ 
-          error: "Validación fallida",
-          details: errorMessages 
+          error: safeError.error,
+          code: safeError.code,
         }), {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-Request-ID": requestId,
+          },
         });
       }
       // Handle JSON parse errors
-      return new Response(JSON.stringify({ error: "JSON inválido" }), {
+      const safeError = errorLogger.logValidationError("JSON inválido");
+      return new Response(JSON.stringify({ 
+        error: safeError.error,
+        code: safeError.code,
+      }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "X-Request-ID": requestId,
+        },
       });
     }
 
@@ -183,9 +213,18 @@ serve(async (req: Request) => {
         status: "failed", 
         error: "Email inválido" 
       }).eq("id", log_id);
-      return new Response(JSON.stringify({ error: "Email inválido" }), {
+      
+      const safeError = errorLogger.logValidationError("Email inválido");
+      return new Response(JSON.stringify({ 
+        error: safeError.error,
+        code: safeError.code,
+      }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "X-Request-ID": requestId,
+        },
       });
     }
 
@@ -201,9 +240,21 @@ serve(async (req: Request) => {
         status: "failed", 
         error: "Registro de mensaje no encontrado" 
       }).eq("id", log_id);
-      return new Response(JSON.stringify({ error: "Registro no encontrado" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      
+      const safeError = errorLogger.logAuthorizationError(
+        "Mensaje log no encontrado para este usuario",
+        true // Treat as "not found" instead of "forbidden" for security
+      );
+      return new Response(JSON.stringify({ 
+        error: safeError.error,
+        code: safeError.code,
+      }), {
+        status: safeError.statusCode,
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "X-Request-ID": requestId,
+        },
       });
     }
 
@@ -220,9 +271,21 @@ serve(async (req: Request) => {
         status: "failed", 
         error: "Oportunidad no encontrada o no autorizada" 
       }).eq("id", log_id);
-      return new Response(JSON.stringify({ error: "Oportunidad no encontrada" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      
+      const safeError = errorLogger.logAuthorizationError(
+        "Oportunidad no encontrada",
+        true
+      );
+      return new Response(JSON.stringify({ 
+        error: safeError.error,
+        code: safeError.code,
+      }), {
+        status: safeError.statusCode,
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "X-Request-ID": requestId,
+        },
       });
     }
 
@@ -232,45 +295,91 @@ serve(async (req: Request) => {
         status: "failed", 
         error: "Destinatario no autorizado para esta oportunidad" 
       }).eq("id", log_id);
-      return new Response(JSON.stringify({ error: "Email não autorizado" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      
+      const safeError = errorLogger.logAuthorizationError(
+        "Email destinatario no autorizado",
+        true
+      );
+      return new Response(JSON.stringify({ 
+        error: safeError.error,
+        code: safeError.code,
+      }), {
+        status: safeError.statusCode,
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "X-Request-ID": requestId,
+        },
       });
     }
 
     if (channel === "email") {
       const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
       if (!RESEND_API_KEY) {
-        await supabase.from("crm_message_logs").update({ status: "failed", error: "RESEND_API_KEY no configurado" }).eq("id", log_id);
-        return new Response(JSON.stringify({ error: "RESEND_API_KEY no configurado" }), {
+        await supabase.from("crm_message_logs").update({ status: "failed", error: "API keys not configured" }).eq("id", log_id);
+        
+        const safeError = errorLogger.logConfigurationError("missing_api_key");
+        return new Response(JSON.stringify({ 
+          error: safeError.error,
+          code: safeError.code,
+        }), {
           status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-Request-ID": requestId,
+          },
         });
       }
 
       const resend = new Resend(RESEND_API_KEY);
       const sanitizedBody = DOMPurify.sanitize(body);
       const html = `<p>${sanitizedBody}</p>`;
-      const response = await resend.emails.send({
-        from: "Sistema Contable <onboarding@resend.dev>",
-        to: [recipient],
-        subject: subject ?? "Notificación CRM",
-        html,
-      });
+      
+      try {
+        const response = await resend.emails.send({
+          from: "Sistema Contable <onboarding@resend.dev>",
+          to: [recipient],
+          subject: subject ?? "Notificación CRM",
+          html,
+        });
 
-      await supabase
-        .from("crm_message_logs")
-        .update({
-          status: "sent",
-          provider_message_id: response.data?.id ?? null,
-          error: null,
-        })
-        .eq("id", log_id);
+        await supabase
+          .from("crm_message_logs")
+          .update({
+            status: "sent",
+            provider_message_id: response.data?.id ?? null,
+            error: null,
+          })
+          .eq("id", log_id);
 
-      return new Response(JSON.stringify({ success: true, provider_id: response.data?.id }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        return new Response(JSON.stringify({ success: true, provider_id: response.data?.id }), {
+          status: 200,
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-Request-ID": requestId,
+          },
+        });
+      } catch (emailError) {
+        const safeError = errorLogger.logExternalServiceError("Resend", emailError);
+        await supabase.from("crm_message_logs").update({
+          status: "failed",
+          error: safeError.error,
+        }).eq("id", log_id);
+        
+        return new Response(JSON.stringify({ 
+          error: safeError.error,
+          code: safeError.code,
+        }), {
+          status: 500,
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-Request-ID": requestId,
+          },
+        });
+      }
     }
 
     if (channel === "whatsapp") {
@@ -287,25 +396,42 @@ serve(async (req: Request) => {
       if (!credsEncrypted?.id) {
         await supabase.from("crm_message_logs").update({ 
           status: "failed", 
-          error: "Credenciales Twilio no configuradas para esta empresa" 
+          error: "Credenciales no configuradas" 
         }).eq("id", log_id);
-        return new Response(JSON.stringify({ error: "Credenciales Twilio no configuradas" }), {
+        
+        const safeError = errorLogger.logConfigurationError("missing_api_key");
+        return new Response(JSON.stringify({ 
+          error: safeError.error,
+          code: safeError.code,
+        }), {
           status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-Request-ID": requestId,
+          },
         });
       }
 
       // Decrypt credentials using database function
-      // Encryption key comes from Supabase Secrets
       const ENCRYPTION_KEY = Deno.env.get("ENCRYPTION_KEY");
       if (!ENCRYPTION_KEY) {
         await supabase.from("crm_message_logs").update({ 
           status: "failed", 
-          error: "Encryption key not configured (contact admin)" 
+          error: "Sistema no disponible" 
         }).eq("id", log_id);
-        return new Response(JSON.stringify({ error: "Configuration error" }), {
+        
+        const safeError = errorLogger.logConfigurationError("missing_encryption_key");
+        return new Response(JSON.stringify({ 
+          error: safeError.error,
+          code: safeError.code,
+        }), {
           status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-Request-ID": requestId,
+          },
         });
       }
 
@@ -320,11 +446,23 @@ serve(async (req: Request) => {
       if (decryptError || !decryptedCreds || decryptedCreds.length === 0) {
         await supabase.from("crm_message_logs").update({ 
           status: "failed", 
-          error: "Error al desencriptar credenciales" 
+          error: "No se pudo procesar credenciales" 
         }).eq("id", log_id);
-        return new Response(JSON.stringify({ error: "Error al desencriptar credenciales" }), {
+        
+        const safeError = errorLogger.logConfigurationError(
+          "decryption_failed",
+          decryptError
+        );
+        return new Response(JSON.stringify({ 
+          error: safeError.error,
+          code: safeError.code,
+        }), {
           status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-Request-ID": requestId,
+          },
         });
       }
 
@@ -335,11 +473,20 @@ serve(async (req: Request) => {
       if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
         await supabase
           .from("crm_message_logs")
-          .update({ status: "failed", error: "Credenciales Twilio incompletas" })
+          .update({ status: "failed", error: "Credenciales incompletas" })
           .eq("id", log_id);
-        return new Response(JSON.stringify({ error: "Credenciales Twilio incompletas" }), {
+        
+        const safeError = errorLogger.logConfigurationError("missing_api_key");
+        return new Response(JSON.stringify({ 
+          error: safeError.error,
+          code: safeError.code,
+        }), {
           status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-Request-ID": requestId,
+          },
         });
       }
 
@@ -350,53 +497,108 @@ serve(async (req: Request) => {
       const sanitizedWhatsappBody = DOMPurify.sanitize(body, { ALLOWED_TAGS: [] });
       bodyParams.set("Body", sanitizedWhatsappBody);
 
-      const twilioResponse = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Basic ${auth}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: bodyParams.toString(),
-        }
-      );
+      try {
+        const twilioResponse = await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Basic ${auth}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: bodyParams.toString(),
+          }
+        );
 
-      const twilioData = await twilioResponse.json();
-      if (!twilioResponse.ok) {
+        const twilioData = await twilioResponse.json();
+        if (!twilioResponse.ok) {
+          const safeError = errorLogger.logExternalServiceError("Twilio", twilioData?.message);
+          await supabase.from("crm_message_logs").update({
+            status: "failed",
+            error: safeError.error,
+          }).eq("id", log_id);
+          
+          return new Response(JSON.stringify({ 
+            error: safeError.error,
+            code: safeError.code,
+          }), {
+            status: 500,
+            headers: { 
+              ...corsHeaders, 
+              "Content-Type": "application/json",
+              "X-Request-ID": requestId,
+            },
+          });
+        }
+
+        await supabase
+          .from("crm_message_logs")
+          .update({
+            status: "sent",
+            provider_message_id: twilioData?.sid ?? null,
+            error: null,
+          })
+          .eq("id", log_id);
+
+        return new Response(JSON.stringify({ success: true, provider_id: twilioData?.sid }), {
+          status: 200,
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-Request-ID": requestId,
+          },
+        });
+      } catch (twilioError) {
+        const safeError = errorLogger.logExternalServiceError("Twilio", twilioError);
         await supabase.from("crm_message_logs").update({
           status: "failed",
-          error: twilioData?.message ?? "Error al enviar WhatsApp",
+          error: safeError.error,
         }).eq("id", log_id);
-        return new Response(JSON.stringify({ error: twilioData?.message ?? "Error al enviar WhatsApp" }), {
+        
+        return new Response(JSON.stringify({ 
+          error: safeError.error,
+          code: safeError.code,
+        }), {
           status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "X-Request-ID": requestId,
+          },
         });
       }
-
-      await supabase
-        .from("crm_message_logs")
-        .update({
-          status: "sent",
-          provider_message_id: twilioData?.sid ?? null,
-          error: null,
-        })
-        .eq("id", log_id);
-
-      return new Response(JSON.stringify({ success: true, provider_id: twilioData?.sid }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
 
-    return new Response(JSON.stringify({ error: "Canal inválido" }), {
+    // 10.2 - Return safe error without exposing internal details
+    const safeError = errorLogger.logValidationError("Canal inválido");
+    return new Response(JSON.stringify({ 
+      error: safeError.error,
+      code: safeError.code,
+    }), {
       status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { 
+        ...corsHeaders, 
+        "Content-Type": "application/json",
+        "X-Request-ID": requestId,
+      },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error?.message || "Error inesperado" }), {
+    // 10.1 - CRITICAL: Never expose error.message to client
+    // This is the main catch-all for unexpected errors
+    const requestId = generateRequestId(); // Generate ID for this error
+    const errorLogger = new SafeErrorLogger(requestId);
+    const safeError = errorLogger.logUnexpectedError(error);
+    
+    return new Response(JSON.stringify({ 
+      error: safeError.error,
+      code: safeError.code,
+    }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { 
+        ...corsHeaders, 
+        "Content-Type": "application/json",
+        "X-Request-ID": requestId,
+      },
     });
   }
 });

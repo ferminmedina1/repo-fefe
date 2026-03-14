@@ -79,11 +79,14 @@ export default function CashRegister() {
 
   // Query for current register
   const { data: currentRegister, isLoading: loading } = useQuery({
-    queryKey: ["cash-register"],
+    queryKey: ["cash-register", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return null;
+
       const { data: register, error: registerError } = await supabase
         .from("cash_registers")
         .select("*")
+        .eq("company_id", currentCompany.id)
         .eq("status", "open")
         .order("opening_date", { ascending: false })
         .limit(1)
@@ -92,6 +95,7 @@ export default function CashRegister() {
       if (registerError) throw registerError;
       return register;
     },
+    enabled: !!currentCompany?.id,
     refetchInterval: 5000, // Refetch every 5 seconds
   });
 
@@ -133,7 +137,7 @@ export default function CashRegister() {
       toast.success("Caja abierta exitosamente");
       setOpenDialog(false);
       setOpeningAmount("");
-      queryClient.invalidateQueries({ queryKey: ["cash-register"] });
+      queryClient.invalidateQueries({ queryKey: ["cash-register", currentCompany?.id] });
     } catch (error: any) {
       toast.error("Error al abrir caja: " + error.message);
     }
@@ -157,7 +161,8 @@ export default function CashRegister() {
           status: "closed",
           notes: closingNotes || null,
         })
-        .eq("id", currentRegister.id);
+        .eq("id", currentRegister.id)
+        .eq("company_id", currentCompany?.id);
 
       if (error) throw error;
 
@@ -165,7 +170,7 @@ export default function CashRegister() {
       setCloseDialog(false);
       setClosingAmount("");
       setClosingNotes("");
-      queryClient.invalidateQueries({ queryKey: ["cash-register"] });
+      queryClient.invalidateQueries({ queryKey: ["cash-register", currentCompany?.id] });
     } catch (error: any) {
       toast.error("Error al cerrar caja: " + error.message);
     }
@@ -197,8 +202,8 @@ export default function CashRegister() {
       setMovementAmount("");
       setMovementCategory("");
       setMovementDescription("");
-      queryClient.invalidateQueries({ queryKey: ["cash-register"] });
-      queryClient.invalidateQueries({ queryKey: ["cash-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["cash-register", currentCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["cash-movements", currentRegister?.id] });
     } catch (error: any) {
       toast.error("Error al registrar movimiento: " + error.message);
     }

@@ -94,7 +94,7 @@ export default function BankAccounts() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", currentCompany?.id] });
       toast.success("Cuenta bancaria creada");
       setIsDialogOpen(false);
       setFormErrors({});
@@ -117,12 +117,13 @@ export default function BankAccounts() {
       const { error } = await supabase
         .from("bank_accounts")
         .update({ active })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("company_id", currentCompany?.id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", currentCompany?.id] });
       toast.success("Estado actualizado");
     },
   });

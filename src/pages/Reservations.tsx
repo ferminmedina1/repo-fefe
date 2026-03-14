@@ -18,6 +18,7 @@ import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useCompany } from "@/contexts/CompanyContext";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 
 interface CartItem {
   product_id: string;
@@ -60,7 +61,10 @@ export default function Reservations() {
         .order("created_at", { ascending: false });
 
       if (searchQuery) {
-        query = query.or(`reservation_number.ilike.%${searchQuery}%,customer_name.ilike.%${searchQuery}%`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.or(`reservation_number.ilike.%${sanitized}%,customer_name.ilike.%${sanitized}%`);
+        }
       }
 
       const { data, error } = await query;
@@ -100,13 +104,15 @@ export default function Reservations() {
     queryKey: ["products-search", productSearch, currentCompany?.id],
     queryFn: async () => {
       if (!productSearch) return [];
+      const sanitized = sanitizeSearchQuery(productSearch);
+      if (!sanitized) return [];
       
       const { data, error } = await supabase
         .from("products")
         .select("*")
         .eq("company_id", currentCompany?.id)
         .eq("active", true)
-        .or(`name.ilike.%${productSearch}%,sku.ilike.%${productSearch}%,barcode.ilike.%${productSearch}%`)
+        .or(`name.ilike.%${sanitized}%,sku.ilike.%${sanitized}%,barcode.ilike.%${sanitized}%`)
         .limit(10);
       
       if (error) throw error;
@@ -122,9 +128,14 @@ export default function Reservations() {
 
       const customer = customers?.find(c => c.id === selectedCustomer);
       if (!customer) throw new Error("Cliente no encontrado");
+      if (!currentCompany?.id) throw new Error("Empresa no seleccionada");
 
       const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
-      const { data: settings } = await supabase.from("companies").select("default_tax_rate").single();
+      const { data: settings } = await supabase
+        .from("companies")
+        .select("default_tax_rate")
+        .eq("id", currentCompany.id)
+        .single();
       const taxRate = settings?.default_tax_rate || 0;
       const tax = subtotal * (taxRate / 100);
       const total = subtotal + tax;

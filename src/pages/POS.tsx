@@ -36,6 +36,7 @@ import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
 import { InvoicePDF } from "@/components/pos/InvoicePDF";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 
 interface CartItem {
   product_id: string;
@@ -206,24 +207,29 @@ export default function POS() {
   };
 
   const { data: customers } = useQuery({
-    queryKey: ["customers-pos"],
+    queryKey: ["customers-pos", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return [];
       const { data, error } = await supabase
         .from("customer_pos_view")
         .select("*")
+        .eq("company_id", currentCompany.id)
         .order("name", { ascending: true });
       
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: warehouses } = useQuery({
-    queryKey: ["warehouses"],
+    queryKey: ["warehouses", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return [];
       const { data, error } = await supabase
         .from("warehouses")
         .select("id, name, code")
+        .eq("company_id", currentCompany.id)
         .eq("active", true)
         .order("is_main", { ascending: false });
       
@@ -234,6 +240,7 @@ export default function POS() {
       }
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const handleBarcodeScanner = (code: string) => {
@@ -429,7 +436,7 @@ export default function POS() {
       setNewCustomerPhone("");
       setNewCustomerEmail("");
       setNewCustomerDocument("");
-      queryClient.invalidateQueries({ queryKey: ["customers-pos"] });
+      queryClient.invalidateQueries({ queryKey: ["customers-pos", currentCompany?.id] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al crear cliente");
@@ -579,6 +586,7 @@ export default function POS() {
         const { data: cashRegister } = await supabase
           .from("cash_registers")
           .select("*")
+          .eq("company_id", currentCompany?.id)
           .eq("status", "open")
           .order("opening_date", { ascending: false })
           .limit(1)
@@ -609,7 +617,7 @@ export default function POS() {
               .insert(cashMovements);
           }
           
-          queryClient.invalidateQueries({ queryKey: ["cash-register"] });
+          queryClient.invalidateQueries({ queryKey: ["cash-register", currentCompany?.id] });
         }
       } catch (error) {
         console.error("Error registrando movimiento de caja:", error);
@@ -646,7 +654,7 @@ export default function POS() {
       // Refrescar datos
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["sales-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["customers-pos"] });
+      queryClient.invalidateQueries({ queryKey: ["customers-pos", currentCompany?.id] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al procesar la venta");
@@ -886,11 +894,6 @@ ${lastSaleData.customer ? `👤 Cliente: ${lastSaleData.customer.name}` : '👤 
     );
   }) || [];
 
-  // Función para sanitizar búsqueda
-  const sanitizeSearchQuery = (query: string) => {
-    return query.trim().toLowerCase();
-  };
-
   // Función para generar PDF como Blob
   const generatePDFBlob = async (saleData: any): Promise<Blob | null> => {
     try {
@@ -908,9 +911,14 @@ ${lastSaleData.customer ? `👤 Cliente: ${lastSaleData.customer.name}` : '👤 
       };
 
       try {
+        if (!currentCompany?.id) {
+          throw new Error('Empresa no seleccionada');
+        }
+
         const { data: ticketConfig, error } = await supabase
           .from('companies')
           .select('*')
+          .eq('id', currentCompany.id)
           .single();
 
         if (!error && ticketConfig) {
@@ -1099,7 +1107,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
                 ref={searchInputRef}
                 placeholder="Buscar productos..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(sanitizeSearchQuery(e.target.value))}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-10"
               />
             </div>

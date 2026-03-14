@@ -91,7 +91,7 @@ export default function Checks() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["checks"] });
+      queryClient.invalidateQueries({ queryKey: ["checks", currentCompany?.id] });
       toast.success("Cheque registrado exitosamente");
       setIsDialogOpen(false);
       setFormData({
@@ -116,12 +116,13 @@ export default function Checks() {
       const { error } = await supabase
         .from("checks")
         .update({ status })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("company_id", currentCompany?.id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["checks"] });
+      queryClient.invalidateQueries({ queryKey: ["checks", currentCompany?.id] });
       toast.success("Estado actualizado");
     },
     onError: () => {
