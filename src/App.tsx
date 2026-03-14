@@ -75,6 +75,7 @@ const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRequests"));
 const LearningCenter = lazy(() => import("./pages/LearningCenter"));
+const KnowledgeBaseCenter = lazy(() => import("./pages/KnowledgeBaseCenter"));
 const SetupWizardPage = lazy(() => import("./pages/SetupWizardPage"));
 const TutorialRunner = lazy(() => import("./components/learning/TutorialRunner"));
 const TutorialHelpButton = lazy(() => import("./components/learning/TutorialHelpButton"));
@@ -335,6 +336,9 @@ const App = () => (
             
             {/* Learning Center - siempre disponible */}
             <Route path="/learning-center" element={<ProtectedRoute><LearningCenter /></ProtectedRoute>} />
+            
+            {/* Knowledge Base - siempre disponible */}
+            <Route path="/help" element={<ProtectedRoute><KnowledgeBaseCenter /></ProtectedRoute>} />
             
             {/* Módulos Adicionales - requieren contrato */}
             <Route path="/quotations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="quotations"><Quotations /></ModuleProtectedRoute></ProtectedRoute>} />

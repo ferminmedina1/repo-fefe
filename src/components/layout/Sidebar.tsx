@@ -48,6 +48,7 @@ import {
   MessageCircle,
   LifeBuoy,
   Plus,
+  HelpCircle,
 } from "lucide-react";
 import { useActiveModules } from "@/hooks/useActiveModules";
 import { usePermissions, Module } from "@/hooks/usePermissions";
@@ -552,6 +553,11 @@ export function Sidebar() {
           title: "Centro de Aprendizaje",
           href: "/learning-center",
           icon: BookOpen,
+        },
+        {
+          title: "Centro de Ayuda",
+          href: "/help",
+          icon: HelpCircle,
         },
       ],
     },
