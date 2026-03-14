@@ -10,6 +10,8 @@ import { User, Session } from "@supabase/supabase-js";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
 import { usePermissions } from "@/hooks/usePermissions";
+import { TutorialRunner } from "./components/learning/TutorialRunner";
+import { TutorialHelpButton } from "./components/learning/TutorialHelpButton";
 
 // Lazy load all page components
 const Landing = lazy(() => import("./pages/Landing"));
@@ -77,8 +79,6 @@ const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRe
 const LearningCenter = lazy(() => import("./pages/LearningCenter"));
 const KnowledgeBaseCenter = lazy(() => import("./pages/KnowledgeBaseCenter"));
 const SetupWizardPage = lazy(() => import("./pages/SetupWizardPage"));
-const TutorialRunner = lazy(() => import("./components/learning/TutorialRunner"));
-const TutorialHelpButton = lazy(() => import("./components/learning/TutorialHelpButton"));
 
 const queryClient = new QueryClient();
 
