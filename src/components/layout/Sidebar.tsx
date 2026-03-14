@@ -543,6 +543,18 @@ export function Sidebar() {
         },
       ],
     },
+
+    // Recursos y Ayuda
+    {
+      section: "Recursos",
+      items: [
+        {
+          title: "Centro de Aprendizaje",
+          href: "/learning-center",
+          icon: BookOpen,
+        },
+      ],
+    },
   ];
 
   const isNavItemVisible = (item: NavItem) => {
