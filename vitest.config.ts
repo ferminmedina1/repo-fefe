@@ -8,7 +8,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: [],
-    include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}', '__tests__/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['node_modules/', 'dist/', '.next/', 'coverage/'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
@@ -18,6 +19,7 @@ export default defineConfig({
         'dist/',
         '.next/',
         'coverage/',
+        'src/**/*.d.ts',
       ],
     },
   },
