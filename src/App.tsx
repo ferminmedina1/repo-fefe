@@ -75,6 +75,7 @@ const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRequests"));
 const LearningCenter = lazy(() => import("./pages/LearningCenter"));
+const SetupWizardPage = lazy(() => import("./pages/SetupWizardPage"));
 const TutorialRunner = lazy(() => import("./components/learning/TutorialRunner"));
 const TutorialHelpButton = lazy(() => import("./components/learning/TutorialHelpButton"));
 
@@ -315,6 +316,7 @@ const App = () => (
             <Route path="/signup" element={<SignupWizard />} />
             <Route path="/signup/success" element={<SignupSuccess />} />
             <Route path="/signup/cancel" element={<SignupCancel />} />
+            <Route path="/setup-wizard" element={<ProtectedRoute><SetupWizardPage /></ProtectedRoute>} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/set-password/:token" element={<SetPasswordToken />} />
