@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/ensure-native-deps.cjs && vite build",
     "build:hostinger": "npm install --no-save --include=optional @rollup/rollup-linux-x64-gnu@4.59.0 @swc/core-linux-x64-gnu@1.13.2 --no-audit --no-fund && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
