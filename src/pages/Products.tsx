@@ -1868,7 +1868,7 @@ export default function Products() {
               }}
             >
               <DialogTrigger asChild>
-                <Button size="sm" className="gap-1 sm:gap-2">
+                <Button size="sm" className="gap-1 sm:gap-2" data-tutorial="btn-create-product">
                   <Plus className="h-4 w-4" />
                   <span className="hidden sm:inline">Agregar Producto</span>
                   <span className="sm:hidden">Agregar</span>
@@ -2874,7 +2874,7 @@ export default function Products() {
             </div>
           </CardHeader>
           <CardContent className="p-2 sm:p-6 overflow-x-auto">
-            <Table>
+            <Table data-tutorial="product-table">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10 sm:w-12" onClick={(e) => e.stopPropagation()}>

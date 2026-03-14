@@ -74,6 +74,8 @@ const SignupWizard = lazy(() => import("./pages/SignupWizard"));
 const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRequests"));
+const TutorialRunner = lazy(() => import("./components/learning/TutorialRunner"));
+const TutorialHelpButton = lazy(() => import("./components/learning/TutorialHelpButton"));
 
 const queryClient = new QueryClient();
 
@@ -405,6 +407,9 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          {/* Tutorial System */}
+          <TutorialRunner />
+          <TutorialHelpButton />
           </Suspense>
         </CompanyProvider>
       </BrowserRouter>

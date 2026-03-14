@@ -526,7 +526,7 @@ export default function Customers() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DialogTrigger asChild>
-                      <Button onClick={() => { setEditingCustomer(null); resetForm(); }} className="gap-2">
+                      <Button onClick={() => { setEditingCustomer(null); resetForm(); }} className="gap-2" data-tutorial="btn-create-customer">
                         <Plus className="h-4 w-4" />
                         Nuevo Cliente
                       </Button>
@@ -649,7 +649,7 @@ export default function Customers() {
 
         <Card className="shadow-soft">
           <CardHeader>
-            <div className="relative">
+            <div className="relative" data-tutorial="customer-filters">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar clientes..."
@@ -660,7 +660,7 @@ export default function Customers() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table data-tutorial="customer-table">
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>

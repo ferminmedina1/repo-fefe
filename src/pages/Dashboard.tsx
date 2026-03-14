@@ -454,7 +454,7 @@ export default function Dashboard() {
         )}
 
         {canViewSales && (
-          <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-4" data-tutorial="kpis">
             <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-blue-500/30">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
                 <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
@@ -777,7 +777,7 @@ export default function Dashboard() {
         </div>
 
         {canViewSales && (
-          <Card className="shadow-soft">
+          <Card className="shadow-soft" data-tutorial="chart-sales">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <div className="p-2 bg-blue-500/10 rounded-lg">
@@ -815,7 +815,7 @@ export default function Dashboard() {
         )}
 
         {canViewProducts && (
-          <Card className="shadow-soft border-l-4 border-red-500/30">
+          <Card className="shadow-soft border-l-4 border-red-500/30" data-tutorial="stock-alerts">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <div className="p-2 bg-red-500/10 rounded-lg">
