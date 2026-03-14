@@ -53,6 +53,68 @@ export default function KnowledgeBase() {
     {} as Record<KBCategory, number>
   );
 
+  const renderArticleContent = () => {
+    if (!selectedArticleData?.content || typeof selectedArticleData.content !== 'string') {
+      return <p className="text-muted-foreground">No content available</p>;
+    }
+
+    const elements = selectedArticleData.content
+      .split('\n\n')
+      .map((paragraph, idx) => {
+        const lines = paragraph
+          .split('\n')
+          .map((line, lineIdx) => {
+            if (line.startsWith('**') && line.endsWith(':**')) {
+              return (
+                <h3
+                  key={lineIdx}
+                  className="font-semibold text-foreground mt-4 mb-2"
+                >
+                  {line.replace(/\*\*/g, '')}
+                </h3>
+              );
+            }
+            if (line.startsWith('- ')) {
+              return (
+                <div key={lineIdx} className="flex gap-3 text-muted-foreground">
+                  <span className="text-primary">•</span>
+                  <span>{line.substring(2)}</span>
+                </div>
+              );
+            }
+            if (line.match(/^\d+\./)) {
+              const numberMatch = line.match(/^\d+/);
+              const number = numberMatch ? numberMatch[0] : '';
+              const text = line.replace(/^\d+\.\s/, '');
+              return (
+                <div key={lineIdx} className="flex gap-3 text-muted-foreground">
+                  <span className="font-semibold text-primary">{number}</span>
+                  <span>{text}</span>
+                </div>
+              );
+            }
+            if (line.trim()) {
+              return (
+                <p key={lineIdx} className="text-muted-foreground leading-relaxed">
+                  {line}
+                </p>
+              );
+            }
+            return null;
+          })
+          .filter((el) => el !== null && el !== undefined);
+
+        return (
+          <div key={idx} className="space-y-2">
+            {lines}
+          </div>
+        );
+      })
+      .filter((el) => el !== null && el !== undefined);
+
+    return <>{elements}</>;
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -99,7 +161,7 @@ export default function KnowledgeBase() {
                       </CardContent>
                     </Card>
                   ) : (
-                    filteredArticles.map(article => (
+                    filteredArticles.map((article) => (
                       <Card
                         key={article.id}
                         className="shadow-soft cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all"
@@ -108,7 +170,7 @@ export default function KnowledgeBase() {
                         <CardContent className="pt-6">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
-                              <h3 className="font-semibold text-foreground mb-2 group-hover:text-primary">
+                              <h3 className="font-semibold text-foreground mb-2">
                                 {article.title}
                               </h3>
                               <p className="text-sm text-muted-foreground mb-3">
@@ -127,7 +189,7 @@ export default function KnowledgeBase() {
                                   <Clock className="h-3 w-3" />
                                   {article.readTime} min
                                 </div>
-                                {article.tags.slice(0, 2).map(tag => (
+                                {article.tags.slice(0, 2).map((tag) => (
                                   <Badge key={tag} variant="secondary" className="text-xs">
                                     {tag}
                                   </Badge>
@@ -159,7 +221,7 @@ export default function KnowledgeBase() {
                         {selectedArticleData.title}
                       </h1>
                       <div className="flex flex-wrap gap-2">
-                        {selectedArticleData.tags.map(tag => (
+                        {selectedArticleData.tags.map((tag) => (
                           <Badge key={tag} variant="secondary">
                             {tag}
                           </Badge>
@@ -183,53 +245,20 @@ export default function KnowledgeBase() {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="prose prose-invert max-w-none">
-                      {selectedArticleData.content.split('\n\n').map((paragraph, idx) => {
-                        const lines = paragraph.split('\n').map((line, lineIdx) => {
-                          if (line.startsWith('**') && line.endsWith(':**')) {
-                            return (
-                              <h3 key={lineIdx} className="font-semibold text-foreground mt-4 mb-2">
-                                {line.replace(/\*\*/g, '')}
-                              </h3>
-                            );
-                          }
-                          if (line.startsWith('- ')) {
-                            return (
-                              <div key={lineIdx} className="flex gap-3 text-muted-foreground">
-                                <span className="text-primary">•</span>
-                                <span>{line.substring(2)}</span>
-                              </div>
-                            );
-                          }
-                          if (line.match(/^\d+\./)) {
-                            const numberMatch = line.match(/^\d+/);
-                            const number = numberMatch ? numberMatch[0] : '';
-                            const text = line.replace(/^\d+\.\s/, '');
-                            return (
-                              <div key={lineIdx} className="flex gap-3 text-muted-foreground">
-                                <span className="font-semibold text-primary">{number}</span>
-                                <span>{text}</span>
-                              </div>
-                            );
-                          }
-                          if (line.trim()) {
-                            return (
-                              <p key={lineIdx} className="text-muted-foreground leading-relaxed">
-                                {line}
-                              </p>
-                            );
-                          }
-                          return null;
-                        }).filter(Boolean);
-                        
-                        return <div key={idx} className="space-y-2">{lines}</div>;
-                      })}
+                      {renderArticleContent()}
                     </div>
 
                     {/* Helpful Section */}
                     <div className="bg-muted/50 p-4 rounded-lg">
-                      <p className="text-sm text-muted-foreground mb-3">¿Te fue útil este artículo?</p>
+                      <p className="text-sm text-muted-foreground mb-3">
+                        ¿Te fue útil este artículo?
+                      </p>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                        >
                           <ThumbsUp className="h-4 w-4" />
                           Sí
                         </Button>
@@ -288,7 +317,7 @@ export default function KnowledgeBase() {
                 <CardContent className="space-y-3">
                   {KB_ARTICLES.sort((a, b) => b.views - a.views)
                     .slice(0, 5)
-                    .map(article => (
+                    .map((article) => (
                       <button
                         key={article.id}
                         onClick={() => setSelectedArticle(article.id)}
