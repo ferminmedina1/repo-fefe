@@ -183,46 +183,46 @@ export default function KnowledgeBase() {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="prose prose-invert max-w-none">
-                      {selectedArticleData.content.split('\n\n').map((paragraph, idx) => (
-                        <div key={idx} className="space-y-2">
-                          {paragraph.split('\n').map((line, lineIdx) => {
-                            if (line.startsWith('**') && line.endsWith(':**')) {
-                              return (
-                                <h3 key={lineIdx} className="font-semibold text-foreground mt-4 mb-2">
-                                  {line.replace(/\*\*/g, '')}
-                                </h3>
-                              );
-                            }
-                            if (line.startsWith('- ')) {
-                              return (
-                                <div key={lineIdx} className="flex gap-3 text-muted-foreground">
-                                  <span className="text-primary">•</span>
-                                  <span>{line.substring(2)}</span>
-                                </div>
-                              );
-                            }
-                            if (line.match(/^\d+\./)) {
-                              const numberMatch = line.match(/^\d+/);
-                              const number = numberMatch ? numberMatch[0] : '';
-                              const text = line.replace(/^\d+\.\s/, '');
-                              return (
-                                <div key={lineIdx} className="flex gap-3 text-muted-foreground">
-                                  <span className="font-semibold text-primary">{number}</span>
-                                  <span>{text}</span>
-                                </div>
-                              );
-                            }
-                            if (line.trim()) {
-                              return (
-                                <p key={lineIdx} className="text-muted-foreground leading-relaxed">
-                                  {line}
-                                </p>
-                              );
-                            }
-                            return <div key={lineIdx} />;
-                          })}
-                        </div>
-                      ))}
+                      {selectedArticleData.content.split('\n\n').map((paragraph, idx) => {
+                        const lines = paragraph.split('\n').map((line, lineIdx) => {
+                          if (line.startsWith('**') && line.endsWith(':**')) {
+                            return (
+                              <h3 key={lineIdx} className="font-semibold text-foreground mt-4 mb-2">
+                                {line.replace(/\*\*/g, '')}
+                              </h3>
+                            );
+                          }
+                          if (line.startsWith('- ')) {
+                            return (
+                              <div key={lineIdx} className="flex gap-3 text-muted-foreground">
+                                <span className="text-primary">•</span>
+                                <span>{line.substring(2)}</span>
+                              </div>
+                            );
+                          }
+                          if (line.match(/^\d+\./)) {
+                            const numberMatch = line.match(/^\d+/);
+                            const number = numberMatch ? numberMatch[0] : '';
+                            const text = line.replace(/^\d+\.\s/, '');
+                            return (
+                              <div key={lineIdx} className="flex gap-3 text-muted-foreground">
+                                <span className="font-semibold text-primary">{number}</span>
+                                <span>{text}</span>
+                              </div>
+                            );
+                          }
+                          if (line.trim()) {
+                            return (
+                              <p key={lineIdx} className="text-muted-foreground leading-relaxed">
+                                {line}
+                              </p>
+                            );
+                          }
+                          return null;
+                        }).filter(Boolean);
+                        
+                        return <div key={idx} className="space-y-2">{lines}</div>;
+                      })}
                     </div>
 
                     {/* Helpful Section */}
