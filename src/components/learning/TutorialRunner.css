@@ -1,0 +1,67 @@
+/* Tutorial Runner Styles */
+
+.tutorial-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.tutorial-highlight {
+  position: fixed;
+  border: 3px solid #3b82f6;
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2),
+    0 0 20px rgba(59, 130, 246, 0.4);
+  pointer-events: none;
+  z-index: 10000;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.tutorial-tooltip {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2),
+      0 0 20px rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.1),
+      0 0 30px rgba(59, 130, 246, 0.6);
+  }
+}
+
+/* Modo oscuro */
+@media (prefers-color-scheme: dark) {
+  .tutorial-suggest-action {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+}
