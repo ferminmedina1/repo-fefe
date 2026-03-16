@@ -925,7 +925,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         action: 'Exporta resumen del trimestre',
       },
     ],
-  }
+  },
 
   // ── Servicios Técnicos ────────────────────────────────
   {
@@ -1246,7 +1246,28 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'emp-2',
         title: '➕ Agregar Nuevo Empleado',
-        description: 'Botón Nuevo. Completa: Datos personales (DNI importante para AFIP), Información de contacto, Domicilio legal, Cargo/Puesto, Salario acuerdo, Obra social, Beneficiario emergencia. Se valida DNI con AFIP automáticamente.',\n        position: 'bottom',\n        action: 'Agrega un empleado de prueba',\n        duration: 3,\n      },\n      {\n        id: 'emp-3',\n        title: '📎 Documentación y Archivos',\n        description: 'Sube documentos: Copia DNI, Acta de ingreso firmada, Contrato laboral, Certificado de obra social, Beneficiarios emergencia. Sistema los guarda en archivo digital. Imprescindible para auditoría laboral.',\n        position: 'top',\n        action: 'Adjunta documentos',\n        duration: 2,\n      },\n      {\n        id: 'emp-4',\n        title: '🔒 Desactivación al Retirarse',\n        description: 'Cuando empleado se retira: NO lo eliminas (pierde historial). Lo \"Desactivas\" (checkbox), así mantienes historial de ventas/comisiones/nóminas, pero no aparece en cálculos futuros. Audit trail perfecto para inspecciones.',\n        position: 'left',\n        action: 'Entiende ciclo de vida empleado',\n      },\n    ],\n  },
+        description: 'Botón Nuevo. Completa: Datos personales (DNI importante para AFIP), Información de contacto, Domicilio legal, Cargo/Puesto, Salario acuerdo, Obra social, Beneficiario emergencia. Se valida DNI con AFIP automáticamente.',
+        position: 'bottom',
+        action: 'Agrega un empleado de prueba',
+        duration: 3,
+      },
+      {
+        id: 'emp-3',
+        title: '📎 Documentación y Archivos',
+        description: 'Sube documentos: Copia DNI, Acta de ingreso firmada, Contrato laboral, Certificado de obra social, Beneficiarios emergencia. Sistema los guarda en archivo digital. Imprescindible para auditoría laboral.',
+        position: 'top',
+        action: 'Adjunta documentos',
+        duration: 2,
+      },
+      {
+        id: 'emp-4',
+        title: '🔒 Desactivación al Retirarse',
+        description: 'Cuando empleado se retira: NO lo eliminas (pierde historial). Lo "Desactivas" (checkbox), así mantienes historial de ventas/comisiones/nóminas, pero no aparece en cálculos futuros. Audit trail perfecto para inspecciones.',
+        position: 'left',
+        action: 'Entiende ciclo de vida empleado',
+      },
+    ],
+  },
 
   // ── Reportes ────────────────────────────────
   {
@@ -2002,7 +2023,6 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
     ],
   },
-];
 
   // ── Migración de Datos (ESPECIAL) ────────────────────────────────
   {
@@ -2218,6 +2238,6 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Usa email para consultas complejas',
       },
-      {
-        id: 'support-4',
-        title: '📞 Llamada Telefónica (Premium)',\n        description: 'Si tu plan incluye soporte premium: puedes pedir llamada directa. Especialista llama en horario pactado, resuelve problema en vivo. Perfecto para: capacitación rápida, problema urgente que frena operaciones, setup inicial.',\n        position: 'bottom',\n        action: 'Solicita llamada si está disponible',\n      },\n    ],\n  },\n\n  // ── Asistente IA (Recursos) ────────────────────────────────\n  {\n    moduleId: 'ai_assistant_learning',\n    moduleName: 'Asistente IA - Consultas Instantáneas',\n    description: 'Tu asistente inteligente responde preguntas en segundos',\n    category: 'Recursos',\n    estimatedTime: 2,\n    icon: 'Sparkles',\n    steps: [\n      {\n        id: 'ai-1',\n        title: '✨ Asistente IA - Respuestas al Instante',\n        description: 'Botón flotante esquina inferior derecha (icono Sparkles). Clickeas, se abre chat con IA que entiende tu negocio. Puedes preguntar CUALQUIER COSA en lenguaje natural: "¿Cuál es mi mejor cliente?" → IA consulta datos → te da ranking. \"¿Cuánto debo reponer?\" → IA analiza stock.',\n        position: 'bottom',\n        action: 'Observa botón flotante IA',\n      },\n      {\n        id: 'ai-2',\n        title: '🤖 Ejemplos de Consultas',\n        description: '(1) Análisis: \"¿Cuál fue mi mejor mes de ventas?\" (2) Operativo: \"¿Tengo stock de Leche descremada?\" (3) Decisiones: \"¿Cuál es el producto más rentable?\" (4) Predicciones: \"¿Cuánto voy a vender en Semana Santa?\" (5) Problemas: \"¿Cómo cancelo una venta?\" IA responde basado en tus datos reales.',\n        position: 'bottom',\n        action: 'Prueba una pregunta sobre tu negocio',\n        duration: 2,\n      },\n      {\n        id: 'ai-3',\n        title: '💡 IA Aprende de ti',\n        description: 'Cuantas más preguntas hagas, mejor aprende IA sobre tu negocio. Entiende: patrones de venta, estacionalidad, clientes importantes, rangos de precio normal. Sugiere mejoras: \"Notaste que el cliente XYZ no compró en 2 meses, deberías contactarlo\".',\n        position: 'bottom',\n        action: 'Usa IA regularmente',\n      },\n      {\n        id: 'ai-4',\n        title: '🔒 Privacidad y Seguridad',\n        description: 'IA SOLO ve tus datos, no datos de otros usuarios/empresas. Conversaciones encriptadas. No guardamos historial conversaciones pasadas. Datos tratados bajo máxima confidencialidad empresarial.',\n        position: 'bottom',\n        action: 'Confía en la privacidad de tus datos',\n      },\n    ],\n  },\n\n  // ── Documentación Oficial ────────────────────────────────\n  {\n    moduleId: 'documentation',\n    moduleName: 'Documentación Oficial GEROS',\n    description: 'Manuals y especificaciones técnicas completas',\n    category: 'Recursos',\n    estimatedTime: 3,\n    icon: 'FileText',\n    steps: [\n      {\n        id: 'docs-1',\n        title: '📄 Documentación Técnica GEROS',\n        description: 'Accede a documentos oficiales PDF/Word: (1) Manual de Usuario Completo (200+ páginas), (2) Glosario de términos, (3) Especificaciones técnicas (para IT), (4) Guías de integración (si usas APIs), (5) Changelog (novedades en cada actualización).',\n        position: 'bottom',\n        action: 'Descarga manual de usuario',\n      },\n      {\n        id: 'docs-2',\n        title: '🔧 Configuración Avanzada',\n        description: 'Para usuarios avanzados: Validaciones personalizadas, Campos customizados, Automatizaciones, Integración APIs, Webhooks. Documentación técnica paso a paso con ejemplos JSON/código.',\n        position: 'bottom',\n        action: 'Consulta si necesitas customización',\n      },\n      {\n        id: 'docs-3',\n        title: '📋 Formatos de Archivo Importación',\n        description: 'Especificación exacta de columnas Excel para cada importación: Clientes (nombre, email, teléfono), Productos (SKU, nombre, precio), Movimientos (fecha, monto, tipo). Descargas templates vacíos para llenar con tus datos.',\n        position: 'bottom',\n        action: 'Descarga templates de importación',\n      },\n      {\n        id: 'docs-4',\n        title: '🌐 API Reference (Para Técnicos)',\n        description: 'Si desarrollador integra GEROS con otra plataforma: endpoints disponibles, autenticación, rate limits. Documentación en Swagger/OpenAPI standard. Ejemplos en Python, JavaScript, cURL.',\n        position: 'bottom',\n        action: 'Compartir con equipo técnico si aplica',\n      },\n    ],\n  },
+    ],
+  },
+];
