@@ -5,7 +5,6 @@
 import React from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { TutorialSelector } from '@/components/learning/TutorialSelector';
-import { TutorialRunner } from '@/components/learning/TutorialRunner';
 import { useTutorial } from '@/hooks/useTutorial';
 import { BookOpen } from 'lucide-react';
 
@@ -25,13 +24,11 @@ export default function LearningCenterPage() {
           </div>
         </div>
 
-        <div className="max-w-6xl">
-          {isRunning ? (
-            <TutorialRunner />
-          ) : (
+        {!isRunning && (
+          <div className="max-w-6xl">
             <TutorialSelector />
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
