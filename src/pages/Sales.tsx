@@ -327,7 +327,7 @@ export default function Sales() {
                   </TableRow>
                 ) : (
                   sales?.map((sale) => (
-                  <TableRow key={sale.id}>
+                    <TableRow key={sale.id}>
                     <TableCell className="font-medium flex items-center gap-2">
                       <Receipt className="h-4 w-4 text-muted-foreground" />
                       {sale.sale_number}
@@ -453,6 +453,7 @@ export default function Sales() {
                       </div>
                     </TableCell>
                   </TableRow>
+                ))
                 )}
               </TableBody>
             </Table>
