@@ -2241,3 +2241,8 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     ],
   },
 ];
+
+// Utility function to get a tutorial by module ID
+export function getTutorialByModuleId(moduleId: string): ModuleTutorial | undefined {
+  return TUTORIAL_MODULES.find(module => module.moduleId === moduleId);
+}
