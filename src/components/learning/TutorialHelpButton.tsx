@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { HelpCircle, X } from 'lucide-react';
 import { useTutorial } from '@/hooks/useTutorial';
 import { getTutorialByModuleId, TUTORIAL_MODULES } from '@/lib/tutorial/config';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,7 +19,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export function TutorialHelpButton() {
-  const { isRunning, startTutorial } = useTutorial();
+  const { isRunning, startTutorialWithRoute } = useTutorial();
+  const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
 
@@ -41,8 +42,8 @@ export function TutorialHelpButton() {
   const currentTutorial = currentModuleId ? getTutorialByModuleId(currentModuleId) : null;
 
   const handleStartCurrentTutorial = () => {
-    if (currentModuleId) {
-      startTutorial(currentModuleId);
+    if (currentModuleId && currentTutorial) {
+      startTutorialWithRoute(currentModuleId, currentTutorial.route, navigate);
       setOpen(false);
     }
   };
@@ -100,7 +101,7 @@ export function TutorialHelpButton() {
               <DropdownMenuItem
                 key={tutorial.moduleId}
                 onClick={() => {
-                  startTutorial(tutorial.moduleId);
+                  startTutorialWithRoute(tutorial.moduleId, tutorial.route, navigate);
                   setOpen(false);
                 }}
               >

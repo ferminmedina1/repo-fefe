@@ -13,6 +13,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Inicio',
     estimatedTime: 4,
     icon: 'LayoutDashboard',
+    route: '/app',
     steps: [
       {
         id: 'dashboard-1',
@@ -58,6 +59,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Ventas',
     estimatedTime: 5,
     icon: 'ShoppingCart',
+    route: '/sales',
     steps: [
       {
         id: 'sales-1',
@@ -103,6 +105,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Inventario',
     estimatedTime: 5,
     icon: 'Package',
+    route: '/products',
     steps: [
       {
         id: 'products-1',
@@ -148,6 +151,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Clientes',
     estimatedTime: 4,
     icon: 'Users',
+    route: '/customers',
     steps: [
       {
         id: 'customers-1',
@@ -191,6 +195,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Inventario',
     estimatedTime: 4,
     icon: 'Warehouse',
+    route: '/inventory-alerts',
     steps: [
       {
         id: 'inventory-1',
@@ -234,6 +239,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'General',
     estimatedTime: 6,
     icon: 'ShoppingCart',
+    route: '/pos',
     steps: [
       {
         id: 'pos-1',
@@ -285,6 +291,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Ventas',
     estimatedTime: 4,
     icon: 'FileCheck',
+    route: '/quotations',
     steps: [
       {
         id: 'quotations-1',
@@ -326,6 +333,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Ventas',
     estimatedTime: 4,
     icon: 'Truck',
+    route: '/delivery-notes',
     steps: [
       {
         id: 'delivery-1',
@@ -370,6 +378,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Ventas',
     estimatedTime: 4,
     icon: 'TrendingDown',
+    route: '/returns',
     steps: [
       {
         id: 'returns-1',
@@ -414,6 +423,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Ventas',
     estimatedTime: 3,
     icon: 'Calendar',
+    route: '/reservations',
     steps: [
       {
         id: 'reservations-1',
@@ -458,6 +468,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Clientes',
     estimatedTime: 4,
     icon: 'Receipt',
+    route: '/accounts-receivable',
     steps: [
       {
         id: 'accrec-1',
@@ -554,6 +565,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Compras',
     estimatedTime: 4,
     icon: 'FileCheck',
+    route: '/purchase-orders',
     steps: [
       {
         id: 'po-1',
@@ -595,6 +607,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Compras',
     estimatedTime: 3,
     icon: 'ShoppingBag',
+    route: '/purchases',
     steps: [
       {
         id: 'purchases-1',
@@ -639,6 +652,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Compras',
     estimatedTime: 3,
     icon: 'PackageCheck',
+    route: '/purchase-reception',
     steps: [
       {
         id: 'reception-1',
@@ -683,6 +697,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Compras',
     estimatedTime: 3,
     icon: 'TrendingDown',
+    route: '/purchase-returns',
     steps: [
       {
         id: 'pret-1',
@@ -727,6 +742,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Compras',
     estimatedTime: 3,
     icon: 'Truck',
+    route: '/suppliers',
     steps: [
       {
         id: 'suppliers-1',
@@ -771,6 +787,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Finanzas',
     estimatedTime: 3,
     icon: 'Building2',
+    route: '/bank-accounts',
     steps: [
       {
         id: 'bank-1',
@@ -812,6 +829,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Finanzas',
     estimatedTime: 3,
     icon: 'TrendingUp',
+    route: '/bank-movements',
     steps: [
       {
         id: 'bankm-1',
@@ -853,6 +871,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Finanzas',
     estimatedTime: 3,
     icon: 'CreditCard',
+    route: '/card-movements',
     steps: [
       {
         id: 'card-1',
@@ -894,6 +913,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Finanzas',
     estimatedTime: 3,
     icon: 'Calculator',
+    route: '/retentions',
     steps: [
       {
         id: 'retention-1',
@@ -935,6 +955,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Operaciones',
     estimatedTime: 4,
     icon: 'Wrench',
+    route: '/technical-services',
     steps: [
       {
         id: 'tech-1',
@@ -979,6 +1000,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Operaciones',
     estimatedTime: 4,
     icon: 'DollarSign',
+    route: '/cash-register',
     steps: [
       {
         id: 'cash-1',
@@ -1022,6 +1044,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Operaciones',
     estimatedTime: 3,
     icon: 'Receipt',
+    route: '/expenses',
     steps: [
       {
         id: 'expenses-1',
@@ -1063,6 +1086,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Operaciones',
     estimatedTime: 3,
     icon: 'Banknote',
+    route: '/checks',
     steps: [
       {
         id: 'checks-1',
@@ -1107,6 +1131,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Operaciones',
     estimatedTime: 3,
     icon: 'Tag',
+    route: '/promotions',
     steps: [
       {
         id: 'promos-1',
@@ -1151,6 +1176,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'RRHH',
     estimatedTime: 5,
     icon: 'Calculator',
+    route: '/payroll',
     steps: [
       {
         id: 'payroll-1',
@@ -1194,6 +1220,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'RRHH',
     estimatedTime: 4,
     icon: 'BadgePercent',
+    route: '/commissions',
     steps: [
       {
         id: 'comm-1',
@@ -1235,6 +1262,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'RRHH',
     estimatedTime: 4,
     icon: 'UserCircle',
+    route: '/employees',
     steps: [
       {
         id: 'emp-1',
@@ -1277,6 +1305,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Reportes',
     estimatedTime: 5,
     icon: 'BarChart3',
+    route: '/reports',
     steps: [
       {
         id: 'reports-1',
@@ -1328,6 +1357,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Reportes',
     estimatedTime: 4,
     icon: 'BookOpen',
+    route: '/accountant-reports',
     steps: [
       {
         id: 'acct-1',

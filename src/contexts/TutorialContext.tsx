@@ -13,6 +13,7 @@ interface TutorialContextType {
   
   // Acciones
   startTutorial: (moduleId: string) => void;
+  startTutorialWithRoute: (moduleId: string, route?: string, navigate?: (path: string) => void) => void;
   nextStep: () => void;
   previousStep: () => void;
   goToStep: (stepIndex: number) => void;
@@ -41,6 +42,26 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     const tutorial = getTutorialByModuleId(moduleId);
     if (!tutorial) return;
 
+    setTutorialState(prev => ({
+      ...prev,
+      activeModuleId: moduleId,
+      currentStepIndex: 0,
+      isRunning: true,
+      completedSteps: [],
+    }));
+  }, []);
+
+  // Iniciar tutorial con navegación a la ruta del módulo
+  const startTutorialWithRoute = useCallback((moduleId: string, route?: string, navigate?: (path: string) => void) => {
+    const tutorial = getTutorialByModuleId(moduleId);
+    if (!tutorial) return;
+
+    // Primero navegar a la ruta si existe y hay función de navegación
+    if (route && navigate) {
+      navigate(route);
+    }
+
+    // Luego iniciar el tutorial
     setTutorialState(prev => ({
       ...prev,
       activeModuleId: moduleId,
@@ -149,6 +170,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     activeModuleId: tutorialState.activeModuleId,
     
     startTutorial,
+    startTutorialWithRoute,
     nextStep,
     previousStep,
     goToStep,

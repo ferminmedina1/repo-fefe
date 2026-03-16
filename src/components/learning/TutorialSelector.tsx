@@ -10,9 +10,11 @@ import { Play, Clock } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { useTutorial } from '@/hooks/useTutorial';
 import { TUTORIAL_MODULES } from '@/lib/tutorial/config';
+import { useNavigate } from 'react-router-dom';
 
 export function TutorialSelector() {
-  const { startTutorial } = useTutorial();
+  const { startTutorialWithRoute } = useTutorial();
+  const navigate = useNavigate();
 
   // Agrupar tutoriales por categoría
   const tutorialsByCategory = TUTORIAL_MODULES.reduce(
@@ -87,7 +89,7 @@ export function TutorialSelector() {
 
                 {/* Botón */}
                 <Button
-                  onClick={() => startTutorial(tutorial.moduleId)}
+                  onClick={() => startTutorialWithRoute(tutorial.moduleId, tutorial.route, navigate)}
                   className="w-full"
                 >
                   <Play className="h-4 w-4 mr-2" />

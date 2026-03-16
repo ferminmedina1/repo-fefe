@@ -28,6 +28,8 @@ export interface ModuleTutorial {
   moduleName: string;
   /** Descripción breve */
   description: string;
+  /** Ruta de la página del módulo (ej: /app/sales) */
+  route?: string;
   /** Pasos del tutorial */
   steps: TutorialStep[];
   /** Ícono del módulo */
