@@ -692,7 +692,7 @@ export default function Customers() {
                   </TableRow>
                 ) : (
                   customers?.map((customer) => (
-                  <TableRow key={customer.id}>
+                    <TableRow key={customer.id}>
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell>{customer.email || "-"}</TableCell>
                     <TableCell>{customer.phone || "-"}</TableCell>
@@ -768,6 +768,7 @@ export default function Customers() {
                       </div>
                     </TableCell>
                   </TableRow>
+                ))
                 )}
               </TableBody>
             </Table>
