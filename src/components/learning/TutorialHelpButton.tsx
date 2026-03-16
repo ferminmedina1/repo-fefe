@@ -67,14 +67,14 @@ export function TutorialHelpButton() {
         <Button
           variant="outline"
           size="icon"
-          className="fixed bottom-6 left-6 rounded-full h-12 w-12 shadow-lg hover:shadow-xl transition-shadow z-50"
+          className="fixed bottom-6 right-28 rounded-full h-12 w-12 shadow-lg hover:shadow-xl transition-shadow z-50"
           title="Tutoriales de la app"
         >
           <HelpCircle className="h-5 w-5" />
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto scrollbar-thin">
+      <DropdownMenuContent align="end" className="w-56 max-h-80 overflow-y-auto scrollbar-thin">
         {/* Tutorial del módulo actual */}
         {currentTutorial && (
           <>
