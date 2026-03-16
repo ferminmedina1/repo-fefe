@@ -2,7 +2,7 @@
 // Tutorial Runner - Componente que ejecuta tutoriales paso a paso
 // ============================================================
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft, X, SkipForward } from 'lucide-react';
 import { useTutorial } from '@/hooks/useTutorial';
@@ -25,48 +25,65 @@ export function TutorialRunner() {
   } = useTutorial();
 
   const [highlightElement, setHighlightElement] = useState<HTMLElement | null>(null);
+  const [highlightStyle, setHighlightStyle] = useState<React.CSSProperties>({});
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
 
   const currentStep = getCurrentStep();
   const currentTutorial = getCurrentTutorial();
   const progress = getProgress();
 
-  // Actualizar highlight y posición del tooltip
-  useEffect(() => {
-    if (!isRunning || !currentStep) return;
-
-    if (currentStep.target) {
-      const element = document.querySelector(currentStep.target) as HTMLElement;
-      if (element) {
-        setHighlightElement(element);
-        updateTooltipPosition(element, currentStep.position || 'top');
-
-        // Scroll al elemento
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    } else {
-      // Sin target, mostrar en el centro
-      setHighlightElement(null);
-      setTooltipStyle({
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-      });
-    }
-  }, [isRunning, currentStep]);
-
-  const updateTooltipPosition = (element: HTMLElement, position: string) => {
+  // Calcular estilo del highlight basado en las coordenadas del elemento
+  const getHighlightStyle = useCallback((element: HTMLElement): React.CSSProperties => {
     const rect = element.getBoundingClientRect();
+    const padding = 8; // píxeles de padding alrededor del elemento
+
+    return {
+      position: 'fixed',
+      top: `${rect.top - padding}px`,
+      left: `${rect.left - padding}px`,
+      width: `${rect.width + padding * 2}px`,
+      height: `${rect.height + padding * 2}px`,
+      pointerEvents: 'none',
+      zIndex: 9999,
+    };
+  }, []);
+
+  // Posicionar el tooltip
+  const updateTooltipPosition = useCallback((element: HTMLElement, position: string) => {
+    const rect = element.getBoundingClientRect();
+    const offset = 20;
+    const tooltipWidth = 320; // max-w-md = 28rem = 448px, pero siendo conservador
+    const tooltipHeight = 250; // estimado
+
     const style: React.CSSProperties = {
       position: 'fixed',
+      zIndex: 10001,
     };
 
-    const offset = 20;
+    // Calcular espacio disponible
+    const spaceTop = rect.top;
+    const spaceBottom = window.innerHeight - rect.bottom;
+    const spaceLeft = rect.left;
+    const spaceRight = window.innerWidth - rect.right;
 
-    switch (position) {
+    // Decidir posición con fallback si no hay espacio
+    let finalPosition = position;
+    if (finalPosition === 'top' && spaceTop < tooltipHeight + offset) {
+      finalPosition = 'bottom';
+    }
+    if (finalPosition === 'bottom' && spaceBottom < tooltipHeight + offset) {
+      finalPosition = 'top';
+    }
+    if (finalPosition === 'left' && spaceLeft < tooltipWidth + offset) {
+      finalPosition = 'right';
+    }
+    if (finalPosition === 'right' && spaceRight < tooltipWidth + offset) {
+      finalPosition = 'left';
+    }
+
+    switch (finalPosition) {
       case 'top':
-        style.bottom = `${window.innerHeight - rect.top + offset}px`;
+        style.top = `${rect.top - tooltipHeight - offset}px`;
         style.left = `${rect.left + rect.width / 2}px`;
         style.transform = 'translateX(-50%)';
         break;
@@ -77,7 +94,7 @@ export function TutorialRunner() {
         break;
       case 'left':
         style.top = `${rect.top + rect.height / 2}px`;
-        style.right = `${window.innerWidth - rect.left + offset}px`;
+        style.left = `${rect.left - tooltipWidth - offset}px`;
         style.transform = 'translateY(-50%)';
         break;
       case 'right':
@@ -88,7 +105,48 @@ export function TutorialRunner() {
     }
 
     setTooltipStyle(style);
-  };
+  }, []);
+
+  // Actualizar positions cuando cambia el paso o la ventana se redimensiona
+  useEffect(() => {
+    if (!isRunning || !currentStep) return;
+
+    const updatePositions = () => {
+      if (currentStep.target) {
+        const element = document.querySelector(currentStep.target) as HTMLElement;
+        if (element) {
+          setHighlightElement(element);
+          setHighlightStyle(getHighlightStyle(element));
+          updateTooltipPosition(element, currentStep.position || 'bottom');
+
+          // Scroll al elemento
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      } else {
+        // Sin target, mostrar en el centro
+        setHighlightElement(null);
+        setHighlightStyle({});
+        setTooltipStyle({
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 10001,
+        });
+      }
+    };
+
+    updatePositions();
+
+    // Re-calcular posiciones al redimensionar
+    window.addEventListener('resize', updatePositions);
+    window.addEventListener('scroll', updatePositions);
+
+    return () => {
+      window.removeEventListener('resize', updatePositions);
+      window.removeEventListener('scroll', updatePositions);
+    };
+  }, [isRunning, currentStep, getHighlightStyle, updateTooltipPosition]);
 
   if (!isRunning || !currentStep || !currentTutorial) return null;
 
@@ -98,29 +156,30 @@ export function TutorialRunner() {
 
   return (
     <>
-      {/* Overlay - Oscurece todo excepto el elemento destacado */}
+      {/* Overlay oscuro con spotlight en el elemento */}
       {highlightElement && (
-        <div className="tutorial-overlay" />
+        <>
+          <div className="tutorial-overlay" />
+          <div 
+            className="tutorial-highlight"
+            style={highlightStyle}
+          />
+        </>
       )}
 
-      {/* Elemento destacado */}
-      {highlightElement && (
-        <div className="tutorial-highlight" />
-      )}
-
-      {/* Tooltip */}
+      {/* Tooltip con instrucciones */}
       <div
         className={cn(
           'tutorial-tooltip',
           'bg-white dark:bg-slate-900 rounded-lg shadow-2xl p-6',
-          'max-w-md z-[10001]'
+          'max-w-md'
         )}
         style={tooltipStyle}
       >
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
               <span className="text-sm font-bold text-blue-600 dark:text-blue-300">
                 {currentIndex + 1}
               </span>
@@ -133,7 +192,7 @@ export function TutorialRunner() {
             variant="ghost"
             size="sm"
             onClick={endTutorial}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 shrink-0"
           >
             <X className="h-4 w-4" />
           </Button>
