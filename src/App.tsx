@@ -12,6 +12,7 @@ import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
 import { usePermissions } from "@/hooks/usePermissions";
 import { TutorialRunner } from "./components/learning/TutorialRunner";
 import { TutorialHelpButton } from "./components/learning/TutorialHelpButton";
+import { TutorialProvider } from "@/contexts/TutorialContext";
 
 // Lazy load all page components
 const Landing = lazy(() => import("./pages/Landing"));
@@ -311,8 +312,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <CompanyProvider>
-          <Suspense fallback={<PageLoader />}>
+        <TutorialProvider>
+          <CompanyProvider>
+            <Suspense fallback={<PageLoader />}>
             <Routes>
             <Route path="/signup" element={<SignupWizard />} />
             <Route path="/signup/success" element={<SignupSuccess />} />
@@ -420,8 +422,9 @@ const App = () => (
           {/* Tutorial System - Global Execution */}
           <TutorialRunner />
           <TutorialHelpButton />
-          </Suspense>
-        </CompanyProvider>
+            </Suspense>
+          </CompanyProvider>
+        </TutorialProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
