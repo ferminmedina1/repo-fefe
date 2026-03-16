@@ -9,12 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Plus, Edit, Trash2, Shield, Clock } from "lucide-react";
+import { Users, Plus, Edit, Trash2, Shield, Clock, AlertTriangle, EyeOff, HelpCircle } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { EmployeePermissionsManager } from "@/components/employees/EmployeePermissionsManager";
@@ -68,6 +69,8 @@ const Employees = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<any>(null);
   const [formData, setFormData] = useState<EmployeeFormData>(initialFormData);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<any>(null);
 
   const canCreate = hasPermission("employees", "create");
   const canEdit = hasPermission("employees", "edit");
@@ -230,6 +233,47 @@ const Employees = () => {
     },
   });
 
+  const deactivateMutation = useMutation({
+    mutationFn: async (employee: any) => {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
+      const { error: deactivateError } = await supabase
+        .from("employees")
+        .update({ active: false })
+        .eq("id", employee.id);
+
+      if (deactivateError) throw deactivateError;
+
+      if (employee.email) {
+        const supabaseClient = supabase as any;
+        const profileResult = await supabaseClient
+          .from("profiles")
+          .select("id")
+          .eq("email", employee.email)
+          .maybeSingle();
+
+        const profiles = profileResult.data;
+
+        if (profiles) {
+          await supabase
+            .from("company_users")
+            .update({ active: false })
+            .eq("user_id", profiles.id)
+            .eq("company_id", currentCompany.id);
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      toast.success("Empleado desactivado exitosamente. Su acceso al sistema ha sido revocado.");
+      setEmployeeToDelete(null);
+      setDeleteConfirmOpen(false);
+    },
+    onError: (error: any) => {
+      toast.error("Error al desactivar empleado: " + error.message);
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (employee: any) => {
       if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
@@ -263,7 +307,9 @@ const Employees = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["company-users"] });
-      toast.success("Empleado eliminado y acceso desactivado exitosamente");
+      toast.success("Empleado eliminado permanentemente de la base de datos");
+      setEmployeeToDelete(null);
+      setDeleteConfirmOpen(false);
     },
     onError: (error: any) => {
       toast.error("Error al eliminar el empleado: " + error.message);
@@ -617,17 +663,29 @@ const Employees = () => {
                                   </Button>
                                 )}
                                 {canDelete && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      if (confirm("Esta seguro de eliminar este empleado? Se desactivara su acceso al sistema.")) {
-                                        deleteMutation.mutate(employee);
-                                      }
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      title="Desactivar acceso (soft delete)"
+                                      onClick={() => {
+                                        setEmployeeToDelete(employee);
+                                        setDeleteConfirmOpen(true);
+                                      }}
+                                    >
+                                      <EyeOff className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEmployeeToDelete(employee);
+                                        setDeleteConfirmOpen(true);
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 )}
                               </div>
                             </TableCell>
@@ -678,6 +736,66 @@ const Employees = () => {
             </TabsContent>
           )}
         </Tabs>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+                <AlertDialogTitle>¿Qué deseas hacer con este empleado?</AlertDialogTitle>
+              </div>
+            </AlertDialogHeader>
+            <AlertDialogDescription className="space-y-4">
+              <div>
+                <p className="font-semibold text-foreground mb-2">
+                  {employeeToDelete?.first_name} {employeeToDelete?.last_name}
+                </p>
+                <p className="text-sm">Elige una de las siguientes opciones:</p>
+              </div>
+            </AlertDialogDescription>
+            <AlertDialogFooter className="gap-3">
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (employeeToDelete) {
+                    deactivateMutation.mutate(employeeToDelete);
+                  }
+                }}
+                disabled={deactivateMutation.isPending}
+                className="gap-2"
+              >
+                <EyeOff className="h-4 w-4" />
+                Desactivar
+              </Button>
+              <AlertDialogAction
+                onClick={() => {
+                  if (employeeToDelete) {
+                    deleteMutation.mutate(employeeToDelete);
+                  }
+                }}
+                disabled={deleteMutation.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Eliminar Permanentemente
+              </AlertDialogAction>
+            </AlertDialogFooter>
+            <div className="bg-destructive/10 p-3 rounded-md text-sm space-y-2 border border-destructive/20">
+              <div className="flex gap-2">
+                <HelpCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-destructive mb-1">Diferencia importante:</p>
+                  <ul className="text-xs space-y-1 list-disc list-inside">
+                    <li><strong>Desactivar:</strong> Revoca acceso pero mantiene datos históricos</li>
+                    <li><strong>Eliminar:</strong> Borra permanentemente (sin recuperación)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Package, ShoppingCart, TrendingUp, Users, AlertTriangle, BarChart3, Activity, ArrowUpRight, ArrowDownRight, TrendingDown, Calendar } from "lucide-react";
+import { DollarSign, Package, ShoppingCart, TrendingUp, Users, AlertTriangle, BarChart3, Activity, ArrowUpRight, ArrowDownRight, TrendingDown, Calendar, CheckCircle2 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { format, subDays, startOfDay, startOfMonth, endOfMonth, subMonths } from "date-fns";
@@ -827,9 +827,12 @@ export default function Dashboard() {
             <CardContent>
               <div className="space-y-3">
                 {criticalStock?.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    ✅ No hay productos con stock crítico
-                  </p>
+                  <div className="flex items-center justify-center gap-2 py-8">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <p className="text-sm text-muted-foreground">
+                      Sin productos com stock crítico
+                    </p>
+                  </div>
                 ) : (
                   criticalStock?.map((product, index) => (
                     <div 

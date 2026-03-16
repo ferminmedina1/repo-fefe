@@ -772,8 +772,14 @@ export default function InventoryAlerts() {
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
           ) : filteredLowStock?.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">No hay productos con stock bajo</p>
+            <Card className="p-8">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <AlertTriangle className="h-10 w-10 text-muted-foreground/40" />
+                <div>
+                  <p className="font-medium text-sm">Sin productos con stock bajo</p>
+                  <p className="text-xs text-muted-foreground">Tu inventario está en óptimo nivel</p>
+                </div>
+              </div>
             </Card>
           ) : (
             filteredLowStock?.map((product) => (
@@ -815,10 +821,14 @@ export default function InventoryAlerts() {
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
           ) : filteredExpiring?.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">
-                No hay productos próximos a vencer
-              </p>
+            <Card className="p-8">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <CheckCircle2 className="h-10 w-10 text-green-600/40" />
+                <div>
+                  <p className="font-medium text-sm">Sin productos próximos a vencer</p>
+                  <p className="text-xs text-muted-foreground">Todos tus productos tienen plazo suficiente</p>
+                </div>
+              </div>
             </Card>
           ) : (
             filteredExpiring?.map((product) => (

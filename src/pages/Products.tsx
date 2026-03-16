@@ -2944,9 +2944,26 @@ export default function Products() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products?.map((product) => {
-                  const isExpanded = expandedProducts.has(product.id);
-                  const productWarehouseStock = getWarehouseStockForProduct(product.id);
+                {products && products.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <Package className="h-12 w-12 text-muted-foreground/40" />
+                        <div>
+                          <h3 className="text-lg font-semibold">Sin productos registrados</h3>
+                          <p className="text-sm text-muted-foreground mb-4">Comienza agregando tu primer producto al catálogo</p>
+                          <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Crear Primer Producto
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  products?.map((product) => {
+                    const isExpanded = expandedProducts.has(product.id);
+                    const productWarehouseStock = getWarehouseStockForProduct(product.id);
                   
                   return (
                     <React.Fragment key={product.id}>
@@ -3247,7 +3264,8 @@ export default function Products() {
                       )}
                     </React.Fragment>
                   );
-                })}
+                })
+                )}
               </TableBody>
             </Table>
           </CardContent>

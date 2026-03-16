@@ -309,7 +309,24 @@ export default function Sales() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sales?.map((sale) => (
+                {sales && sales.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <Receipt className="h-12 w-12 text-muted-foreground/40" />
+                        <div>
+                          <h3 className="text-lg font-semibold">Sin ventas registradas</h3>
+                          <p className="text-sm text-muted-foreground mb-4">Comienza registrando tu primera venta</p>
+                          <Button onClick={() => navigate('/pos')} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Crear Primera Venta
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sales?.map((sale) => (
                   <TableRow key={sale.id}>
                     <TableCell className="font-medium flex items-center gap-2">
                       <Receipt className="h-4 w-4 text-muted-foreground" />
@@ -436,7 +453,7 @@ export default function Sales() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </CardContent>

@@ -674,7 +674,24 @@ export default function Customers() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customers?.map((customer) => (
+                {customers && customers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <Users className="h-12 w-12 text-muted-foreground/40" />
+                        <div>
+                          <h3 className="text-lg font-semibold">Sin clientes registrados</h3>
+                          <p className="text-sm text-muted-foreground mb-4">Comienza agregando tu primer cliente</p>
+                          <Button onClick={handleOpenDialog} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Crear Primer Cliente
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  customers?.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell>{customer.email || "-"}</TableCell>
@@ -751,7 +768,7 @@ export default function Customers() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </CardContent>
