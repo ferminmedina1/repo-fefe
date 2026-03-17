@@ -1,274 +1,236 @@
-// ============================================================
-// Tutorial Runner - Componente que ejecuta tutoriales paso a paso
-// ============================================================
-
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
+import Joyride, { CallBackProps, STATUS, Step, TooltipRenderProps, ACTIONS, EVENTS } from 'react-joyride';
+import { useTutorial } from '@/hooks/useTutorial';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft, X, SkipForward } from 'lucide-react';
-import { useTutorial } from '@/hooks/useTutorial';
 import { cn } from '@/lib/utils';
-import './TutorialRunner.css';
+import { useNavigate } from 'react-router-dom';
+
+const CustomTooltip = ({
+  index,
+  step,
+  tooltipProps,
+  primaryProps,
+  backProps,
+  skipProps,
+  closeProps,
+  isLastStep,
+}: TooltipRenderProps) => {
+  const { getProgress, getCurrentTutorial } = useTutorial();
+  const tutorial = getCurrentTutorial();
+  const totalSteps = tutorial?.steps.length || 0;
+  // Calculamos el progreso basado en el index actual en caso de un mínimo retraso del context
+  const progress = totalSteps > 0 ? Math.round(((index + 1) / totalSteps) * 100) : 0;
+  
+  // Extraer configuración original extendida
+  const originalStep = tutorial?.steps[index];
+
+  return (
+    <div
+      {...tooltipProps}
+      className={cn(
+        'bg-card rounded-xl shadow-2xl p-6 w-[340px] max-w-md',
+        'border border-primary/20 backdrop-blur-sm relative overflow-hidden',
+        // Efecto glow sutil para que se vea muy premium
+        'ring-1 ring-black/5 dark:ring-white/10'
+      )}
+    >
+      {/* Decorative top gradient bar */}
+      <div className="absolute top-0 left-0 right-0 h-[4px] bg-gradient-to-r from-primary/60 via-primary to-primary/60"></div>
+
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4 mt-1">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20 shadow-sm">
+            <span className="text-sm font-bold text-primary">
+              {index + 1}
+            </span>
+          </div>
+          <h3 className="text-lg font-bold text-foreground leading-tight pr-6">
+            {originalStep?.title || step.title}
+          </h3>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          {...closeProps}
+          className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/80 rounded-full absolute top-4 right-4 transition-colors"
+        >
+          <X className="h-[14px] w-[14px]" />
+        </Button>
+      </div>
+
+      {/* Contenido principal */}
+      <div className="text-[14px] text-foreground/80 mb-5 leading-relaxed font-medium">
+        {step.content}
+      </div>
+
+      {/* Acción sugerida (si aplica) */}
+      {originalStep?.action && (
+        <div className="bg-primary/5 border border-primary/20 rounded-lg px-3.5 py-3 mb-5 flex gap-2.5 items-start shadow-sm transition-all hover:bg-primary/10">
+          <span className="text-lg leading-none mt-0.5 animate-pulse">💡</span>
+          <p className="text-sm text-foreground/90 font-medium leading-snug">
+            {originalStep.action}
+          </p>
+        </div>
+      )}
+
+      {/* Barra de progreso */}
+      <div className="mb-5">
+        <div className="flex justify-between items-center mb-1.5 px-0.5">
+          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+            Paso {index + 1} de {totalSteps}
+          </span>
+          <span className="text-[11px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">{progress}%</span>
+        </div>
+        <div className="w-full h-1.5 bg-secondary/60 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-primary transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Botones de navegación */}
+      <div className="flex gap-2">
+        {index > 0 && (
+          <Button
+            variant="outline"
+            {...backProps}
+            className="flex-1 text-xs h-9 shadow-sm border-border/60 hover:bg-secondary/50"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Atrás
+          </Button>
+        )}
+
+        <Button
+          variant="ghost"
+          {...skipProps}
+          className="flex-[0.5] text-xs h-9 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+          title="Saltar tutorial"
+        >
+          <SkipForward className="h-4 w-4" />
+        </Button>
+
+        <Button
+          {...primaryProps}
+          className="flex-1 text-xs h-9 shadow-md hover:shadow-lg transition-all bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          {isLastStep ? 'Terminar' : 'Siguiente'}
+          {!isLastStep && <ChevronRight className="h-4 w-4 ml-1" />}
+        </Button>
+      </div>
+
+      {/* Info adicional opcional */}
+      {originalStep?.duration && (
+        <p className="text-[10px] text-muted-foreground/60 mt-3 text-center uppercase tracking-wider font-semibold">
+          ⏱️ Estimado: {originalStep.duration}s
+        </p>
+      )}
+    </div>
+  );
+};
 
 export function TutorialRunner() {
+  const navigate = useNavigate();
   const {
     isRunning,
-    activeModuleId,
     tutorialState,
-    getCurrentStep,
     getCurrentTutorial,
-    getProgress,
-    nextStep,
-    previousStep,
+    setNavigate,
     endTutorial,
-    skipTutorial,
     goToStep,
   } = useTutorial();
 
-  const [highlightElement, setHighlightElement] = useState<HTMLElement | null>(null);
-  const [highlightStyle, setHighlightStyle] = useState<React.CSSProperties>({});
-  const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
-
-  const currentStep = getCurrentStep();
+  const [steps, setSteps] = useState<Step[]>([]);
   const currentTutorial = getCurrentTutorial();
-  const progress = getProgress();
 
-  // Calcular estilo del highlight basado en las coordenadas del elemento
-  const getHighlightStyle = useCallback((element: HTMLElement): React.CSSProperties => {
-    const rect = element.getBoundingClientRect();
-    const padding = 8; // píxeles de padding alrededor del elemento
-
-    return {
-      position: 'fixed',
-      top: `${rect.top - padding}px`,
-      left: `${rect.left - padding}px`,
-      width: `${rect.width + padding * 2}px`,
-      height: `${rect.height + padding * 2}px`,
-      pointerEvents: 'none',
-      zIndex: 9999,
-    };
-  }, []);
-
-  // Posicionar el tooltip
-  const updateTooltipPosition = useCallback((element: HTMLElement, position: string) => {
-    const rect = element.getBoundingClientRect();
-    const offset = 20;
-    const tooltipWidth = 320; // max-w-md = 28rem = 448px, pero siendo conservador
-    const tooltipHeight = 250; // estimado
-
-    const style: React.CSSProperties = {
-      position: 'fixed',
-      zIndex: 10001,
-    };
-
-    // Calcular espacio disponible
-    const spaceTop = rect.top;
-    const spaceBottom = window.innerHeight - rect.bottom;
-    const spaceLeft = rect.left;
-    const spaceRight = window.innerWidth - rect.right;
-
-    // Decidir posición con fallback si no hay espacio
-    let finalPosition = position;
-    if (finalPosition === 'top' && spaceTop < tooltipHeight + offset) {
-      finalPosition = 'bottom';
-    }
-    if (finalPosition === 'bottom' && spaceBottom < tooltipHeight + offset) {
-      finalPosition = 'top';
-    }
-    if (finalPosition === 'left' && spaceLeft < tooltipWidth + offset) {
-      finalPosition = 'right';
-    }
-    if (finalPosition === 'right' && spaceRight < tooltipWidth + offset) {
-      finalPosition = 'left';
-    }
-
-    switch (finalPosition) {
-      case 'top':
-        style.top = `${rect.top - tooltipHeight - offset}px`;
-        style.left = `${rect.left + rect.width / 2}px`;
-        style.transform = 'translateX(-50%)';
-        break;
-      case 'bottom':
-        style.top = `${rect.bottom + offset}px`;
-        style.left = `${rect.left + rect.width / 2}px`;
-        style.transform = 'translateX(-50%)';
-        break;
-      case 'left':
-        style.top = `${rect.top + rect.height / 2}px`;
-        style.left = `${rect.left - tooltipWidth - offset}px`;
-        style.transform = 'translateY(-50%)';
-        break;
-      case 'right':
-        style.top = `${rect.top + rect.height / 2}px`;
-        style.left = `${rect.right + offset}px`;
-        style.transform = 'translateY(-50%)';
-        break;
-    }
-
-    setTooltipStyle(style);
-  }, []);
-
-  // Actualizar positions cuando cambia el paso o la ventana se redimensiona
+  // Registrar el navigate en el contexto para los cambios de ruta programáticos
   useEffect(() => {
-    if (!isRunning || !currentStep) return;
+    setNavigate(navigate);
+  }, [navigate, setNavigate]);
 
-    const updatePositions = () => {
-      if (currentStep.target) {
-        const element = document.querySelector(currentStep.target) as HTMLElement;
-        if (element) {
-          setHighlightElement(element);
-          setHighlightStyle(getHighlightStyle(element));
-          updateTooltipPosition(element, currentStep.position || 'bottom');
+  useEffect(() => {
+    if (currentTutorial) {
+      const joyrideSteps: Step[] = currentTutorial.steps.map(step => {
+        const hasTarget = !!step.target;
+        return {
+          target: hasTarget ? step.target! : 'body',
+          title: step.title,
+          content: step.description,
+          placement: hasTarget 
+            ? (step.position === 'top' ? 'top' : step.position === 'bottom' ? 'bottom' : step.position === 'left' ? 'left' : step.position === 'right' ? 'right' : 'auto')
+            : 'center',
+          disableBeacon: true,
+          disableOverlayClose: true,  // Spotlight estricto: evita cierre por clic afuera
+          spotlightClicks: false,     // Bloquea clics en el elemento mientras lee el tooltip
+          spotlightPadding: 8,
+          // Evitamos que al cambiar entre rutas el tooltip tiemble
+          floaterProps: {
+            disableAnimation: true,
+          }
+        };
+      });
+      setSteps(joyrideSteps);
+    } else {
+      setSteps([]);
+    }
+  }, [currentTutorial]);
 
-          // Scroll al elemento
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      } else {
-        // Sin target, mostrar en el centro
-        setHighlightElement(null);
-        setHighlightStyle({});
-        setTooltipStyle({
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 10001,
-        });
+  const handleJoyrideCallback = (data: CallBackProps) => {
+    const { action, index, status, type } = data;
+
+    // Cuando termina voluntariamente o por skip
+    if (([STATUS.FINISHED, STATUS.SKIPPED] as string[]).includes(status)) {
+      endTutorial();
+      return;
+    }
+
+    // Gestionamos clicks en next/prev y errores.
+    if (type === EVENTS.STEP_AFTER) {
+      if (action === ACTIONS.NEXT) {
+        goToStep(index + 1);
+      } else if (action === ACTIONS.PREV) {
+        goToStep(index - 1);
       }
-    };
+    } else if (type === EVENTS.TARGET_NOT_FOUND) {
+      // Ignorar discretamente el TARGET_NOT_FOUND sin forzar un loop, 
+      // ya que con nuestra lógica asincrónica de contexto el target puede estar formándose.
+      console.warn(`Tutorial: Target not found para el paso ${index}, esperando montaje...`);
+    }
+    
+    // Si se intentó hacer click en el botón `close` nativo
+    if (action === ACTIONS.CLOSE && type === EVENTS.STEP_AFTER) {
+      endTutorial();
+    }
+  };
 
-    updatePositions();
-
-    // Re-calcular posiciones al redimensionar
-    window.addEventListener('resize', updatePositions);
-    window.addEventListener('scroll', updatePositions);
-
-    return () => {
-      window.removeEventListener('resize', updatePositions);
-      window.removeEventListener('scroll', updatePositions);
-    };
-  }, [isRunning, currentStep, getHighlightStyle, updateTooltipPosition]);
-
-  if (!isRunning || !currentStep || !currentTutorial) return null;
-
-  const totalSteps = currentTutorial.steps.length;
-  const currentIndex = tutorialState.currentStepIndex;
-  const isLastStep = currentIndex === totalSteps - 1;
+  if (!isRunning || !currentTutorial) return null;
 
   return (
-    <>
-      {/* Overlay oscuro con spotlight en el elemento */}
-      {highlightElement && (
-        <>
-          <div className="tutorial-overlay" />
-          <div 
-            className="tutorial-highlight"
-            style={highlightStyle}
-          />
-        </>
-      )}
-
-      {/* Tooltip con instrucciones */}
-      <div
-        className={cn(
-          'tutorial-tooltip',
-          'bg-white dark:bg-slate-900 rounded-lg shadow-2xl p-6',
-          'max-w-md'
-        )}
-        style={tooltipStyle}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
-              <span className="text-sm font-bold text-blue-600 dark:text-blue-300">
-                {currentIndex + 1}
-              </span>
-            </div>
-            <h3 className="text-lg font-bold text-foreground">
-              {currentStep.title}
-            </h3>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={endTutorial}
-            className="h-8 w-8 p-0 shrink-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Contenido */}
-        <p className="text-sm text-muted-foreground mb-3">
-          {currentStep.description}
-        </p>
-
-        {/* Acción sugerida */}
-        {currentStep.action && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded px-3 py-2 mb-4">
-            <p className="text-xs text-blue-700 dark:text-blue-300">
-              <span className="font-semibold">💡 Próximo paso:</span> {currentStep.action}
-            </p>
-          </div>
-        )}
-
-        {/* Barra de progreso */}
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-medium text-muted-foreground">
-              Progreso: {currentIndex + 1}/{totalSteps}
-            </span>
-            <span className="text-xs font-bold text-blue-600">{progress}%</span>
-          </div>
-          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-blue-600 transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Botones de navegación */}
-        <div className="flex gap-3">
-          {currentIndex > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={previousStep}
-              className="flex-1"
-            >
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Anterior
-            </Button>
-          )}
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={skipTutorial}
-            className="flex-1"
-          >
-            <SkipForward className="h-4 w-4 mr-2" />
-            Saltar
-          </Button>
-
-          <Button
-            onClick={isLastStep ? endTutorial : nextStep}
-            size="sm"
-            className="flex-1"
-          >
-            {isLastStep ? 'Completado ✓' : 'Siguiente'}
-            {!isLastStep && <ChevronRight className="h-4 w-4 ml-2" />}
-          </Button>
-        </div>
-
-        {/* Info adicional */}
-        {currentTutorial.estimatedTime && (
-          <p className="text-xs text-muted-foreground mt-3 text-center">
-            ⏱️ Tiempo estimado: {currentTutorial.estimatedTime} min
-          </p>
-        )}
-      </div>
-    </>
+    <Joyride
+      steps={steps}
+      stepIndex={tutorialState.currentStepIndex}
+      run={isRunning}
+      callback={handleJoyrideCallback}
+      continuous
+      scrollToFirstStep
+      scrollOffset={120} // Considera el header para un scroll suave armónico
+      showProgress
+      showSkipButton
+      disableScrollParentFix // Previene glitches de scroll en contendores flex
+      tooltipComponent={CustomTooltip}
+      // Configuración estética de Joyride Overlay
+      styles={{
+        options: {
+          zIndex: 10000,
+          overlayColor: 'rgba(0, 0, 0, 0.70)', // Spotlight intenso y lujoso
+        },
+        spotlight: {
+          borderRadius: '12px',
+        }
+      }}
+    />
   );
 }

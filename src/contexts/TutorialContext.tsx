@@ -2,7 +2,7 @@
 // Tutorial Context - Compartir estado de tutoriales globalmente
 // ============================================================
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { TutorialState, TutorialStep } from '@/lib/tutorial/types';
 import { getTutorialByModuleId, TUTORIAL_MODULES } from '@/lib/tutorial/config';
 
@@ -19,6 +19,7 @@ interface TutorialContextType {
   goToStep: (stepIndex: number) => void;
   endTutorial: () => void;
   skipTutorial: () => void;
+  setNavigate: (navigate: (path: string) => void) => void;
   
   // Información
   getCurrentStep: () => TutorialStep | null;
@@ -29,6 +30,9 @@ interface TutorialContextType {
 
 const TutorialContext = createContext<TutorialContextType | undefined>(undefined);
 
+// Ruta a donde volver cuando termine el tutorial
+const RETURN_ROUTE = '/learning';
+
 export function TutorialProvider({ children }: { children: React.ReactNode }) {
   const [tutorialState, setTutorialState] = useState<TutorialState>({
     activeModuleId: null,
@@ -36,6 +40,13 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     isRunning: false,
     completedSteps: [],
   });
+  
+  // Guardamos la función de navegación
+  const navigateRef = useRef<((path: string) => void) | null>(null);
+  
+  const setNavigate = useCallback((navigate: (path: string) => void) => {
+    navigateRef.current = navigate;
+  }, []);
 
   // Iniciar tutorial de un módulo
   const startTutorial = useCallback((moduleId: string) => {
@@ -56,19 +67,26 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     const tutorial = getTutorialByModuleId(moduleId);
     if (!tutorial) return;
 
+    // Guardar función de navegación si se proporciona
+    if (navigate) {
+      navigateRef.current = navigate;
+    }
+
     // Primero navegar a la ruta si existe y hay función de navegación
-    if (route && navigate) {
-      navigate(route);
+    if (route && navigateRef.current) {
+      navigateRef.current(route);
     }
 
     // Luego iniciar el tutorial
-    setTutorialState(prev => ({
-      ...prev,
-      activeModuleId: moduleId,
-      currentStepIndex: 0,
-      isRunning: true,
-      completedSteps: [],
-    }));
+    setTimeout(() => {
+      setTutorialState(prev => ({
+        ...prev,
+        activeModuleId: moduleId,
+        currentStepIndex: 0,
+        isRunning: true,
+        completedSteps: [],
+      }));
+    }, 0);
   }, []);
 
   // Ir al siguiente paso
@@ -81,11 +99,40 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       const currentStep = tutorial.steps[prev.currentStepIndex];
 
       if (newIndex >= tutorial.steps.length) {
-        // Tutorial completado
+        // Tutorial completado - volver al Centro de Aprendizaje
+        if (navigateRef.current) {
+          setTimeout(() => {
+            navigateRef.current!(RETURN_ROUTE);
+          }, 0);
+        }
         return {
           ...prev,
           isRunning: false,
           completedSteps: [...prev.completedSteps, currentStep.id],
+        };
+      }
+
+      const nextStepData = tutorial.steps[newIndex];
+      
+      // Si el próximo paso requiere navegación, lo hacemos asincrónico para evitar race-conditions con Joyride
+      if (nextStepData.route && navigateRef.current) {
+        setTimeout(() => {
+          navigateRef.current!(nextStepData.route!);
+          // Pequeño delay adicional para permitir mount del nuevo componente
+          setTimeout(() => {
+            setTutorialState(currentState => ({
+              ...currentState,
+              currentStepIndex: newIndex,
+              completedSteps: [...currentState.completedSteps, currentStep.id],
+              isRunning: true,
+            }));
+          }, 400);
+        }, 0);
+        
+        // Congelamos el status momentáneamente cambiando isRunning a false temporalmente
+        return {
+          ...prev,
+          isRunning: false, 
         };
       }
 
@@ -99,10 +146,36 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
 
   // Ir al paso anterior
   const previousStep = useCallback(() => {
-    setTutorialState(prev => ({
-      ...prev,
-      currentStepIndex: Math.max(0, prev.currentStepIndex - 1),
-    }));
+    setTutorialState(prev => {
+      const tutorial = getTutorialByModuleId(prev.activeModuleId!);
+      if (!tutorial) return prev;
+
+      const newIndex = Math.max(0, prev.currentStepIndex - 1);
+      
+      const prevStepData = tutorial.steps[newIndex];
+      if (prevStepData.route && navigateRef.current) {
+        setTimeout(() => {
+          navigateRef.current!(prevStepData.route!);
+          setTimeout(() => {
+            setTutorialState(currentState => ({
+              ...currentState,
+              currentStepIndex: newIndex,
+              isRunning: true,
+            }));
+          }, 400);
+        }, 0);
+        
+        return {
+          ...prev,
+          isRunning: false,
+        };
+      }
+      
+      return {
+        ...prev,
+        currentStepIndex: newIndex,
+      };
+    });
   }, []);
 
   // Saltar a un paso específico
@@ -111,23 +184,50 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       const tutorial = getTutorialByModuleId(prev.activeModuleId!);
       if (!tutorial) return prev;
 
+      const clampedIndex = Math.max(0, Math.min(stepIndex, tutorial.steps.length - 1));
+      const stepData = tutorial.steps[clampedIndex];
+      
+      if (stepData.route && navigateRef.current) {
+        setTimeout(() => {
+          navigateRef.current!(stepData.route!);
+          setTimeout(() => {
+            setTutorialState(currentState => ({
+              ...currentState,
+              currentStepIndex: clampedIndex,
+              isRunning: true,
+            }));
+          }, 400);
+        }, 0);
+
+        return {
+          ...prev,
+          isRunning: false,
+        };
+      }
+
       return {
         ...prev,
-        currentStepIndex: Math.max(0, Math.min(stepIndex, tutorial.steps.length - 1)),
+        currentStepIndex: clampedIndex,
       };
     });
   }, []);
 
-  // Finalizar tutorial
+  // Finalizar tutorial y volver al Centro de Aprendizaje
   const endTutorial = useCallback(() => {
     setTutorialState(prev => ({
       ...prev,
       isRunning: false,
       activeModuleId: null,
     }));
+    // Volver al Centro de Aprendizaje
+    if (navigateRef.current) {
+      setTimeout(() => {
+        navigateRef.current!(RETURN_ROUTE);
+      }, 0);
+    }
   }, []);
 
-  // Saltar tutorial
+  // Saltar tutorial y volver al Centro de Aprendizaje
   const skipTutorial = useCallback(() => {
     setTutorialState({
       activeModuleId: null,
@@ -135,6 +235,12 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       isRunning: false,
       completedSteps: [],
     });
+    // Volver al Centro de Aprendizaje
+    if (navigateRef.current) {
+      setTimeout(() => {
+        navigateRef.current!(RETURN_ROUTE);
+      }, 0);
+    }
   }, []);
 
   // Obtener paso actual
@@ -176,6 +282,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     goToStep,
     endTutorial,
     skipTutorial,
+    setNavigate,
     
     getCurrentStep,
     getCurrentTutorial,

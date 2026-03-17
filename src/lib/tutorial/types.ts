@@ -19,6 +19,8 @@ export interface TutorialStep {
   icon?: string;
   /** Duración sugerida en segundos */
   duration?: number;
+  /** Ruta a navegar al mostrar este paso */
+  route?: string;
 }
 
 export interface ModuleTutorial {

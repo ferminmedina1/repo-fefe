@@ -2062,6 +2062,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Inicio',
     estimatedTime: 30,
     icon: 'Upload',
+    route: '/app',
     steps: [
       {
         id: 'migration-1',
@@ -2070,6 +2071,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Continúa leyendo esta guía paso a paso',
         duration: 2,
+        route: '/app',
       },
       {
         id: 'migration-2',
@@ -2086,6 +2088,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Abre Configuración General',
         duration: 3,
+        route: '/settings/general',
       },
       {
         id: 'migration-4',
@@ -2094,6 +2097,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Configura antes de importar ventas',
         duration: 4,
+        route: '/settings/payment-methods',
       },
       {
         id: 'migration-5',
@@ -2102,6 +2106,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Importa archivo Clientes.xlsx',
         duration: 5,
+        route: '/customers',
       },
       {
         id: 'migration-6',
@@ -2110,6 +2115,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Importa archivo Productos.xlsx',
         duration: 5,
+        route: '/products',
       },
       {
         id: 'migration-7',
@@ -2118,6 +2124,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Importa Proveedores.xlsx + Empleados.xlsx',
         duration: 5,
+        route: '/suppliers',
       },
       {
         id: 'migration-8',
@@ -2126,6 +2133,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Completa registro de saldos iniciales',
         duration: 4,
+        route: '/finances',
       },
       {
         id: 'migration-9',
@@ -2134,6 +2142,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Valida números vs. sistema anterior',
         duration: 3,
+        route: '/app',
       },
       {
         id: 'migration-10',
@@ -2142,6 +2151,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Ve al Centro de Aprendizaje para más tutoriales',
         duration: 2,
+        route: '/learning',
       },
     ],
   },
