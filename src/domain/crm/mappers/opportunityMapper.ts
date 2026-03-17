@@ -22,6 +22,7 @@ export const toOpportunityDTO = (row: OpportunityRow): OpportunityDTO => ({
   currency: row.currency,
   expectedRevenue: row.expected_revenue,
   nextStep: row.next_step,
+  customFields: (row.custom_fields as Record<string, unknown> | null) ?? null,
   lastActivityAt: row.last_activity_at,
   slaDueAt: row.sla_due_at,
   scoreTotal: row.score_total ?? 0,

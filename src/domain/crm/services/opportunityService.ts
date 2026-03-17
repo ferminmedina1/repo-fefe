@@ -113,6 +113,7 @@ export const opportunityService = {
       expected_revenue: values.expected_revenue ?? undefined,
       next_step: values.next_step || undefined,
       tags: values.tags || undefined,
+      custom_fields: (values as any).custom_fields || undefined,
     });
     const created = await opportunityRepository.create(values);
     await stageRuleService.applyForOpportunity({

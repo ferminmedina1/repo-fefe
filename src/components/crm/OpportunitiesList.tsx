@@ -210,6 +210,7 @@ export function OpportunitiesList({ companyId, search, filters, onCreate }: Oppo
     source: dto.source, currency: dto.currency, expected_revenue: dto.expectedRevenue,
     next_step: dto.nextStep, last_activity_at: dto.lastActivityAt, sla_due_at: dto.slaDueAt,
     score_total: dto.scoreTotal ?? 0, score_updated_at: dto.scoreUpdatedAt,
+    custom_fields: dto.customFields ?? {},
     tags: dto.tags, created_at: dto.createdAt, updated_at: dto.updatedAt, closed_at: null,
   });
 

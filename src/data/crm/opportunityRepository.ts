@@ -12,7 +12,7 @@ export const opportunityRepository = {
     let q = supabase
       .from("crm_opportunities")
       .select(
-        "id, company_id, name, email, phone, customer_id, pipeline_id, stage, value, estimated_close_date, probability, next_step, last_activity_at, sla_due_at, score_total, score_updated_at, created_at, updated_at, owner_id, status, tags",
+        "id, company_id, name, email, phone, customer_id, pipeline_id, stage, value, estimated_close_date, probability, next_step, last_activity_at, sla_due_at, score_total, score_updated_at, created_at, updated_at, owner_id, status, tags, custom_fields",
         { count: "estimated" }
       )
       .eq("company_id", params.companyId);

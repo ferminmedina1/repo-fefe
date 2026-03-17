@@ -27,10 +27,18 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { LucidePlus, LucideDownload, List, CalendarDays, Kanban, SlidersHorizontal, Eye } from "lucide-react";
+import { LucidePlus, LucideDownload, LucideUpload, List, CalendarDays, Kanban, SlidersHorizontal, Eye } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,6 +49,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { opportunityService } from "@/domain/crm/services/opportunityService";
 import type { OpportunityDTO } from "@/domain/crm/dtos/opportunity";
 import * as XLSX from "xlsx";
+import Papa from "papaparse";
 
 // --- Data hooks reutilizables ---
 type OpportunityRow = Database["public"]["Tables"]["crm_opportunities"]["Row"];
@@ -59,6 +68,37 @@ type OpportunityInsertExtended = OpportunityInsert & {
   tags?: string[] | null;
 };
 type OpportunityUpdate = Database["public"]["Tables"]["crm_opportunities"]["Update"];
+type PipelineRow = Database["public"]["Tables"]["crm_pipelines"]["Row"];
+
+type ImportMode = "existing" | "create" | "none";
+
+type ImportValidationIssue = {
+  rowNumber: number;
+  field: string;
+  message: string;
+};
+
+type ImportPreparedRow = {
+  payload: OpportunityInsertExtended;
+  extraColumns: Record<string, string>;
+};
+
+type PlannedCustomField = {
+  label: string;
+  fieldKey: string;
+  fieldType: CustomFieldType;
+};
+
+type CustomFieldType = "text" | "number" | "textarea" | "select" | "checkbox" | "date";
+
+type ImportPreview = {
+  totalRows: number;
+  validRows: ImportPreparedRow[];
+  invalidRows: ImportValidationIssue[];
+  extraHeaders: string[];
+  headerValueSamples: Record<string, string[]>;
+  plannedCustomFields: PlannedCustomField[];
+};
 
 export function useOpportunitiesQuery(params: {
   companyId: string;
@@ -166,6 +206,16 @@ export default function OpportunitiesPage() {
   const [view, setView] = useState<"list" | "calendar" | "kanban">("list");
   const [showViewPanel, setShowViewPanel] = useState(false);
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importMode, setImportMode] = useState<ImportMode>("existing");
+  const [importPipelineId, setImportPipelineId] = useState<string>("");
+  const [importPipelineName, setImportPipelineName] = useState("");
+  const [importPipelineStages, setImportPipelineStages] = useState("nuevo,en_proceso,ganado,perdido");
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [importErrorsVisibleCount, setImportErrorsVisibleCount] = useState(50);
+  const [isCheckingImport, setIsCheckingImport] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -232,6 +282,11 @@ export default function OpportunitiesPage() {
     const allStages = pipelines.flatMap((p: any) => p.stages || []);
     return Array.from(new Set(allStages));
   }, [filters.pipelineId, pipelines]);
+
+  const selectedImportPipeline = useMemo(
+    () => pipelines.find((pipeline: any) => pipeline.id === importPipelineId) as PipelineRow | undefined,
+    [pipelines, importPipelineId]
+  );
 
   const createSavedViewMutation = useMutation({
     mutationFn: async () => {
@@ -406,6 +461,558 @@ export default function OpportunitiesPage() {
     }
   };
 
+  const normalizeCell = (value: unknown) => String(value ?? "").trim();
+
+  const DEFAULT_IMPORT_HEADERS = new Set(
+    [
+      "name", "nombre", "oportunidad",
+      "email", "mail", "correo",
+      "phone", "telefono", "teléfono", "celular",
+      "probability", "probabilidad",
+      "value", "monto", "importe",
+      "expected_revenue", "ingreso_esperado",
+      "estimated_close_date", "fecha_cierre_estimado",
+      "close_date", "fecha_cierre",
+      "stage", "etapa",
+      "status", "estado",
+      "tags", "etiquetas",
+      "description", "descripcion",
+      "source", "fuente",
+      "next_step", "proximo_paso",
+      "currency", "moneda",
+      "pipeline", "pipeline_id", "pipeline_name",
+      "owner_id", "owner", "responsable",
+      "customer_id", "customer", "cliente",
+    ].map((header) => header.toLowerCase().trim())
+  );
+
+  const slugifyFieldKey = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
+  const inferCustomFieldType = (samples: string[]): CustomFieldType => {
+    const nonEmpty = samples.map((sample) => sample.trim()).filter(Boolean);
+    if (!nonEmpty.length) return "text";
+
+    const isBoolean = nonEmpty.every((sample) => /^(true|false|1|0|si|sí|no|yes)$/i.test(sample));
+    if (isBoolean) return "checkbox";
+
+    const isNumber = nonEmpty.every((sample) => {
+      const normalized = sample.replace(/\./g, "").replace(",", ".");
+      return Number.isFinite(Number(normalized));
+    });
+    if (isNumber) return "number";
+
+    const isDate = nonEmpty.every((sample) => {
+      const date = new Date(sample);
+      return !Number.isNaN(date.getTime());
+    });
+    if (isDate) return "date";
+
+    return "text";
+  };
+
+  const getCell = (row: Record<string, unknown>, aliases: string[]) => {
+    for (const alias of aliases) {
+      const direct = row[alias];
+      if (direct !== undefined && direct !== null && String(direct).trim() !== "") {
+        return String(direct).trim();
+      }
+
+      const aliasLower = alias.toLowerCase();
+      const key = Object.keys(row).find((k) => k.toLowerCase().trim() === aliasLower);
+      if (!key) continue;
+      const value = row[key];
+      if (value !== undefined && value !== null && String(value).trim() !== "") {
+        return String(value).trim();
+      }
+    }
+    return "";
+  };
+
+  const parseOptionalNumber = (value: string) => {
+    if (!value) return null;
+    const normalized = value.replace(/\./g, "").replace(",", ".");
+    const number = Number(normalized);
+    return Number.isFinite(number) ? number : Number.NaN;
+  };
+
+  const parseOptionalDate = (value: string) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "INVALID_DATE";
+    return date.toISOString().slice(0, 10);
+  };
+
+  const normalizeStage = (value: string) =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "_");
+
+  const parseStageList = (value: string) => {
+    const parsed = value
+      .split(",")
+      .map((stage) => normalizeStage(stage))
+      .filter(Boolean);
+
+    if (!parsed.length) {
+      return ["nuevo", "en_proceso", "ganado", "perdido"];
+    }
+
+    return Array.from(new Set(parsed));
+  };
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const resetImportState = () => {
+    setImportFile(null);
+    setImportPreview(null);
+    setImportMode("existing");
+    setImportPipelineId("");
+    setImportPipelineName("");
+    setImportPipelineStages("nuevo,en_proceso,ganado,perdido");
+    setImportErrorsVisibleCount(50);
+    setIsCheckingImport(false);
+    setIsImporting(false);
+  };
+
+  const runImportPrecheck = async () => {
+    if (!importFile) {
+      toast.error("Seleccioná un archivo CSV");
+      return;
+    }
+
+    if (importMode === "existing" && !importPipelineId) {
+      toast.error("Seleccioná un pipeline para importar");
+      return;
+    }
+
+    if (importMode === "create" && !importPipelineName.trim()) {
+      toast.error("Indicá un nombre para el nuevo pipeline");
+      return;
+    }
+
+    setIsCheckingImport(true);
+    setImportPreview(null);
+    setImportErrorsVisibleCount(50);
+
+    Papa.parse(importFile, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const rows = (results.data as Record<string, unknown>[]) || [];
+        const invalidRows: ImportValidationIssue[] = [];
+        const validRows: ImportPreparedRow[] = [];
+        const extraHeadersSet = new Set<string>();
+        const headerValueSamples = new Map<string, string[]>();
+
+        if (!rows.length) {
+          setIsCheckingImport(false);
+          toast.error("El CSV está vacío");
+          return;
+        }
+
+        let selectedPipelineStages: string[] = [];
+        if (importMode === "existing") {
+          selectedPipelineStages = (selectedImportPipeline?.stages ?? []).map((stage) => normalizeStage(stage));
+        }
+        if (importMode === "create") {
+          selectedPipelineStages = parseStageList(importPipelineStages);
+        }
+
+        const selectedStageSet = new Set(selectedPipelineStages);
+
+        for (let index = 0; index < rows.length; index += 1) {
+          const row = rows[index];
+          const rowNumber = index + 2;
+
+          Object.entries(row).forEach(([rawHeader, rawValue]) => {
+            const header = String(rawHeader || "").trim();
+            if (!header) return;
+
+            const normalizedHeader = header.toLowerCase().trim();
+            if (DEFAULT_IMPORT_HEADERS.has(normalizedHeader)) return;
+
+            extraHeadersSet.add(header);
+
+            const cellValue = normalizeCell(rawValue);
+            if (!cellValue) return;
+
+            const existing = headerValueSamples.get(header) || [];
+            if (existing.length < 50) {
+              existing.push(cellValue);
+              headerValueSamples.set(header, existing);
+            }
+          });
+
+          const name = getCell(row, ["name", "nombre", "oportunidad"]);
+          const email = getCell(row, ["email", "mail", "correo"]);
+          const phone = getCell(row, ["phone", "telefono", "teléfono", "celular"]);
+
+          if (!name) {
+            invalidRows.push({ rowNumber, field: "name", message: "Nombre requerido" });
+            continue;
+          }
+          if (!email) {
+            invalidRows.push({ rowNumber, field: "email", message: "Email requerido" });
+            continue;
+          }
+          if (!emailRegex.test(email)) {
+            invalidRows.push({ rowNumber, field: "email", message: "Email inválido" });
+            continue;
+          }
+          if (!phone) {
+            invalidRows.push({ rowNumber, field: "phone", message: "Teléfono requerido" });
+            continue;
+          }
+
+          const rawProbability = getCell(row, ["probability", "probabilidad"]);
+          const probability = parseOptionalNumber(rawProbability);
+          if (Number.isNaN(probability)) {
+            invalidRows.push({ rowNumber, field: "probability", message: "Probabilidad inválida" });
+            continue;
+          }
+          if (probability !== null && (probability < 0 || probability > 100)) {
+            invalidRows.push({ rowNumber, field: "probability", message: "Probabilidad debe estar entre 0 y 100" });
+            continue;
+          }
+
+          const rawValue = getCell(row, ["value", "monto", "importe"]);
+          const value = parseOptionalNumber(rawValue);
+          if (Number.isNaN(value)) {
+            invalidRows.push({ rowNumber, field: "value", message: "Monto inválido" });
+            continue;
+          }
+
+          const rawExpectedRevenue = getCell(row, ["expected_revenue", "ingreso_esperado"]);
+          const expectedRevenue = parseOptionalNumber(rawExpectedRevenue);
+          if (Number.isNaN(expectedRevenue)) {
+            invalidRows.push({ rowNumber, field: "expected_revenue", message: "Ingreso esperado inválido" });
+            continue;
+          }
+
+          const estimatedCloseDate = parseOptionalDate(getCell(row, ["estimated_close_date", "fecha_cierre_estimado"]));
+          if (estimatedCloseDate === "INVALID_DATE") {
+            invalidRows.push({ rowNumber, field: "estimated_close_date", message: "Fecha estimada inválida" });
+            continue;
+          }
+
+          const closeDate = parseOptionalDate(getCell(row, ["close_date", "fecha_cierre"]));
+          if (closeDate === "INVALID_DATE") {
+            invalidRows.push({ rowNumber, field: "close_date", message: "Fecha de cierre inválida" });
+            continue;
+          }
+
+          const rawStage = normalizeStage(getCell(row, ["stage", "etapa"]));
+          const fallbackStage = selectedPipelineStages[0] || "nuevo";
+          const stage = rawStage || fallbackStage;
+
+          if ((importMode === "existing" || importMode === "create") && selectedStageSet.size > 0 && !selectedStageSet.has(stage)) {
+            invalidRows.push({
+              rowNumber,
+              field: "stage",
+              message: `La etapa '${stage}' no existe en el pipeline seleccionado`,
+            });
+            continue;
+          }
+
+          const status = normalizeCell(getCell(row, ["status", "estado"])).toLowerCase() || "abierta";
+          if (!["abierta", "ganado", "perdido"].includes(status)) {
+            invalidRows.push({ rowNumber, field: "status", message: "Estado inválido (abierta/ganado/perdido)" });
+            continue;
+          }
+
+          const tagsRaw = getCell(row, ["tags", "etiquetas"]);
+          const tags = tagsRaw
+            ? tagsRaw.split(/[;,]/).map((tag) => tag.trim()).filter(Boolean)
+            : null;
+
+          const extraColumns: Record<string, string> = {};
+          Object.entries(row).forEach(([rawHeader, rawValue]) => {
+            const header = String(rawHeader || "").trim();
+            if (!header) return;
+            if (DEFAULT_IMPORT_HEADERS.has(header.toLowerCase().trim())) return;
+
+            const cellValue = normalizeCell(rawValue);
+            if (!cellValue) return;
+            extraColumns[header] = cellValue;
+          });
+
+          validRows.push({
+            payload: {
+              company_id: currentCompany.id,
+              name,
+              email,
+              phone,
+              pipeline_id: importMode === "existing" ? importPipelineId : null,
+              stage,
+              status,
+              probability: probability === null ? 0 : Math.round(probability),
+              value: value === null ? null : value,
+              expected_revenue: expectedRevenue === null ? null : expectedRevenue,
+              estimated_close_date: estimatedCloseDate as string | null,
+              close_date: closeDate as string | null,
+              description: getCell(row, ["description", "descripcion"]) || null,
+              source: getCell(row, ["source", "fuente"]) || null,
+              next_step: getCell(row, ["next_step", "proximo_paso"]) || null,
+              currency: getCell(row, ["currency", "moneda"]) || "ARS",
+              tags,
+            },
+            extraColumns,
+          });
+        }
+
+        const plannedCustomFields: PlannedCustomField[] = [];
+        if (extraHeadersSet.size > 0) {
+          const { data: existingFieldDefs, error: existingFieldDefsError } = await supabase
+            .from("crm_opportunity_custom_field_definitions")
+            .select("field_key, label")
+            .eq("company_id", currentCompany.id)
+            .eq("is_active", true);
+
+          if (existingFieldDefsError) {
+            setIsCheckingImport(false);
+            toast.error(existingFieldDefsError.message || "No se pudieron validar custom fields");
+            return;
+          }
+
+          const existingByFieldKey = new Set(
+            (existingFieldDefs || []).map((field: any) => String(field.field_key).toLowerCase())
+          );
+          const existingByLabelSlug = new Set(
+            (existingFieldDefs || []).map((field: any) => slugifyFieldKey(String(field.label || "")))
+          );
+
+          const usedKeys = new Set<string>((existingFieldDefs || []).map((field: any) => String(field.field_key)));
+
+          Array.from(extraHeadersSet).forEach((header, index) => {
+            const headerSlug = slugifyFieldKey(header);
+            if (!headerSlug) return;
+
+            if (existingByFieldKey.has(headerSlug) || existingByLabelSlug.has(headerSlug)) {
+              return;
+            }
+
+            const baseKey = headerSlug || `campo_${index + 1}`;
+            let nextKey = baseKey;
+            let suffix = 2;
+            while (usedKeys.has(nextKey)) {
+              nextKey = `${baseKey}_${suffix}`;
+              suffix += 1;
+            }
+            usedKeys.add(nextKey);
+
+            const inferredType = inferCustomFieldType(headerValueSamples.get(header) || []);
+            plannedCustomFields.push({
+              label: header,
+              fieldKey: nextKey,
+              fieldType: inferredType,
+            });
+          });
+        }
+
+        setImportPreview({
+          totalRows: rows.length,
+          validRows,
+          invalidRows,
+          extraHeaders: Array.from(extraHeadersSet),
+          headerValueSamples: Object.fromEntries(headerValueSamples.entries()),
+          plannedCustomFields,
+        });
+
+        setIsCheckingImport(false);
+
+        if (!validRows.length) {
+          toast.error("No hay filas válidas para importar");
+          return;
+        }
+
+        if (!invalidRows.length) {
+          toast.success(
+            `Pre-check OK: ${validRows.length} filas válidas${
+              plannedCustomFields.length ? `, ${plannedCustomFields.length} custom fields nuevos` : ""
+            }`
+          );
+          return;
+        }
+
+        toast.warning(
+          `Pre-check completado: ${validRows.length} válidas, ${invalidRows.length} inválidas${
+            plannedCustomFields.length ? `, ${plannedCustomFields.length} custom fields nuevos` : ""
+          }`
+        );
+      },
+      error: (error) => {
+        setIsCheckingImport(false);
+        toast.error(error.message || "No se pudo leer el CSV");
+      },
+    });
+  };
+
+  const importValidRows = async () => {
+    if (!importPreview || !importPreview.validRows.length) {
+      toast.error("Ejecutá el pre-check antes de importar");
+      return;
+    }
+
+    setIsImporting(true);
+
+    try {
+      let pipelineIdToUse: string | null = importMode === "existing" ? importPipelineId : null;
+
+      if (importMode === "create") {
+        const stages = parseStageList(importPipelineStages);
+        const { data: createdPipeline, error: pipelineError } = await supabase
+          .from("crm_pipelines")
+          .insert([
+            {
+              company_id: currentCompany.id,
+              name: importPipelineName.trim(),
+              stages,
+            },
+          ])
+          .select("id")
+          .single();
+
+        if (pipelineError) throw pipelineError;
+        pipelineIdToUse = createdPipeline.id;
+      }
+
+      const { data: existingFieldDefs, error: existingFieldDefsError } = await supabase
+        .from("crm_opportunity_custom_field_definitions")
+        .select("field_key, label, field_type")
+        .eq("company_id", currentCompany.id)
+        .eq("is_active", true);
+      if (existingFieldDefsError) throw existingFieldDefsError;
+
+      const fieldKeyByHeader = new Map<string, string>();
+      const fieldTypeByKey = new Map<string, CustomFieldType>();
+
+      const existingByFieldKey = new Map<string, string>();
+      const existingByLabelSlug = new Map<string, string>();
+      const usedKeys = new Set<string>();
+
+      (existingFieldDefs || []).forEach((field: any) => {
+        const key = String(field.field_key);
+        usedKeys.add(key);
+        existingByFieldKey.set(key.toLowerCase(), key);
+        existingByLabelSlug.set(slugifyFieldKey(String(field.label || "")), key);
+        fieldTypeByKey.set(key, (field.field_type as CustomFieldType) || "text");
+      });
+
+      const newFieldDefs: Database["public"]["Tables"]["crm_opportunity_custom_field_definitions"]["Insert"][] = [];
+
+      importPreview.extraHeaders.forEach((header, index) => {
+        const headerSlug = slugifyFieldKey(header);
+        const existingByKey = existingByFieldKey.get(headerSlug);
+        const existingByLabel = existingByLabelSlug.get(headerSlug);
+        if (existingByKey) {
+          fieldKeyByHeader.set(header, existingByKey);
+          return;
+        }
+        if (existingByLabel) {
+          fieldKeyByHeader.set(header, existingByLabel);
+          return;
+        }
+
+        const baseKey = headerSlug || `campo_${index + 1}`;
+        let nextKey = baseKey;
+        let suffix = 2;
+        while (usedKeys.has(nextKey)) {
+          nextKey = `${baseKey}_${suffix}`;
+          suffix += 1;
+        }
+
+        usedKeys.add(nextKey);
+        fieldKeyByHeader.set(header, nextKey);
+
+        const inferredType = inferCustomFieldType(importPreview.headerValueSamples[header] || []);
+        fieldTypeByKey.set(nextKey, inferredType);
+
+        newFieldDefs.push({
+          company_id: currentCompany.id,
+          field_key: nextKey,
+          label: header,
+          field_type: inferredType,
+          options: null,
+          is_required: false,
+          is_active: true,
+          sort_order: existingByFieldKey.size + newFieldDefs.length,
+        });
+      });
+
+      if (newFieldDefs.length > 0) {
+        const { error: insertCustomFieldDefsError } = await supabase
+          .from("crm_opportunity_custom_field_definitions")
+          .insert(newFieldDefs);
+        if (insertCustomFieldDefsError) throw insertCustomFieldDefsError;
+      }
+
+      const finalRows = importPreview.validRows.map(({ payload, extraColumns }) => {
+        const customFields: Record<string, unknown> = {};
+
+        Object.entries(extraColumns).forEach(([header, rawValue]) => {
+          const fieldKey = fieldKeyByHeader.get(header);
+          if (!fieldKey) return;
+
+          const fieldType = fieldTypeByKey.get(fieldKey) || "text";
+          if (fieldType === "number") {
+            const parsed = parseOptionalNumber(rawValue);
+            customFields[fieldKey] = Number.isNaN(parsed) ? rawValue : parsed;
+            return;
+          }
+          if (fieldType === "checkbox") {
+            if (/^(true|1|si|sí|yes)$/i.test(rawValue)) {
+              customFields[fieldKey] = true;
+              return;
+            }
+            if (/^(false|0|no)$/i.test(rawValue)) {
+              customFields[fieldKey] = false;
+              return;
+            }
+          }
+          customFields[fieldKey] = rawValue;
+        });
+
+        return {
+          ...payload,
+          pipeline_id: pipelineIdToUse,
+          custom_fields: customFields,
+        };
+      });
+
+      const CHUNK_SIZE = 500;
+      for (let index = 0; index < finalRows.length; index += CHUNK_SIZE) {
+        const chunk = finalRows.slice(index, index + CHUNK_SIZE);
+        const { error } = await supabase.from("crm_opportunities").insert(chunk);
+        if (error) throw error;
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["opportunities"] });
+      queryClient.invalidateQueries({ queryKey: ["crm-pipelines", currentCompany.id] });
+      queryClient.invalidateQueries({ queryKey: ["crm-opportunity-custom-fields", currentCompany.id] });
+
+      toast.success(
+        `Importación completada: ${finalRows.length} oportunidades creadas${
+          importPreview.invalidRows.length ? `, ${importPreview.invalidRows.length} filas omitidas` : ""
+        }`
+      );
+
+      setIsImportDialogOpen(false);
+      resetImportState();
+    } catch (error: any) {
+      toast.error(error.message || "Error al importar oportunidades");
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -496,6 +1103,176 @@ export default function OpportunitiesPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Dialog
+              open={isImportDialogOpen}
+              onOpenChange={(open) => {
+                setIsImportDialogOpen(open);
+                if (!open) resetImportState();
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="Importar oportunidades">
+                  <LucideUpload className="w-5 h-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                  <DialogTitle>Importar oportunidades desde CSV</DialogTitle>
+                  <DialogDescription>
+                    Requerido por fila: nombre, email y teléfono. Podés importar solo filas válidas y omitir las incompletas.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="opportunities-csv-file">Archivo CSV</Label>
+                    <Input
+                      id="opportunities-csv-file"
+                      type="file"
+                      accept=".csv"
+                      onChange={(event) => {
+                        setImportFile(event.target.files?.[0] || null);
+                        setImportPreview(null);
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Pipeline de destino</Label>
+                    <Select value={importMode} onValueChange={(value) => setImportMode(value as ImportMode)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Elegí cómo asignar pipeline" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="existing">Usar pipeline existente</SelectItem>
+                        <SelectItem value="create">Crear pipeline nuevo</SelectItem>
+                        <SelectItem value="none">Importar sin pipeline</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {importMode === "existing" && (
+                    <div className="space-y-2">
+                      <Label>Pipeline</Label>
+                      <Select value={importPipelineId} onValueChange={setImportPipelineId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccioná un pipeline" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {pipelines.map((pipeline: any) => (
+                            <SelectItem key={pipeline.id} value={pipeline.id}>
+                              {pipeline.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {importMode === "create" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Nombre del pipeline</Label>
+                        <Input
+                          value={importPipelineName}
+                          onChange={(event) => setImportPipelineName(event.target.value)}
+                          placeholder="Ej: Pipeline migrado"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Etapas (separadas por coma)</Label>
+                        <Input
+                          value={importPipelineStages}
+                          onChange={(event) => setImportPipelineStages(event.target.value)}
+                          placeholder="nuevo,en_proceso,ganado,perdido"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button onClick={runImportPrecheck} disabled={!importFile || isCheckingImport}>
+                      {isCheckingImport ? "Chequeando..." : "Chequear CSV"}
+                    </Button>
+                  </div>
+
+                  {importPreview && (
+                    <div className="space-y-3 rounded-md border p-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Badge variant="outline">Total: {importPreview.totalRows}</Badge>
+                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                          Válidas: {importPreview.validRows.length}
+                        </Badge>
+                        <Badge variant="destructive">Inválidas: {importPreview.invalidRows.length}</Badge>
+                      </div>
+
+                      {!!importPreview.invalidRows.length && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium">Filas con error</p>
+                          <div className="max-h-44 overflow-y-auto rounded border p-2 text-xs space-y-1">
+                            {importPreview.invalidRows.slice(0, importErrorsVisibleCount).map((issue, index) => (
+                              <div key={`${issue.rowNumber}-${issue.field}-${index}`}>
+                                Fila {issue.rowNumber} · {issue.field}: {issue.message}
+                              </div>
+                            ))}
+                          </div>
+                          {importPreview.invalidRows.length > importErrorsVisibleCount && (
+                            <div className="flex justify-end">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setImportErrorsVisibleCount((prev) =>
+                                    Math.min(prev + 100, importPreview.invalidRows.length)
+                                  )
+                                }
+                              >
+                                Ver más errores ({importErrorsVisibleCount}/{importPreview.invalidRows.length})
+                              </Button>
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            El reporte de errores se visualiza en esta pantalla. Podés corregir el CSV y volver a chequear,
+                            o continuar importando solo filas válidas.
+                          </p>
+                        </div>
+                      )}
+
+                      {importPreview.plannedCustomFields.length > 0 && (
+                        <div className="space-y-2 rounded border p-2">
+                          <p className="text-sm font-medium">
+                            Se crearán {importPreview.plannedCustomFields.length} custom fields nuevos
+                          </p>
+                          <div className="max-h-44 overflow-y-auto rounded border p-2 text-xs space-y-1">
+                            {importPreview.plannedCustomFields.map((field) => (
+                              <div key={field.fieldKey}>
+                                {field.label} → {field.fieldKey} ({field.fieldType})
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
+                          Cerrar para corregir CSV
+                        </Button>
+                        <Button
+                          onClick={importValidRows}
+                          disabled={!importPreview.validRows.length || isImporting}
+                        >
+                          {isImporting ? "Importando..." : "Importar solo válidas"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
             <Button onClick={() => setShowDrawer(true)} variant="default">
               <LucidePlus className="w-4 h-4 mr-1" /> Nueva oportunidad
             </Button>

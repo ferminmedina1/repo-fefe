@@ -21,6 +21,7 @@ export const opportunitySchema = z.object({
   expected_revenue: z.number().optional(),
   next_step: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  custom_fields: z.record(z.any()).optional(),
 });
 
 export type OpportunityForm = z.infer<typeof opportunitySchema>;

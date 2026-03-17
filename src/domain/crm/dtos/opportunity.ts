@@ -26,6 +26,7 @@ export interface OpportunityDTO {
   currency: string | null;
   expectedRevenue: number | null;
   nextStep: string | null;
+  customFields: Record<string, unknown> | null;
   lastActivityAt: string | null;
   slaDueAt: string | null;
   scoreTotal: number | null;

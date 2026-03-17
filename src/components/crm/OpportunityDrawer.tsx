@@ -41,6 +41,18 @@ interface TagRow {
   color: string;
 }
 
+type OpportunityCustomFieldType = "text" | "number" | "textarea" | "select" | "checkbox" | "date";
+
+interface OpportunityCustomFieldDefinition {
+  id: string;
+  field_key: string;
+  label: string;
+  type: OpportunityCustomFieldType;
+  options?: string[];
+  is_required?: boolean;
+  sort_order?: number;
+}
+
 const TAG_COLOR_PALETTE = [
   "rgb(59, 130, 246)",
   "rgb(16, 185, 129)",
@@ -105,6 +117,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity, initi
       status: "abierta",
       currency: "ARS",
       tags: [],
+      custom_fields: {},
       ...initialValues,
     },
     mode: "onChange",
@@ -137,6 +150,9 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity, initi
         expected_revenue: normalizeNumber(values.expected_revenue),
         next_step: normalizeText(values.next_step),
         tags: values.tags && values.tags.length ? values.tags : null,
+        custom_fields: values.custom_fields && Object.keys(values.custom_fields).length
+          ? values.custom_fields
+          : {},
       };
 
       if (isEditing) {
@@ -231,8 +247,42 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity, initi
   const [messageSubject, setMessageSubject] = useState("");
   const [messageBody, setMessageBody] = useState("");
   const [messageRecipient, setMessageRecipient] = useState("");
+  const [newCustomField, setNewCustomField] = useState<{
+    name: string;
+    type: OpportunityCustomFieldType;
+    options: string;
+  }>({ name: "", type: "text", options: "" });
+
+  const { data: customFields = [] } = useQuery<OpportunityCustomFieldDefinition[]>({
+    queryKey: ["crm-opportunity-custom-fields", companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("crm_opportunity_custom_field_definitions")
+        .select("id, field_key, label, field_type, options, is_required, sort_order")
+        .eq("company_id", companyId)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+
+      return (data || []).map((field: any) => ({
+        id: field.id,
+        field_key: field.field_key,
+        label: field.label,
+        type: field.field_type as OpportunityCustomFieldType,
+        options: field.options || undefined,
+        is_required: field.is_required,
+        sort_order: field.sort_order,
+      }));
+    },
+    enabled: !!companyId && open,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
 
   const selectedTags = form.watch("tags") || [];
+  const customFieldValues = (form.watch("custom_fields") || {}) as Record<string, unknown>;
   const selectedTagSet = useMemo(() => new Set(selectedTags), [selectedTags]);
   const selectedCustomerId = form.watch("customer_id");
   const selectedCustomer = useMemo(
@@ -449,6 +499,7 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity, initi
         expected_revenue: opportunity.expected_revenue ?? undefined,
         next_step: opportunity.next_step || "",
         tags: opportunity.tags || [],
+        custom_fields: (opportunity.custom_fields as Record<string, unknown> | null) || {},
       };
       console.log("Form values to reset:", formValues);
       form.reset(formValues);
@@ -466,10 +517,110 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity, initi
         tags: [],
         lost_reason: "",
         won_reason: "",
+        custom_fields: {},
         ...initialValues,
       });
     }
   }, [opportunity, open, isEditing, pipelinesLoading, customersLoading, ownersLoading, form]);
+
+  const upsertCustomFieldValue = (fieldId: string, value: unknown) => {
+    form.setValue(
+      "custom_fields",
+      {
+        ...customFieldValues,
+        [fieldId]: value,
+      },
+      { shouldValidate: true }
+    );
+  };
+
+  const slugifyCustomFieldKey = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
+  const createCustomFieldMutation = useMutation({
+    mutationFn: async () => {
+      const label = newCustomField.name.trim();
+      if (!label) throw new Error("El nombre del campo es requerido");
+
+      const keyBase = slugifyCustomFieldKey(label);
+      if (!keyBase) throw new Error("Nombre de campo inválido");
+
+      const existingKeys = new Set(customFields.map((field) => field.field_key));
+      let fieldKey = keyBase;
+      let suffix = 1;
+      while (existingKeys.has(fieldKey)) {
+        suffix += 1;
+        fieldKey = `${keyBase}_${suffix}`;
+      }
+
+      const options =
+        newCustomField.type === "select"
+          ? newCustomField.options
+              .split(",")
+              .map((option) => option.trim())
+              .filter(Boolean)
+          : null;
+
+      const { error } = await supabase.from("crm_opportunity_custom_field_definitions").insert([
+        {
+          company_id: companyId,
+          field_key: fieldKey,
+          label,
+          field_type: newCustomField.type,
+          options,
+          is_required: false,
+          is_active: true,
+          sort_order: customFields.length,
+        },
+      ]);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-opportunity-custom-fields", companyId] });
+      setNewCustomField({ name: "", type: "text", options: "" });
+      toast.success("Campo personalizado agregado");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "No se pudo crear el campo personalizado");
+    },
+  });
+
+  const deactivateCustomFieldMutation = useMutation({
+    mutationFn: async (field: OpportunityCustomFieldDefinition) => {
+      const { error } = await supabase
+        .from("crm_opportunity_custom_field_definitions")
+        .delete()
+        .eq("id", field.id)
+        .eq("company_id", companyId);
+
+      if (error) throw error;
+    },
+    onSuccess: (_data, field) => {
+      queryClient.invalidateQueries({ queryKey: ["crm-opportunity-custom-fields", companyId] });
+      const nextValues = { ...customFieldValues };
+      delete nextValues[field.field_key];
+      form.setValue("custom_fields", nextValues, { shouldValidate: true });
+      toast.success("Campo personalizado eliminado");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "No se pudo eliminar el campo personalizado");
+    },
+  });
+
+  const addCustomFieldDefinition = () => {
+    createCustomFieldMutation.mutate();
+  };
+
+  const removeCustomFieldDefinition = (field: OpportunityCustomFieldDefinition) => {
+    deactivateCustomFieldMutation.mutate(field);
+  };
 
   const { data: activityList } = useQuery<ActivityListResult>({
     queryKey: ["crm-activities", companyId, opportunity?.id, activityTypeFilter],
@@ -963,6 +1114,147 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity, initi
               <div className="grid gap-2">
                 <label className="font-medium">Fuente</label>
                 <Input {...form.register("source")} placeholder="Ej: Web, Referido, Email..." />
+              </div>
+
+              <div className="space-y-3 rounded-md border p-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-muted-foreground">Campos personalizados</p>
+                  <Badge variant="outline">{customFields.length}</Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <Input
+                    value={newCustomField.name}
+                    onChange={(event) =>
+                      setNewCustomField((prev) => ({ ...prev, name: event.target.value }))
+                    }
+                    placeholder="Nombre del campo"
+                  />
+                  <Select
+                    value={newCustomField.type}
+                    onValueChange={(value) =>
+                      setNewCustomField((prev) => ({
+                        ...prev,
+                        type: value as OpportunityCustomFieldType,
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="text">Texto</SelectItem>
+                      <SelectItem value="number">Número</SelectItem>
+                      <SelectItem value="textarea">Texto largo</SelectItem>
+                      <SelectItem value="select">Selección</SelectItem>
+                      <SelectItem value="checkbox">Checkbox</SelectItem>
+                      <SelectItem value="date">Fecha</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" variant="outline" onClick={addCustomFieldDefinition}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Agregar
+                  </Button>
+                </div>
+
+                {newCustomField.type === "select" && (
+                  <Input
+                    value={newCustomField.options}
+                    onChange={(event) =>
+                      setNewCustomField((prev) => ({ ...prev, options: event.target.value }))
+                    }
+                    placeholder="Opciones separadas por coma"
+                  />
+                )}
+
+                {customFields.length > 0 && (
+                  <div className="space-y-3 border-t pt-3">
+                    {customFields.map((field) => (
+                      <div key={field.id} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="font-medium text-sm">{field.label}</label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeCustomFieldDefinition(field)}
+                            aria-label={`Eliminar ${field.label}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        {field.type === "text" && (
+                          <Input
+                            value={String(customFieldValues[field.field_key] ?? "")}
+                            onChange={(event) => upsertCustomFieldValue(field.field_key, event.target.value)}
+                            placeholder={field.label}
+                          />
+                        )}
+
+                        {field.type === "number" && (
+                          <Input
+                            type="number"
+                            value={String(customFieldValues[field.field_key] ?? "")}
+                            onChange={(event) => {
+                              const raw = event.target.value;
+                              upsertCustomFieldValue(field.field_key, raw === "" ? "" : Number(raw));
+                            }}
+                            placeholder={field.label}
+                          />
+                        )}
+
+                        {field.type === "textarea" && (
+                          <Textarea
+                            value={String(customFieldValues[field.field_key] ?? "")}
+                            onChange={(event) => upsertCustomFieldValue(field.field_key, event.target.value)}
+                            placeholder={field.label}
+                            rows={3}
+                          />
+                        )}
+
+                        {field.type === "date" && (
+                          <Input
+                            type="date"
+                            value={String(customFieldValues[field.field_key] ?? "")}
+                            onChange={(event) => upsertCustomFieldValue(field.field_key, event.target.value)}
+                          />
+                        )}
+
+                        {field.type === "checkbox" && (
+                          <label className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={customFieldValues[field.field_key] === true}
+                              onChange={(event) =>
+                                upsertCustomFieldValue(field.field_key, event.target.checked)
+                              }
+                            />
+                            {field.label}
+                          </label>
+                        )}
+
+                        {field.type === "select" && (
+                          <Select
+                            value={String(customFieldValues[field.field_key] ?? "")}
+                            onValueChange={(value) => upsertCustomFieldValue(field.field_key, value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder={`Seleccioná ${field.label}`} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(field.options || []).map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {option}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-2">
