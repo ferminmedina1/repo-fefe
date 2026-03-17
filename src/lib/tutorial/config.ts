@@ -513,6 +513,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Clientes',
     estimatedTime: 5,
     icon: 'MessageCircle',
+    route: '/customer-support',
     steps: [
       {
         id: 'support-1',
@@ -1402,6 +1403,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Administración',
     estimatedTime: 3,
     icon: 'Settings',
+    route: '/settings/email',
     steps: [
       {
         id: 'email-1',
@@ -1446,6 +1448,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Administración',
     estimatedTime: 3,
     icon: 'Store',
+    route: '/pos-points',
     steps: [
       {
         id: 'posafip-1',
@@ -1490,6 +1493,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Administración',
     estimatedTime: 3,
     icon: 'Shield',
+    route: '/audit-logs',
     steps: [
       {
         id: 'audit-1',
@@ -1534,6 +1538,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Administración',
     estimatedTime: 3,
     icon: 'Activity',
+    route: '/access-logs',
     steps: [
       {
         id: 'access-1',
@@ -1798,6 +1803,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Administración',
     estimatedTime: 5,
     icon: 'Lock',
+    route: '/monthly-closing',
     steps: [
       {
         id: 'close-1',
@@ -1850,6 +1856,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Administración',
     estimatedTime: 4,
     icon: 'Zap',
+    route: '/bulk-operations',
     steps: [
       {
         id: 'bulk-1',
@@ -1894,6 +1901,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Administración',
     estimatedTime: 3,
     icon: 'Bell',
+    route: '/notification-settings',
     steps: [
       {
         id: 'notif-1',
@@ -1938,6 +1946,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Administración',
     estimatedTime: 4,
     icon: 'Plug',
+    route: '/integrations',
     steps: [
       {
         id: 'integ-1',
@@ -1982,6 +1991,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Administración',
     estimatedTime: 4,
     icon: 'Store',
+    route: '/afip',
     steps: [
       {
         id: 'afip-1',
@@ -2026,6 +2036,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Administración',
     estimatedTime: 3,
     icon: 'Settings',
+    route: '/settings',
     steps: [
       {
         id: 'settings-1',
@@ -2088,7 +2099,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Abre Configuración General',
         duration: 3,
-        route: '/settings/general',
+        route: '/settings',
       },
       {
         id: 'migration-4',
@@ -2097,7 +2108,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Configura antes de importar ventas',
         duration: 4,
-        route: '/settings/payment-methods',
+        route: '/settings',
       },
       {
         id: 'migration-5',
@@ -2133,7 +2144,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Completa registro de saldos iniciales',
         duration: 4,
-        route: '/finances',
+        route: '/bank-movements',
       },
       {
         id: 'migration-9',
@@ -2151,7 +2162,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
         position: 'bottom',
         action: 'Ve al Centro de Aprendizaje para más tutoriales',
         duration: 2,
-        route: '/learning',
+        route: '/learning-center',
       },
     ],
   },
@@ -2164,6 +2175,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Recursos',
     estimatedTime: 3,
     icon: 'BookOpen',
+    route: '/learning-center',
     steps: [
       {
         id: 'learning-1',
@@ -2214,6 +2226,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Recursos',
     estimatedTime: 4,
     icon: 'BookOpen',
+    route: '/help',
     steps: [
       {
         id: 'kb-1',
@@ -2255,6 +2268,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     category: 'Recursos',
     estimatedTime: 2,
     icon: 'LifeBuoy',
+    route: '/platform-support',
     steps: [
       {
         id: 'support-1',

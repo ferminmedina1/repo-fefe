@@ -31,7 +31,7 @@ interface TutorialContextType {
 const TutorialContext = createContext<TutorialContextType | undefined>(undefined);
 
 // Ruta a donde volver cuando termine el tutorial
-const RETURN_ROUTE = '/learning';
+const RETURN_ROUTE = '/learning-center';
 
 export function TutorialProvider({ children }: { children: React.ReactNode }) {
   const [tutorialState, setTutorialState] = useState<TutorialState>({
@@ -59,6 +59,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       currentStepIndex: 0,
       isRunning: true,
       completedSteps: [],
+      originRoute: window.location.pathname,
     }));
   }, []);
 
@@ -85,6 +86,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
         currentStepIndex: 0,
         isRunning: true,
         completedSteps: [],
+        originRoute: window.location.pathname,
       }));
     }, 0);
   }, []);
@@ -99,8 +101,8 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       const currentStep = tutorial.steps[prev.currentStepIndex];
 
       if (newIndex >= tutorial.steps.length) {
-        // Tutorial completado - volver al Centro de Aprendizaje
-        if (navigateRef.current) {
+        // Tutorial completado - volver al Centro de Aprendizaje si vino de ahí
+        if (navigateRef.current && prev.originRoute === RETURN_ROUTE) {
           setTimeout(() => {
             navigateRef.current!(RETURN_ROUTE);
           }, 0);
@@ -108,6 +110,8 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
         return {
           ...prev,
           isRunning: false,
+          activeModuleId: null,
+          originRoute: undefined,
           completedSteps: [...prev.completedSteps, currentStep.id],
         };
       }
@@ -212,35 +216,39 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Finalizar tutorial y volver al Centro de Aprendizaje
+  // Finalizar tutorial y quedarse o volver al origin
   const endTutorial = useCallback(() => {
-    setTutorialState(prev => ({
-      ...prev,
-      isRunning: false,
-      activeModuleId: null,
-    }));
-    // Volver al Centro de Aprendizaje
-    if (navigateRef.current) {
-      setTimeout(() => {
-        navigateRef.current!(RETURN_ROUTE);
-      }, 0);
-    }
+    setTutorialState(prev => {
+      if (navigateRef.current && prev.originRoute === RETURN_ROUTE) {
+        setTimeout(() => {
+          navigateRef.current!(RETURN_ROUTE);
+        }, 0);
+      }
+      return {
+        ...prev,
+        isRunning: false,
+        activeModuleId: null,
+        originRoute: undefined,
+      };
+    });
   }, []);
 
-  // Saltar tutorial y volver al Centro de Aprendizaje
+  // Saltar tutorial
   const skipTutorial = useCallback(() => {
-    setTutorialState({
-      activeModuleId: null,
-      currentStepIndex: 0,
-      isRunning: false,
-      completedSteps: [],
+    setTutorialState(prev => {
+      if (navigateRef.current && prev.originRoute === RETURN_ROUTE) {
+        setTimeout(() => {
+          navigateRef.current!(RETURN_ROUTE);
+        }, 0);
+      }
+      return {
+        activeModuleId: null,
+        currentStepIndex: 0,
+        isRunning: false,
+        completedSteps: [],
+        originRoute: undefined,
+      };
     });
-    // Volver al Centro de Aprendizaje
-    if (navigateRef.current) {
-      setTimeout(() => {
-        navigateRef.current!(RETURN_ROUTE);
-      }, 0);
-    }
   }, []);
 
   // Obtener paso actual

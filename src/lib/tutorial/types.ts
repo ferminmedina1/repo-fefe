@@ -51,6 +51,8 @@ export interface TutorialState {
   isRunning: boolean;
   /** Pasos completados */
   completedSteps: string[];
+  /** Ruta desde donde inició el tutorial para volver allí o quedarse */
+  originRoute?: string;
 }
 
 export interface UserTutorialProgress {

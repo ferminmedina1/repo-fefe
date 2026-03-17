@@ -62,6 +62,11 @@ export function TutorialHelpButton() {
 
   if (isRunning) return null;
 
+  const publicRoutes = ['/', '/auth', '/signup', '/reset-password', '/setup-wizard'];
+  if (publicRoutes.includes(location.pathname) || location.pathname.startsWith('/set-password/') || location.pathname.includes('/signup/')) {
+    return null;
+  }
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
