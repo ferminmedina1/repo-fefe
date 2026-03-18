@@ -80,6 +80,8 @@ const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRe
 const Opportunities = lazy(() => import("./pages/Opportunities"));
 const Pipelines = lazy(() => import("./pages/Pipelines"));
 const CrmReports = lazy(() => import("./pages/CrmReports"));
+const CrmAutomations = lazy(() => import("./pages/CrmAutomations"));
+const CrmAutomationEditor = lazy(() => import("./pages/CrmAutomationEditor"));
 const CrmRoles = lazy(() => import("./pages/CrmRoles"));
 const MonthlySalesAnalytics = lazy(() => import("./pages/analytics/MonthlySalesAnalytics"));
 const GrossMarginAnalytics = lazy(() => import("./pages/analytics/GrossMarginAnalytics"));
@@ -358,6 +360,8 @@ const App = () => (
             <Route path="/opportunities" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><Opportunities /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/pipelines" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pipelines"><Pipelines /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/crm-reports" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmReports /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/crm-automations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmAutomations /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/crm-automations/:workflowId" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmAutomationEditor /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/settings/crm-roles" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmRoles /></ModuleProtectedRoute></ProtectedRoute>} />
             
 
