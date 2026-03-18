@@ -61,37 +61,88 @@ function StepDots({ total, current }: { total: number; current: number }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Enterprise-grade target validation
+// Advanced target validation with detailed diagnostics
 // ─────────────────────────────────────────────────────────────
-function isValidTarget(selector: string | undefined): boolean {
-  if (!selector) return false;
+interface ValidationResult {
+  isValid: boolean;
+  reason?: string;
+  details?: {
+    exists: boolean;
+    visible: boolean;
+    hasDimensions: boolean;
+    hasContent: boolean;
+    inViewport: boolean;
+    notHidden: boolean;
+    zIndexOk: boolean;
+  };
+}
+
+function validateTarget(selector: string | undefined, debug = false): ValidationResult {
+  if (!selector) {
+    return { isValid: false, reason: 'No selector provided' };
+  }
+  
   try {
     const element = document.querySelector(selector);
-    if (!element) return false;
-    
-    // Check if element is visible
+    if (!element) {
+      return { isValid: false, reason: 'Element not found in DOM', details: { exists: false, visible: false, hasDimensions: false, hasContent: false, inViewport: false, notHidden: false, zIndexOk: false } };
+    }
+
     const style = window.getComputedStyle(element);
-    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
-      return false;
-    }
-    
-    // Check if element has dimensions
     const rect = element.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) {
-      return false;
+    const parent = element.parentElement;
+    const parentStyle = parent ? window.getComputedStyle(parent) : null;
+
+    // Detailed checks
+    const checks = {
+      exists: true,
+      visible: style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0',
+      hasDimensions: rect.width > 0 && rect.height > 0,
+      hasContent: !!(element.textContent?.trim() || element.children.length > 0),
+      inViewport: rect.top < window.innerHeight && rect.bottom > 0 && rect.left < window.innerWidth && rect.right > 0,
+      notHidden: style.overflow !== 'hidden' || rect.height > 0,
+      zIndexOk: parseInt(style.zIndex) >= 0 || style.zIndex === 'auto',
+    };
+
+    const allValid = checks.exists && checks.visible && checks.hasDimensions && checks.hasContent;
+
+    if (debug) {
+      console.log(`[Tutorial] Target validation for "${selector}":`, {
+        ...checks,
+        rect: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, width: rect.width, height: rect.height },
+        display: style.display,
+        visibility: style.visibility,
+        opacity: style.opacity,
+        parentOverflow: parentStyle?.overflow,
+      });
     }
-    
-    // Check if element has content (not empty)
-    const text = element.textContent?.trim();
-    const hasChildren = element.children.length > 0;
-    if (!text && !hasChildren) {
-      return false;
+
+    if (!allValid) {
+      const failureReasons = [];
+      if (!checks.exists) failureReasons.push('Element not in DOM');
+      if (!checks.visible) failureReasons.push('Element hidden (display/visibility/opacity)');
+      if (!checks.hasDimensions) failureReasons.push(`No dimensions (${rect.width}x${rect.height})`);
+      if (!checks.hasContent) failureReasons.push('Element empty (no text/children)');
+      if (!checks.inViewport) failureReasons.push(`Out of viewport (top=${rect.top.toFixed(0)}, bottom=${rect.bottom.toFixed(0)})`);
+      
+      return {
+        isValid: false,
+        reason: failureReasons.join('; '),
+        details: checks,
+      };
     }
-    
-    return true;
+
+    return {
+      isValid: true,
+      details: checks,
+    };
   } catch (e) {
-    return false;
+    return { isValid: false, reason: `Error during validation: ${(e as Error).message}` };
   }
+}
+
+function isValidTarget(selector: string | undefined): boolean {
+  return validateTarget(selector).isValid;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -113,11 +164,12 @@ interface NarrationCardProps {
   onSkip: () => void;
   onMinimize: () => void;
   targetUnavailable?: boolean;
+  targetFailureReason?: string;
 }
 
 function NarrationCard({
   stepIndex, totalSteps, tutorialName, title, description,
-  blockName, action, isLastStep, canGoBack, onNext, onBack, onSkip, onMinimize, targetUnavailable
+  blockName, action, isLastStep, canGoBack, onNext, onBack, onSkip, onMinimize, targetUnavailable, targetFailureReason
 }: NarrationCardProps) {
   return (
     <div className={cn(
@@ -164,8 +216,16 @@ function NarrationCard({
         {/* Warning if target unavailable */}
         {targetUnavailable && (
           <div className="mb-3 p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-            <p className="text-xs text-yellow-700 dark:text-yellow-200">
-              El elemento de enfoque no está visible en esta página. Continúa para más instrucciones.
+            <p className="text-xs text-yellow-700 dark:text-yellow-200 font-medium">
+              ⏳ El elemento de enfoque no está disponible aún.
+            </p>
+            {targetFailureReason && (
+              <p className="text-xs text-yellow-700/70 dark:text-yellow-200/70 mt-1">
+                Motivo: {targetFailureReason}
+              </p>
+            )}
+            <p className="text-xs text-yellow-700/60 dark:text-yellow-200/60 mt-1">
+              Continúa con la siguiente instrucción.
             </p>
           </div>
         )}
@@ -455,6 +515,7 @@ export function TutorialRunner() {
   const [completedName, setCompletedName] = useState('');
   const [showCompletion, setShowCompletion] = useState(false);
   const [invalidTargets, setInvalidTargets] = useState<Set<string>>(new Set());
+  const [targetFailureReasons, setTargetFailureReasons] = useState<Map<string, string>>(new Map());
 
   // Refs to avoid stale closures in completion callbacks
   const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -491,7 +552,7 @@ export function TutorialRunner() {
   // Reset minimized on step change
   useEffect(() => { setMinimized(false); }, [tutorialState.currentStepIndex]);
 
-  // Continuously validate current target (enterprise: 3 sec retry)
+  // Continuously validate current target (robust: 8 sec retry with exponential backoff)
   useEffect(() => {
     if (!isRunning || minimized) {
       if (validationTimerRef.current) clearInterval(validationTimerRef.current);
@@ -501,39 +562,114 @@ export function TutorialRunner() {
     const currentStep = currentTutorial?.steps[tutorialState.currentStepIndex];
     if (!currentStep?.target) return;
 
-    // Check immediately
-    if (!isValidTarget(currentStep.target)) {
-      setInvalidTargets(prev => new Set([...prev, currentStep.target!]));
-    } else {
-      // Target is valid, remove from invalid set
-      setInvalidTargets(prev => {
-        const updated = new Set(prev);
-        updated.delete(currentStep.target!);
-        return updated;
-      });
-    }
-
-    // Retry every 500ms for 3 seconds (async loading)
+    const selector = currentStep.target;
     let attempts = 0;
-    validationTimerRef.current = setInterval(() => {
-      attempts++;
-      if (isValidTarget(currentStep.target!)) {
-        // Target became valid
+    const maxAttempts = 16; // 8 seconds with varying intervals
+    let observer: IntersectionObserver | null = null;
+
+    const checkAndUpdateTarget = () => {
+      const validation = validateTarget(selector, attempts === 0);
+      
+      if (validation.isValid) {
+        // Target is valid, ensure it's not in invalid set
         setInvalidTargets(prev => {
           const updated = new Set(prev);
-          updated.delete(currentStep.target!);
+          updated.delete(selector);
           return updated;
         });
-        if (validationTimerRef.current) clearInterval(validationTimerRef.current);
-      } else if (attempts >= 6) {
-        // 3 seconds passed (6 × 500ms), target definitely unavailable
-        setInvalidTargets(prev => new Set([...prev, currentStep.target!]));
-        if (validationTimerRef.current) clearInterval(validationTimerRef.current);
+        
+        // Clear failure reason
+        setTargetFailureReasons(prev => {
+          const updated = new Map(prev);
+          updated.delete(selector);
+          return updated;
+        });
+        
+        // Stop checking
+        if (validationTimerRef.current) {
+          clearInterval(validationTimerRef.current);
+          validationTimerRef.current = null;
+        }
+        if (observer) observer.disconnect();
+        
+        if (attempts > 0) {
+          console.log(`[Tutorial] Target "${selector}" recovered after ${attempts} attempts`);
+        }
+        return true;
       }
-    }, 500);
+      
+      return false;
+    };
+
+    // Check immediately
+    if (checkAndUpdateTarget()) return;
+
+    // Mark as temporarily invalid
+    setInvalidTargets(prev => new Set([...prev, selector]));
+
+    // Set up IntersectionObserver to catch async-loaded elements
+    try {
+      const element = document.querySelector(selector);
+      if (element) {
+        observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach(entry => {
+              if (entry.isIntersecting) {
+                // Element became visible
+                checkAndUpdateTarget();
+              }
+            });
+          },
+          { threshold: 0.1 }
+        );
+        observer.observe(element);
+      }
+    } catch (e) {
+      console.warn(`[Tutorial] Could not set up IntersectionObserver for "${selector}"`);
+    }
+
+    // Retry with exponential backoff: fast at first, slower over time
+    validationTimerRef.current = setInterval(() => {
+      attempts++;
+      
+      // Dynamic intervals: fast start (200ms), then slower (500ms), then even slower (1000ms)
+      let nextInterval = 200;
+      if (attempts > 8) nextInterval = 1000;
+      else if (attempts > 4) nextInterval = 500;
+
+      if (checkAndUpdateTarget()) {
+        // Found! Stop searching
+        return;
+      }
+
+      if (attempts >= maxAttempts) {
+        // 8+ seconds passed, mark as permanently unavailable
+        const validation = validateTarget(selector);
+        console.warn(
+          `[Tutorial] Target \"${selector}\" not found after ${maxAttempts} attempts`,
+          validation
+        );
+        
+        setInvalidTargets(prev => new Set([...prev, selector]));
+        
+        // Save failure reason
+        setTargetFailureReasons(prev => {
+          const updated = new Map(prev);
+          updated.set(selector, validation.reason || 'Elemento no encontrado');
+          return updated;
+        });
+        
+        if (validationTimerRef.current) {
+          clearInterval(validationTimerRef.current);
+          validationTimerRef.current = null;
+        }
+        if (observer) observer.disconnect();
+      }
+    }, 200); // Start fast, intervals increase inside the loop
 
     return () => {
       if (validationTimerRef.current) clearInterval(validationTimerRef.current);
+      if (observer) observer.disconnect();
     };
   }, [isRunning, tutorialState.currentStepIndex, minimized, currentTutorial]);
 
@@ -685,6 +821,7 @@ export function TutorialRunner() {
           onSkip={() => { skipTutorial(); }}
           onMinimize={() => setMinimized(true)}
           targetUnavailable={targetIsInvalid}
+          targetFailureReason={targetIsInvalid && currentOriginalStep.target ? targetFailureReasons.get(currentOriginalStep.target) : undefined}
         />
       )}
 

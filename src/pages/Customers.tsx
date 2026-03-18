@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { z } from "zod";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useTutorial } from "@/hooks/useTutorial";
 import { useCompany } from "@/contexts/CompanyContext";
 
 const customerSchema = z.object({
@@ -44,8 +45,9 @@ export default function Customers() {
   const navigate = useNavigate();
   const { currentCompany } = useCompany();
   const { hasPermission } = usePermissions();
-  const canCreate = hasPermission('customers', 'create');
-  const canEdit = hasPermission('customers', 'edit');
+  const { isRunning } = useTutorial();
+  const canCreate = hasPermission('customers', 'create') || isRunning;
+  const canEdit = hasPermission('customers', 'edit') || isRunning;
   
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);

@@ -37,6 +37,7 @@ import { generateQuotationPDF } from "@/components/pdf/QuotationPDF";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useTutorial } from "@/hooks/useTutorial";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { useCompany } from "@/contexts/CompanyContext";
 
@@ -64,6 +65,7 @@ export default function Quotations() {
   const [deliveryItems, setDeliveryItems] = useState<any[]>([]);
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
+  const { isRunning } = useTutorial();
 
   const { data: quotations, isLoading } = useQuery({
     queryKey: ["quotations", searchQuery, currentCompany?.id],
@@ -546,8 +548,8 @@ export default function Quotations() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const canCreate = hasPermission("quotations", "create");
-  const canEdit = hasPermission("quotations", "edit");
+  const canCreate = hasPermission("quotations", "create") || isRunning;
+  const canEdit = hasPermission("quotations", "edit") || isRunning;
 
   return (
     <Layout>

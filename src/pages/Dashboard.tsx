@@ -8,15 +8,19 @@ import { format, subDays, startOfDay, startOfMonth, endOfMonth, subMonths } from
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useTutorial } from "@/hooks/useTutorial";
 import { Badge } from "@/components/ui/badge";
 import { BusinessHealthPanel } from "@/components/dashboard/BusinessHealthPanel";
 
 export default function Dashboard() {
   const { currentCompany } = useCompany();
   const { hasPermission, loading } = usePermissions();
-  const canViewSales = hasPermission("sales", "view");
-  const canViewProducts = hasPermission("products", "view");
-  const canViewCustomers = hasPermission("customers", "view");
+  const { isRunning } = useTutorial();
+  
+  // Show tutorial elements even if user lacks permissions (for tutorial visibility)
+  const canViewSales = hasPermission("sales", "view") || isRunning;
+  const canViewProducts = hasPermission("products", "view") || isRunning;
+  const canViewCustomers = hasPermission("customers", "view") || isRunning;
 
   // Ventas del mes actual vs mes pasado
   const { data: monthlyComparison } = useQuery({

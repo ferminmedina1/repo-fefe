@@ -19,6 +19,7 @@ import Papa from "papaparse";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useTutorial } from "@/hooks/useTutorial";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -65,8 +66,9 @@ export default function Products() {
   const navigate = useNavigate();
   const { currentCompany } = useCompany();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
-  const canCreate = hasPermission('products', 'create');
-  const canEdit = hasPermission('products', 'edit');
+  const { isRunning } = useTutorial();
+  const canCreate = hasPermission('products', 'create') || isRunning;
+  const canEdit = hasPermission('products', 'edit') || isRunning;
   const canDelete = hasPermission('products', 'delete');
   const canExport = hasPermission('products', 'export');
 
