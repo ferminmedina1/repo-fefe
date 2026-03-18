@@ -266,7 +266,7 @@ export default function Sales() {
 
         <Card className="shadow-soft">
           <CardHeader>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-tutorial="sales-filters">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -274,6 +274,7 @@ export default function Sales() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
+                  data-tutorial="sales-filters"
                 />
               </div>
               <div className="relative">

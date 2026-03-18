@@ -73,7 +73,7 @@ export function TutorialHelpButton() {
         <Button
           variant="outline"
           size="icon"
-          className="fixed bottom-6 right-28 rounded-full h-12 w-12 shadow-lg hover:shadow-xl transition-shadow z-50"
+          className="fixed bottom-24 right-6 rounded-full h-12 w-12 shadow-lg hover:shadow-xl transition-shadow z-40"
           title="Tutoriales de la app"
         >
           <HelpCircle className="h-5 w-5" />
