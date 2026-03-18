@@ -10,6 +10,24 @@ import { cn } from '@/lib/utils';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 // ─────────────────────────────────────────────────────────────
+// Spotlight pulse animation
+// ─────────────────────────────────────────────────────────────
+const spotlightStyles = `
+  @keyframes spotlight-pulse {
+    0%, 100% {
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.6), 0 0 0 8px rgba(59, 130, 246, 0.3), 0 0 30px rgba(59, 130, 246, 0.7), 0 0 60px rgba(59, 130, 246, 0.5), inset 0 0 25px rgba(59, 130, 246, 0.25) !important;
+    }
+    50% {
+      box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.8), 0 0 0 12px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.8), 0 0 80px rgba(59, 130, 246, 0.6), inset 0 0 35px rgba(59, 130, 246, 0.35) !important;
+    }
+  }
+  
+  .react-joyride__spotlight {
+    animation: spotlight-pulse 2s ease-in-out infinite !important;
+  }
+`;
+
+// ─────────────────────────────────────────────────────────────
 // Step dots / progress indicator
 // ─────────────────────────────────────────────────────────────
 function StepDots({ total, current }: { total: number; current: number }) {
@@ -279,8 +297,16 @@ const MiniBar = ({ stepTitle, stepAction, stepIndex, totalSteps, tutorialName, o
 };
 
 // ─────────────────────────────────────────────────────────────
-// Joyride tooltip (for steps WITH a target)
+// Arrow pointer for visual guidance
 // ─────────────────────────────────────────────────────────────
+function TooltipArrow() {
+  return (
+    <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
+      <div className="w-0 h-0 border-l-8 border-r-8 border-t-0 border-b-8 border-l-transparent border-r-transparent border-b-card" />
+      <div className="absolute top-px left-1/2 -translate-x-1/2 w-0 h-0 border-l-6 border-r-6 border-t-0 border-b-6 border-l-transparent border-r-transparent border-b-border/70" />
+    </div>
+  );
+}
 interface ExtendedTooltipProps extends TooltipRenderProps {
   onMinimize: () => void;
 }
@@ -295,17 +321,17 @@ const CustomTooltip = ({
 
   return (
     <div {...tooltipProps} className={cn(
-      'relative w-[360px] max-w-[calc(100vw-24px)]',
-      'bg-card/95 backdrop-blur-xl rounded-2xl overflow-hidden',
-      'border border-border/60 shadow-[0_20px_60px_rgba(0,0,0,0.25)]',
-      'animate-in fade-in-0 zoom-in-95 duration-200 ease-out'
+      'relative w-[400px] max-w-[calc(100vw-24px)]',
+      'bg-card/98 backdrop-blur-xl rounded-2xl overflow-hidden',
+      'border border-border/70 shadow-[0_16px_48px_rgba(0,0,0,0.22)]',
+      'animate-in slide-in-from-bottom-4 fade-in-0 duration-300 ease-out'
     )}>
-      <div className="h-[3px] w-full bg-gradient-to-r from-primary/40 via-primary to-primary/40" />
+      <div className="h-[3px] w-full bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
 
-      <div className="p-5">
+      <div className="p-5 pt-7">
         {/* Header */}
-        <div className="flex gap-3 mb-3 pr-14">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+        <div className="flex gap-3 mb-3 pr-8">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
             <span className="text-xs font-bold text-primary tabular-nums">{index + 1}</span>
           </div>
           <div className="min-w-0">
@@ -322,8 +348,8 @@ const CustomTooltip = ({
           </div>
         )}
 
-        {/* Controls */}
-        <div className="absolute top-[11px] right-3 flex gap-1">
+        {/* Controls top-right */}
+        <div className="absolute top-[calc(3px+10px)] right-3 flex gap-1">
           {hasAction && (
             <Button variant="ghost" size="icon" onClick={onMinimize}
               className="h-7 w-7 rounded-lg text-primary/60 hover:text-primary hover:bg-primary/10">
@@ -436,6 +462,21 @@ export function TutorialRunner() {
   const currentTutorial = getCurrentTutorial();
 
   useEffect(() => { setNavigate(navigate); }, [navigate, setNavigate]);
+
+  // Inject spotlight pulse animation styles
+  useEffect(() => {
+    const styleId = 'spotlight-pulse-animation';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = spotlightStyles;
+      document.head.appendChild(style);
+    }
+    return () => {
+      const existingStyle = document.getElementById(styleId);
+      if (existingStyle) existingStyle.remove();
+    };
+  }, []);
 
   // Abort on public routes
   useEffect(() => {
@@ -594,20 +635,34 @@ export function TutorialRunner() {
           showProgress={false}
           showSkipButton
           disableScrollParentFix
+          floaterProps={{ disableAnimation: true }}
           tooltipComponent={(props: TooltipRenderProps) => (
             <CustomTooltip {...props} onMinimize={() => setMinimized(true)} />
           )}
           styles={{
             options: {
               zIndex: 10000,
-              overlayColor: 'rgba(0, 0, 0, 0.60)',
+              overlayColor: 'rgba(0, 0, 0, 0.20)',
+              arrowColor: 'transparent',
+              backgroundColor: 'transparent',
+              textColor: 'transparent',
+              primaryColor: 'transparent',
             },
             spotlight: {
               borderRadius: '14px',
-              boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.3), 0 0 20px rgba(59, 130, 246, 0.4)',
+              boxShadow: '0 0 0 4px rgba(59, 130, 246, 0.6), 0 0 0 8px rgba(59, 130, 246, 0.3), 0 0 30px rgba(59, 130, 246, 0.7), 0 0 60px rgba(59, 130, 246, 0.5), inset 0 0 25px rgba(59, 130, 246, 0.25)',
             },
             overlay: {
               mixBlendMode: 'normal',
+            },
+            tooltip: {
+              backgroundColor: 'transparent',
+              borderRadius: '0px',
+              padding: '0px',
+              boxShadow: 'none',
+            },
+            tooltipContainer: {
+              textAlign: 'left' as const,
             },
           }}
         />
