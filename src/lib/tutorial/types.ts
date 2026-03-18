@@ -7,6 +7,8 @@ export interface TutorialStep {
   id: string;
   /** Selector CSS del elemento a destacar */
   target?: string;
+  /** Nombre del bloque/sección señalizado (ej: "KPIs", "Gráfico de Ventas") */
+  blockName?: string;
   /** Título del paso */
   title: string;
   /** Explicación simple */

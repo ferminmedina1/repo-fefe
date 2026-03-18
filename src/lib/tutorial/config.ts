@@ -17,6 +17,8 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'dashboard-1',
+        target: '[data-tutorial="kpis"]',
+        blockName: 'KPIs / Indicadores Clave',
         title: '👋 Bienvenido a tu Dashboard',
         description: 'Este es tu panel de control principal. Aquí verás un resumen de todas tus operaciones: ventas totales del mes, rentabilidad, cuentas por cobrar y saldo de clientes en tiempo real.',
         position: 'bottom',
@@ -25,6 +27,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'dashboard-2',
         target: '[data-tutorial="kpis"]',
+        blockName: 'KPIs / Indicadores Clave',
         title: '📊 4 Indicadores Clave (KPIs)',
         description: 'Las 4 tarjetas principales muestran: (1) Ventas del Mes total, (2) Margen Bruto %, (3) Total Por Cobrar a clientes, (4) Saldo en cuentas de clientes. Cada tarjeta tiene un badge % que muestra cambio vs. mes anterior.',
         position: 'bottom',
@@ -34,6 +37,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'dashboard-3',
         target: '[data-tutorial="chart-sales"]',
+        blockName: 'Gráfico de Ventas',
         title: '📈 Gráfico: Ventas de los Últimos 7 Días',
         description: 'Gráfico interactivo que muestra tendencia diaria de ventas. Eje X = Fecha, Eje Y = Monto en ARS. Es útil para identificar días picos y tendencias semanales. Pasa mouse sobre puntos para ver valores exactos.',
         position: 'top',
@@ -42,9 +46,11 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'dashboard-4',
+        target: '[data-tutorial="stock-alerts"]',
+        blockName: 'Alertas de Stock',
         title: '🚨 Alertas de Stock Bajo',
         description: 'En la parte inferior ves el panel de "Alertas de Stock Bajo". Aquí aparecen los productos que cayeron por debajo de su stock mínimo configurado. Cada alerta muestra: Nombre del producto, Stock mínimo requerido, Cantidad actual. Si ves alertas, es hora de reponer!',
-        position: 'bottom',
+        position: 'top',
         action: 'Revisa si hay productos que necesitan reposición urgente',
         duration: 3,
       },
@@ -63,6 +69,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'sales-1',
+        blockName: 'Interface General',
         title: '🛒 Gestión de Ventas',
         description: 'En este módulo puedes ver todas tus ventas realizadas, crear nuevas ventas, y gestionar tus pedidos. Las ventas se crean desde POS (mostrador rápido) o desde este módulo para ventas más complejas.',
         position: 'bottom',
@@ -70,6 +77,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'sales-2',
+        blockName: 'Botón Nueva Venta',
         title: '➕ Crear Nueva Venta',
         description: 'Haz clic en el botón "Nueva Venta" (arriba a la derecha). Se abrirá un formulario donde podrás: seleccionar cliente, agregar múltiples productos, elegir método de pago, aplicar descuentos y generar comprobante fiscal.',
         position: 'bottom',
@@ -79,6 +87,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'sales-3',
         target: '[data-tutorial="sales-table"]',
+        blockName: 'Tabla de Ventas',
         title: '📋 Historial Completo de Ventas',
         description: 'Tabla con todas tus ventas: Número (correlativo AFIP), Fecha, Cliente, Productos listados, Método de pago (Efectivo/Tarjeta/Cheque), Total en ARS, Estado, y Acciones. Cada venta muestra un icono Receipt y se pueden ver detalles.',
         position: 'top',
@@ -88,6 +97,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'sales-4',
         target: '[data-tutorial="sales-filters"]',
+        blockName: 'Búsqueda y Filtros',
         title: '🔍 Búsqueda y Filtros',
         description: 'Usa la barra superior para filtrar: (1) Input "Buscar por número de venta" para encontrar por correlativo, (2) Select "Filtrar por producto" para ver qué ventas incluyen ese producto. Muy útil para reconciliaciones rápidas.',
         position: 'bottom',
@@ -109,6 +119,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'products-1',
+        blockName: 'Catálogo de Productos',
         title: '📦 Tu Catálogo de Productos',
         description: 'Aquí ves todas tus productos activos. El catálogo incluye: Código SKU único, Código de barras, Nombre, Precio de venta, Stock actual, Proveedor, Categoría. Los productos aparecen en orden de creación o filtrados.',
         position: 'bottom',
@@ -117,6 +128,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'products-2',
         target: '[data-tutorial="btn-create-product"]',
+        blockName: 'Botón Nuevo Producto',
         title: '➕ Agregar Nuevo Producto',
         description: 'Haz clic en el botón "Nuevo Producto" (arriba derecha). Se abre formulario donde defines: Nombre, SKU, Código de barras (para POS), Precio de costo, Precio de venta, Stock inicial, Categoría, Impuesto (IVA 21%, 10.5% o 0%), Proveedor preferido, Imagen.',
         position: 'bottom',
@@ -126,6 +138,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'products-3',
         target: '[data-tutorial="product-table"]',
+        blockName: 'Tabla de Productos',
         title: '📊 Información del Producto',
         description: 'Cada fila muestra: icono Receipt, Código, Nombre, Precio, Stock actual (en verde si OK, en rojo si bajo), Margen %, Proveedor. Haz clic en producto para editar o ver historial de ventas.',
         position: 'top',
@@ -134,6 +147,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'products-4',
+        blockName: 'Configuración de Stock',
         title: '⚠️ Alertas Automáticas de Stock Bajo',
         description: 'Configura stock mínimo para cada producto. Cuando alcance ese nivel, se dispara alerta automática (aparece en Dashboard). Ejemplo: si mínimo es 5 y llega a 4, se alerta. Así no se te agota stock sin que lo sepas.',
         position: 'left',
@@ -155,6 +169,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'customers-1',
+        blockName: 'Base de Clientes',
         title: '👥 Base de Clientes Completa',
         description: 'Registro centralizado de todos tus clientes: Nombre, Teléfono, Email, Dirección, CUIT/DNI, Límite de crédito, Saldo pendiente, Última compra, Total gasto histórico. Es la fuente de verdad para gestionar relaciones.',
         position: 'bottom',
@@ -162,6 +177,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'customers-2',
+        blockName: 'Nuevo Cliente',
         title: '➕ Agregar Nuevo Cliente',
         description: 'Haz clic en "Nuevo Cliente" (arriba derecha). Completa: Nombre completo, Teléfono, Email (para enviar cotizaciones/facturas), Dirección completa, CUIT/DNI, Límite de crédito para venta a crédito, se sugiere categorizar (mayorista, minorista, consumidor).',
         position: 'bottom',
@@ -170,6 +186,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'customers-3',
+        blockName: 'Perfil del Cliente',
         title: '🎯 Perfil del Cliente',
         description: 'Haz clic en cliente para ver: resumen completo, todas sus compras (historial), movimientos de cuenta corriente, deuda acumulada, descuentos aplicados, datos para contacto. Lugar central para todo sobre ese cliente.',
         position: 'right',
@@ -178,6 +195,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'customers-4',
+        blockName: 'Búsqueda Rápida',
         title: '🔍 Búsqueda Rápida',
         description: 'La barra de búsqueda superior busca por: nombre del cliente, teléfono, email, CUIT/DNI. Escribe parcial y te autocompleta. Muy útil para encontrar rápido durante una venta al teléfono.',
         position: 'bottom',
@@ -199,6 +217,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'inventory-1',
+        blockName: 'Centro de Control',
         title: '📦 Centro de Control de Stock',
         description: 'Vista centralizada de QUÉ productos tienen bajo stock. El sistema monitorea automáticamente todos tus productos contra su nivel mínimo configurado. Es tu early warning system para evitar desabastecimiento.',
         position: 'bottom',
@@ -206,6 +225,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'inventory-2',
+        blockName: 'Panel de Alertas',
         title: '🚨 Panel de Alertas Críticas',
         description: 'Los productos que aparecen aquí están por debajo del mínimo establecido. Colores: Verde (OK), Naranja (Próximo a mínimo), Rojo (Crítico, reponer urgente). Cada alerta muestra el gap: cuánto falta para llegar a mínimo.',
         position: 'bottom',
@@ -214,6 +234,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'inventory-3',
+        blockName: 'Tabla de Stock',
         title: '📊 Tabla Completa de Stock',
         description: 'Ves todos tus productos con: Nombre, Código, Stock Actual, Stock Mínimo configurado, Diferencia, Última compra fecha, Rotación (veces/mes que se vende). Te permite priorizar qué reponer primero.',
         position: 'top',
@@ -222,6 +243,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'inventory-4',
+        blockName: 'Orden de Recompra',
         title: '📝 Crear Orden de Recompra Automática',
         description: 'Selecciona productos de la lista y haz clic "Crear Orden". Se genera automáticamente una orden de compra pre-cargada con cantidad sugerida (para llegar a mínimo + 1 mes de venta promedio).',
         position: 'left',
@@ -243,6 +265,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'pos-1',
+        blockName: 'Interfaz POS Completa',
         title: '🛒 Terminal de Punto de Venta (POS)',
         description: 'Este es tu caja rápida. Aquí capturarás ventas del mostrador en segundos: busca producto, agrega cantidad, selecciona método de pago, confirma. El flujo está optimizado para velocidad. Se genera automáticamente recibo o factura fiscal.',
         position: 'bottom',
@@ -250,6 +273,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'pos-2',
+        blockName: 'Búsqueda de Productos',
         title: '🔍 Búsqueda de Productos',
         description: 'Campo de entrada en la izquierda superior. Puedes: (1) Escribir nombre del producto (ej: "Leche"), (2) Escanear código de barras directamente (si tienes lector), (3) Escribir SKU del producto. Autocompleta mientras escribes.',
         position: 'bottom',
@@ -258,6 +282,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'pos-3',
+        blockName: 'Carrito de Compra',
         title: '🛍️ Carrito de Compra (Derecha)',
         description: 'Lado derecho muestraItems agregados. Cada línea: Nombre, Precio unitario, Cantidad (controles + -), Subtotal. Botones: Editar cantidad, Eliminar (🗑). En rojo alertas si no hay stock. Scroll si hay muchos items.',
         position: 'left',
@@ -266,6 +291,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'pos-4',
+        blockName: 'Método de Pago',
         title: '💳 Método de Pago',
         description: 'Selector debajo del carrito. Opciones: Efectivo (sin recargo), Tarjeta débito (sin recargo), Tarjeta crédito (con opciones de cuotas 3/6/12, cada una con su recargo %), Cheque (a fecha), Transferencia. Selecciona según cliente.',
         position: 'top',
@@ -274,6 +300,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'pos-5',
+        blockName: 'Finalizar Venta',
         title: '✅ Resumen y Finalizar Venta',
         description: 'En botones finales: Total en ARS grande, Descuentos aplicables, Botón "Cobrar" verde. Al clickear: verifica pago (efectivo, tarjeta, etc.), genera comprobante AFIP automático, actualiza stock, guarda venta. Se muestra recibo para imprimir.',
         position: 'top',
@@ -295,6 +322,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'quotations-1',
+        blockName: 'Gestión de Presupuestos',
         title: '📋 Gestión de Presupuestos',
         description: 'Crea cotizaciones detalladas para tus clientes antes de cerrar ventas. Presupuestos incluyen: Cliente, Productos con precios, Descuentos, Validez (días hasta vencimiento), Notas comerciales, Total final.',
         position: 'bottom',
@@ -302,6 +330,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'quotations-2',
+        blockName: 'Crear Presupuesto',
         title: '➕ Crear Nuevo Presupuesto',
         description: 'Botón "Nuevo Presupuesto" arriba. Selecciona cliente, agrega productos misma interfaz que POS, establece días de validez (ej: 7, 15, 30 días), agrega notas especiales si aplica (volumen, términos de pago especiales).',
         position: 'bottom',
@@ -310,6 +339,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'quotations-3',
+        blockName: 'Historial y Estados',
         title: '📊 Historial y Estados',
         description: 'Tabla con: Número presupuesto, Fecha creación, Cliente, Total, Estado (Pendiente = esperando respuesta cliente, Aceptado, Rechazado, Vencido). Cada presupuesto tiene fecha autocalculada de vencimiento.',
         position: 'top',
@@ -317,6 +347,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'quotations-4',
+        blockName: 'Exportar a PDF',
         title: '📄 Enviar y Exportar a PDF',
         description: 'Cada presupuesto puede: Enviarse por mail directamente al cliente (con email precompletado), Descargarse en PDF profesional (con logo empresa), Convertirse en venta confirma (si cliente acepta).',
         position: 'left',
@@ -337,6 +368,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'delivery-1',
+        blockName: 'Remitos de Entrega',
         title: '🚚 Remitos de Entrega',
         description: 'Registra las entregas de productos a tus clientes.',
         position: 'bottom',
@@ -345,6 +377,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'delivery-2',
         target: '[data-tutorial="btn-create-delivery"]',
+        blockName: 'Crear Remito',
         title: '➕ Crear Remito',
         description: 'Haz clic para crear un nuevo remito de entrega.',
         position: 'bottom',
@@ -354,6 +387,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'delivery-3',
         target: '[data-tutorial="delivery-table"]',
+        blockName: 'Historial de Entregas',
         title: '📋 Historial de Entregas',
         description: 'Todas tus entregas registradas con fecha, cliente y estado.',
         position: 'top',
@@ -362,6 +396,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'delivery-4',
         target: '[data-tutorial="track-delivery"]',
+        blockName: 'Rastreo de Entregas',
         title: '📍 Rastreo de Entregas',
         description: 'Actualiza el estado: pendiente, en camino, entregado, devuelto.',
         position: 'left',
@@ -382,6 +417,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'returns-1',
+        blockName: 'Gestión de Devoluciones',
         title: '📉 Gestión de Devoluciones',
         description: 'Registra devoluciones de productos que los clientes devuelven.',
         position: 'bottom',
@@ -390,6 +426,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'returns-2',
         target: '[data-tutorial="btn-create-return"]',
+        blockName: 'Nueva Devolución',
         title: '➕ Nueva Devolución',
         description: 'Haz clic para crear una devolución. Selecciona la venta original y los productos.',
         position: 'bottom',
@@ -399,6 +436,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'returns-3',
         target: '[data-tutorial="return-reason"]',
+        blockName: 'Motivo de Devolución',
         title: '❓ Motivo de Devolución',
         description: 'Especifica por qué el cliente devuelve: producto defectuoso, cambio, no quiere, etc.',
         position: 'top',
@@ -407,6 +445,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'returns-4',
         target: '[data-tutorial="process-return"]',
+        blockName: 'Procesar Devolución',
         title: '✅ Procesar Devolución',
         description: 'Registra la devolución y genera el documento. El stock se actualiza automáticamente.',
         position: 'top',
@@ -427,6 +466,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'reservations-1',
+        blockName: 'Sistema de Reservas',
         title: '📅 Sistema de Reservas',
         description: 'Reserva productos para clientes que los comprarán en el futuro.',
         position: 'bottom',
@@ -435,6 +475,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'reservations-2',
         target: '[data-tutorial="btn-reserve"]',
+        blockName: 'Crear Reserva',
         title: '➕ Crear Reserva',
         description: 'Selecciona cliente, productos y fecha de retiro.',
         position: 'bottom',
@@ -444,6 +485,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'reservations-3',
         target: '[data-tutorial="reservation-status"]',
+        blockName: 'Estados de Reserva',
         title: '⏳ Estados de Reserva',
         description: 'Pendiente: esperando al cliente. Retirada: el cliente la recibió.',
         position: 'top',
@@ -452,6 +494,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'reservations-4',
         target: '[data-tutorial="expiry-date"]',
+        blockName: 'Vencimiento de Reserva',
         title: '⏰ Vencimiento de Reserva',
         description: 'Las reservas expiran si no se retiran a tiempo. Configura el período de validez.',
         position: 'left',
@@ -472,6 +515,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'accrec-1',
+        blockName: 'Cuentas Corrientes',
         title: '🧾 Cuentas Corrientes de Clientes',
         description: 'Aquí ves el estado de cada cliente: cuánto debe, cuándo vence, y su historial de pagos.',
         position: 'bottom',
@@ -480,6 +524,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'accrec-2',
         target: '[data-tutorial="customer-debt"]',
+        blockName: 'Saldo Pendiente',
         title: '💰 Saldo Pendiente',
         description: 'En rojo aparecen clientes con saldo vencido. En naranja, próximos a vencer.',
         position: 'bottom',
@@ -489,6 +534,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'accrec-3',
         target: '[data-tutorial="payment-record"]',
+        blockName: 'Registrar Pago',
         title: '📝 Registrar Pago',
         description: 'Haz clic para registrar un pago recibido de un cliente.',
         position: 'top',
@@ -497,6 +543,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'accrec-4',
         target: '[data-tutorial="payment-history"]',
+        blockName: 'Historial de Pagos',
         title: '📊 Historial de Pagos',
         description: 'Ve todas las transacciones del cliente: fechas, montos y fechas de pago.',
         position: 'left',
@@ -517,6 +564,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'support-1',
+        blockName: 'Centro de Soporte',
         title: '💬 Centro de Soporte al Cliente',
         description: 'Registro de tickets, consultas y reclamos de clientes.',
         position: 'bottom',
@@ -525,6 +573,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'support-2',
         target: '[data-tutorial="btn-new-ticket"]',
+        blockName: 'Crear Ticket',
         title: '➕ Crear Ticket',
         description: 'Abre un nuevo ticket para registrar una consulta o reclamo de cliente.',
         position: 'bottom',
@@ -534,6 +583,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'support-3',
         target: '[data-tutorial="ticket-priority"]',
+        blockName: 'Nivel de Prioridad',
         title: '🚨 Nivel de Prioridad',
         description: 'Baja, Media, Alta o Urgente. Ordena las tareas por importancia.',
         position: 'top',
@@ -542,6 +592,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'support-4',
         target: '[data-tutorial="ticket-resolution"]',
+        blockName: 'Resolver Ticket',
         title: '✅ Resolver Ticket',
         description: 'Cierra el ticket cuando el problema se haya solucionado.',
         position: 'top',
@@ -550,6 +601,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'support-5',
         target: '[data-tutorial="customer-satisfaction"]',
+        blockName: 'Calificación del Cliente',
         title: '⭐ Calificación del Cliente',
         description: 'Los clientes califican la resolución de su problema (1-5 estrellas).',
         position: 'left',
@@ -570,6 +622,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'po-1',
+        blockName: 'Órdenes de Compra',
         title: '✅ Órdenes de Compra',
         description: 'Cria órdenes formales para solicitar productos a tus proveedores. Cada orden incluye: Proveedor, Productos, Cantidades, Precios, Descuentos, Total, Período de entrega estimado.',
         position: 'bottom',
@@ -577,6 +630,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'po-2',
+        blockName: 'Nueva Orden de Compra',
         title: '➕ Nueva Orden de Compra',
         description: 'Botón "Nueva Orden" arriba. Selecciona proveedor (precarga precios especiales negociados), agrega productos con cantidades, especifica fecha entrega requerida, añade notas adicionales, genera PDF para enviar.',
         position: 'bottom',
@@ -585,6 +639,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'po-3',
+        blockName: 'Ciclo de Vida',
         title: '🔄 Ciclo de Vida de la Orden',
         description: 'Estados automáticos: Borrador (editandose), Enviada (a proveedor), Confirmada (proveedor acepta), Parcialmente recibida (llegan algunos items), Completamente recibida, Cancelada. Cada transición actualiza estados en recepción.',
         position: 'top',
@@ -592,6 +647,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'po-4',
+        blockName: 'Recepción de Mercadería',
         title: '✓ Recepción de Mercadería Vinculada',
         description: 'Cuando llega en Modulo "Recepción" selecciona la orden PO, confirma items recibidos, valida cantidades y calidad. Stock se actualiza automáticamente en Productos.',
         position: 'left',
@@ -612,6 +668,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'purchases-1',
+        blockName: 'Historial de Compras',
         title: '🛍️ Historial de Compras',
         description: 'Registro de todas las compras realizadas a proveedores.',
         position: 'bottom',
@@ -620,6 +677,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'purchases-2',
         target: '[data-tutorial="purchases-filters"]',
+        blockName: 'Filtros',
         title: '🔍 Filtrar por Período',
         description: 'Busca compras por fecha, proveedor o estado de pago.',
         position: 'bottom',
@@ -629,6 +687,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'purchases-3',
         target: '[data-tutorial="purchase-detail"]',
+        blockName: 'Detalle de Compra',
         title: '📋 Detalle de Compra',
         description: 'Haz clic en una compra para ver: productos, cantidades, precios e impuestos.',
         position: 'top',
@@ -637,6 +696,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'purchases-4',
         target: '[data-tutorial="invoice-attachment"]',
+        blockName: 'Adjuntar Factura',
         title: '📎 Adjuntar Factura',
         description: 'Sube la factura del proveedor para tener registro completo.',
         position: 'left',
@@ -657,6 +717,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'reception-1',
+        blockName: 'Recepción de Mercadería',
         title: '✓ Recepción de Mercadería',
         description: 'Registra cuando reciben productos del proveedor. El stock se actualiza automáticamente.',
         position: 'bottom',
@@ -665,6 +726,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'reception-2',
         target: '[data-tutorial="receive-order"]',
+        blockName: 'Recibir Orden',
         title: '📦 Recibir Orden',
         description: 'Selecciona la orden de compra y confirma la cantidad recibida.',
         position: 'bottom',
@@ -674,6 +736,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'reception-3',
         target: '[data-tutorial="check-items"]',
+        blockName: 'Verificar Items',
         title: '✔️ Verificar Items',
         description: 'Comprueba que has recibido la cantidad correcta de cada producto.',
         position: 'top',
@@ -682,6 +745,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'reception-4',
         target: '[data-tutorial="quality-check"]',
+        blockName: 'Control de Calidad',
         title: '🔍 Control de Calidad',
         description: 'Registra si hay dañados, vencidos o defectuosos antes de aceptar.',
         position: 'left',
@@ -702,6 +766,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'pret-1',
+        blockName: 'Devoluciones a Proveedores',
         title: '📉 Devoluciones a Proveedores',
         description: 'Registra cuando devuelves productos dañados o no conformes al proveedor.',
         position: 'bottom',
@@ -710,6 +775,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'pret-2',
         target: '[data-tutorial="btn-create-return"]',
+        blockName: 'Nueva Devolución',
         title: '➕ Nueva Devolución',
         description: 'Selecciona la compra original y los productos a devolver.',
         position: 'bottom',
@@ -719,6 +785,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'pret-3',
         target: '[data-tutorial="return-reason"]',
+        blockName: 'Motivo de Devolución',
         title: '❓ Motivo de Devolución',
         description: 'Especifica: Defectuoso, Vencido, No conforme a especificación, Cantidad sobrante.',
         position: 'top',
@@ -727,6 +794,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'pret-4',
         target: '[data-tutorial="refund-status"]',
+        blockName: 'Estado del Reembolso',
         title: '💰 Estado del Reembolso',
         description: 'Registra si ya recibiste crédito, nota de débito o efectivo del proveedor.',
         position: 'left',
@@ -747,6 +815,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'suppliers-1',
+        blockName: 'Base de Proveedores',
         title: '🚚 Base de Proveedores',
         description: 'Registro de todos tus proveedores: datos de contacto, condiciones de pago y términos.',
         position: 'bottom',
@@ -755,6 +824,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'suppliers-2',
         target: '[data-tutorial="btn-add-supplier"]',
+        blockName: 'Agregar Proveedor',
         title: '➕ Agregar Proveedor',
         description: 'Crea nuevo proveedor con: nombre, CUIT, contacto, dirección y condiciones de pago.',
         position: 'bottom',
@@ -764,6 +834,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'suppliers-3',
         target: '[data-tutorial="supplier-terms"]',
+        blockName: 'Condiciones Comerciales',
         title: '📋 Condiciones Comerciales',
         description: 'Plazo de pago, descuentos por volumen, mínimo de compra, formas de pago aceptadas.',
         position: 'top',
@@ -772,6 +843,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'suppliers-4',
         target: '[data-tutorial="supplier-rating"]',
+        blockName: 'Calificación del Proveedor',
         title: '⭐ Calificación del Proveedor',
         description: 'Registra evaluaciones: calidad, puntualidad en entregas, precio competitivo.',
         position: 'left',
@@ -792,6 +864,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'bank-1',
+        blockName: 'Cuentas Bancarias',
         title: '🏦 Registro de Cuentas Bancarias',
         description: 'Panel centralizado de todas tus cuentas: Banco, Tipo (Corriente/Caja Ahorro), Número cuenta, Titularidad, Saldo actual, Límite disponible, Moneda (ARS/USD).',
         position: 'bottom',
@@ -799,6 +872,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'bank-2',
+        blockName: 'Agregar Cuenta',
         title: '➕ Agregar Nueva Cuenta',
         description: 'Botón Agregar. Especifica: Banco (dropdown), Sucursal, Número cuenta, Alias para transferencias, Titularidad (nombre legal), Moneda, Saldo inicial (para registros históricos).',
         position: 'bottom',
@@ -807,6 +881,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'bank-3',
+        blockName: 'Saldo en Tiempo Real',
         title: '💰 Saldo en Tiempo Real',
         description: 'Cada cuenta muestra saldo actualizado con todos los movimientos registrados. Es la fuente de verdad. Puedes reconciliar vs. extracto bancario en módulo "Movimientos Bancarios".',
         position: 'top',
@@ -814,6 +889,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'bank-4',
+        blockName: 'Vinculación de Movimientos',
         title: '🔗 Vinculación de Movimientos',
         description: 'Cuando registras movimientos (depósitos, transferencias), los asocias a esta cuenta. Sistema las agrupa por cuenta para reportes contables.',
         position: 'left',
@@ -834,6 +910,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'bankm-1',
+        blockName: 'Historial de Movimientos',
         title: '📈 Historial de Movimientos Bancarios',
         description: 'Registra TODOS los movimientos: Depósitos (dinero que entra), Extracciones (dinero que sale), Transferencias entre cuentas propias, Comisiones cobradas. Esencial para reconciliación contable.',
         position: 'bottom',
@@ -841,6 +918,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'bankm-2',
+        blockName: 'Nuevo Movimiento',
         title: '➕ Registrar Nuevo Movimiento',
         description: 'Botón Nuevo. Especifica: Tipo (Depósito/Extracción/Transferencia), Cuenta origen, Cuenta destino (si aplica), Monto, Fecha, Concepto (ej: "Venta POS 25/3", "Pago nómina bancario"). Se vincula automáticamente a venta si aplica.',
         position: 'bottom',
@@ -849,6 +927,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'bankm-3',
+        blockName: 'Categorización de Movimientos',
         title: '🔀 Categorización de Movimientos',
         description: 'Cada movimiento es: Entrada (aumenta saldo), Salida (disminuye), Transferencia (de una cuenta a otra). Se agrupa automáticamente en reportes por tipo para análisis de flujo de caja.',
         position: 'top',
@@ -856,6 +935,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'bankm-4',
+        blockName: 'Conciliación Bancaria',
         title: '✔️ Conciliación Bancaria',
         description: 'Compara tus registros con extracto del banco. Descarga movimientos del banco, márcalos como "Conciliados". Sistema alerta si hay discrepancias (movimiento sistema no coincide con banco).',
         position: 'left',
@@ -876,6 +956,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'card-1',
+        blockName: 'Movimientos de Tarjetas',
         title: '💳 Movimientos de Tarjetas',
         description: 'Registro de transacciones con tarjetas de crédito/débito: (1) Compras a surtidor, (2) Pagos de cuotas previas, (3) Adelantos de dinero, (4) Cargos de membresía. Esencial para reconciliación con extractos.',
         position: 'bottom',
@@ -883,6 +964,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'card-2',
+        blockName: 'Registrar Transacción',
         title: '➕ Registrar Transacción',
         description: 'Botón Nuevo. Especifica: Tarjeta usada (dropdown), Tipo compra (Comercial/Adelanto/Pago), Monto, Fecha, Comercio/Concepto, Si es cuota: cuota X de Y. Sistema calcula automáticamente próximo vencimiento.',
         position: 'bottom',
@@ -891,6 +973,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'card-3',
+        blockName: 'Gestión de Tarjetas',
         title: '🎫 Gestión de Tarjetas',
         description: 'Cada tarjeta tu empresa usa: Tipo (Crédito/Débito), Banco emisor, Titular, Últimos 4 dígitos, Límite disponible, Vencimiento. Datos para control de gastos vs. presupuesto.',
         position: 'top',
@@ -898,6 +981,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'card-4',
+        blockName: 'Resumen y Reportes',
         title: '📊 Resumen y Reportes',
         description: 'Genera resumen por tarjeta/período: Total gasto, Transacciones pendientes, Próximo vencimiento de pago, Saldo rotativo. Exporta para contador/fiscalista.',
         position: 'left',
@@ -918,6 +1002,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'retention-1',
+        blockName: 'Retenciones Fiscales',
         title: '🧮 Registro de Retenciones Fiscales',
         description: 'Cuando proveedores te retienen dinero por impuestos (Ganancias, IVA) o cuando tu empresa retiene a otros. Essential para: (1) Crédito fiscal, (2) Acudir ante AFIP, (3) Reconciliación de pagos.',
         position: 'bottom',
@@ -925,6 +1010,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'retention-2',
+        blockName: 'Registrar Retención',
         title: '➕ Registrar Nueva Retención',
         description: 'Botón Nuevo. Especifica: Tipo retención (Ganancias 35%/21%, IVA 9%/6%, Bienes Personales 1.25%), Período fiscal, Monto retenido, Número de comprobante, Proveedor/Empresa que retiene, Notas. Sistema guarda para acreditar.',
         position: 'bottom',
@@ -933,6 +1019,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'retention-3',
+        blockName: 'Clasificación por Tipo',
         title: '📋 Clasificación por Tipo',
         description: 'Sistema clasifica retenciones por tipo: Impuesto a Ganancias (para acreitar en declaración jurada), IVA (para crédito fiscal), Bienes Personales. Cada categoría agrupa para reporte mensual/anual.',
         position: 'top',
@@ -940,6 +1027,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'retention-4',
+        blockName: 'Resumen para Contador',
         title: '📊 Resumen para Contador',
         description: 'Genera reporte de retenciones pagadas/soportadas por período. Exporta detalle para que contador lo use en declaración jurada y acreditación de impuestos ante AFIP.',
         position: 'left',
@@ -960,6 +1048,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'tech-1',
+        blockName: 'Servicios Técnicos',
         title: '🔧 Servicios Técnicos',
         description: 'Registro de trabajos técnicos, reparaciones y mantenimientos.',
         position: 'bottom',
@@ -968,6 +1057,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'tech-2',
         target: '[data-tutorial="new-service"]',
+        blockName: 'Crear Trabajo',
         title: '➕ Crear Trabajo',
         description: 'Selecciona cliente, describe el problema, asigna técnico y prioridad.',
         position: 'bottom',
@@ -977,6 +1067,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'tech-3',
         target: '[data-tutorial="service-status"]',
+        blockName: 'Estados del Servicio',
         title: '⏳ Estados del Servicio',
         description: 'Nuevo, En progreso, En espera de partes, Completado, Cancelado.',
         position: 'top',
@@ -985,6 +1076,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'tech-4',
         target: '[data-tutorial="service-invoice"]',
+        blockName: 'Generar Factura',
         title: '📄 Generar Factura',
         description: 'Una vez completado, genera factura con mano de obra y partes utilizadas.',
         position: 'left',
@@ -1005,6 +1097,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'cash-1',
+        blockName: 'Control de Caja',
         title: '💵 Control de Caja',
         description: 'Gestión del dinero físico en mostrador. Tracking: Apertura (dinero inicial), Entradas (ventas), Salidas (gastos/cambios), Cierre (recuento y depósito). Previene faltantes y fraudes.',
         position: 'bottom',
@@ -1012,6 +1105,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'cash-2',
+        blockName: 'Apertura de Caja',
         title: '📖 Apertura de Caja',
         description: 'Inicio del día: especifica monto inicial en caja (ej: $1.000 en billetes/monedas), reembolso anterior, etc. Debe hacerse ANTES de vendedores. Sistema registra usuario, hora, fecha.',
         position: 'bottom',
@@ -1020,6 +1114,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'cash-3',
+        blockName: 'Movimientos Diarios',
         title: '➕➖ Movimientos Diarios',
         description: 'El sistema registra automáticamente: Ventas POS (entran), Devoluciones (salen), Gastos (gasolina, papelería, etc - salen). Puedes agregar movimientos manuales (reembolsos empleados, adelantos).',
         position: 'top',
@@ -1028,6 +1123,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'cash-4',
+        blockName: 'Cierre de Caja',
         title: '🔒 Cierre de Caja',
         description: 'Fin de día: Cuenta dinero físico, ingresa total, sistema calcula faltante/sobrante vs. saldo teórico. Si cuadra exacto, genera comprobante cierre. Dinero se deposita en banco al día siguiente.',
         position: 'left',
@@ -1049,6 +1145,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'expenses-1',
+        blockName: 'Registro de Gastos',
         title: '🧾 Registro de Gastos Operativos',
         description: 'Controla TODO dinero que sale: Servicios (electricidad, internet, teléfono), Suministros (papel, tinta), Mantenimiento (reparaciones), Publicidad, Viajes/combustible, Otros. Base para análisis de costos y rentabilidad.',
         position: 'bottom',
@@ -1056,6 +1153,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'expenses-2',
+        blockName: 'Registrar Gasto',
         title: '➕ Registrar Nuevo Gasto',
         description: 'Botón Nuevo. Especifica: Descripción (ej: "Electricidad marzo"), Categoría, Monto, Fecha, Comprobante adjunto (factura), Área responsable. Cada gasto se rastrea para presupuesto vs. real.',
         position: 'bottom',
@@ -1064,6 +1162,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'expenses-3',
+        blockName: 'Categorías de Gasto',
         title: '📂 Categorías de Gasto',
         description: 'Servicios, Suministros, Mantenimiento, Publicidad, Viajes, Otros. Cada categoría se puede presupuestar y monitorear vs. límite. Análisis por categoría muestra dónde va más dinero.',
         position: 'top',
@@ -1071,6 +1170,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'expenses-4',
+        blockName: 'Análisis de Gastos',
         title: '📊 Análisis de Gastos',
         description: 'Reporte mensual/anual por categoría: Total gasto, % del total, varianza vs. presupuesto. Para contador: exporta para incluir en estados financieros, análisis de rentabilidad.',
         position: 'left',
@@ -1091,6 +1191,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'checks-1',
+        blockName: 'Gestión de Cheques',
         title: '💰 Gestión de Cheques',
         description: 'Registro de cheques emitidos a proveedores y recibidos de clientes.',
         position: 'bottom',
@@ -1099,6 +1200,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'checks-2',
         target: '[data-tutorial="cheque-emitido"]',
+        blockName: 'Cheques Emitidos',
         title: '📤 Cheques Emitidos',
         description: 'Cheques que emites para pagar a proveedores. Número, monto, fecha, banco.',
         position: 'bottom',
@@ -1108,6 +1210,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'checks-3',
         target: '[data-tutorial="cheque-recibido"]',
+        blockName: 'Cheques Recibidos',
         title: '📥 Cheques Recibidos',
         description: 'Cheques que recibes de clientes. Verifica números y endosos.',
         position: 'top',
@@ -1116,6 +1219,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'checks-4',
         target: '[data-tutorial="cheque-status"]',
+        blockName: 'Estado del Cheque',
         title: '⏳ Estado del Cheque',
         description: 'Nuevo, Depositado, Presentado, Acreditado, Rechazado.',
         position: 'left',
@@ -1136,6 +1240,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'promos-1',
+        blockName: 'Promociones y Descuentos',
         title: '🏷️ Promociones y Descuentos',
         description: 'Crea ofertas especiales para atraer clientes o limpiar stock antiguo.',
         position: 'bottom',
@@ -1144,6 +1249,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'promos-2',
         target: '[data-tutorial="new-promo"]',
+        blockName: 'Crear Promoción',
         title: '➕ Crear Promoción',
         description: 'Nombre, productos incluidos, descuento, período de validez, límite de cantidad.',
         position: 'bottom',
@@ -1153,6 +1259,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'promos-3',
         target: '[data-tutorial="promo-rules"]',
+        blockName: 'Reglas de la Promoción',
         title: '📋 Reglas de la Promoción',
         description: 'Descuento por producto, por compra mínima, segunda unidad al 50%, etc.',
         position: 'top',
@@ -1161,6 +1268,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'promos-4',
         target: '[data-tutorial="promo-performance"]',
+        blockName: 'Desempeño de Promoción',
         title: '📊 Desempeño de Promoción',
         description: 'Ventas generadas, productos vendidos, margen total de la promoción.',
         position: 'left',
@@ -1181,6 +1289,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'payroll-1',
+        blockName: 'Sistema de Liquidaciones',
         title: '🧮 Sistema de Liquidaciones de Nómina',
         description: 'Cálculo automático de sueldos mensuales. Procesa: Sueldo básico, Horas extra (50%/100%), Bonificaciones, Descuentos (ausencias, deudas), Aportes (obra social 3%, sindicato), Impuesto Ganancias. Genera liquidación digital + papeles.',
         position: 'bottom',
@@ -1188,6 +1297,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'payroll-2',
+        blockName: 'Crear Liquidación',
         title: '➕ Crear Liquidación Mensual',
         description: 'Botón Nueva. Selecciona: Mes/Año, Empleados a incluir, Verifica datos (sueldo, categoría, descuentos), Revisa cálculos automáticos, Confirma para generar nómina final. Sistema pre-valida aportes.',
         position: 'bottom',
@@ -1196,6 +1306,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'payroll-3',
+        blockName: 'Componentes de Nómina',
         title: '💰 Componentes y Detalles',
         description: 'Cada liquidación muestra: Sueldo mensual, Horas extra trabajadas, Bonificaciones/incentivos, Deducciones (obra social, sindicato, segun impuesto Ganancias), Neto a pagar. Cada empleado ve su recibo.',
         position: 'top',
@@ -1204,6 +1315,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'payroll-4',
+        blockName: 'Generación de Documentos',
         title: '📄 Generación de Documentos',
         description: 'Sistema genera automáticamente: (1) Recibo individual PDF para cada empleado (con firma digital), (2) Resumen para contabilidad, (3) Archivo para depósito bancario automático. Todo listo para contador/auditor.',
         position: 'left',
@@ -1225,6 +1337,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'comm-1',
+        blockName: 'Sistema de Comisiones',
         title: '🎖️ Sistema Automático de Comisiones',
         description: 'Calcula automáticamente lo que debe recibir cada vendedor basado en sus ventas. Soporta: Comisión flat (% sobre total), Escala progresiva (más % si supera meta), Bonificación por volumen, Descuentos por devoluciones.',
         position: 'bottom',
@@ -1232,6 +1345,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'comm-2',
+        blockName: 'Configurar Reglas',
         title: '📋 Configurar Reglas de Comisión',
         description: 'Define por vendedor/equipo: Porcentaje base (ej: 5%), Escala (ej: +1% si vende >$50k), Meta mensual, Bonificación especial. Sistema aplica automáticamente cada vez que vendedor realiza venta.',
         position: 'bottom',
@@ -1240,6 +1354,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'comm-3',
+        blockName: 'Ventas y Comisión',
         title: '📊 Ventas y Comisión Calculada',
         description: 'Por cada vendedor: Total ventas del período, Comisión base, Bonificaciones (si aplican), Deducciones (si hay devoluciones), Total a pagar. Sistema rastrea en tiempo real.',
         position: 'top',
@@ -1247,6 +1362,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'comm-4',
+        blockName: 'Validación de Comisiones',
         title: '✓ Validación e Incorporación a Nómina',
         description: 'Antes de pagar APRUEBA comisiones. Se incorporan automáticamente a liquidación de nómina. Vendedor ve detalle en su recibo de sueldo. Transparencia = más motivación.',
         position: 'left',
@@ -1267,6 +1383,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'emp-1',
+        blockName: 'Base de Datos de Empleados',
         title: '👤 Base de Datos de Empleados',
         description: 'Registro centralizado de tu equipo: Nombre, DNI, Fecha nacimiento, Domicilio, Contacto (teléfono/email), Cargo, Fecha ingreso, Salario base, Obra social afiliada, Beneficiario emergencia. Punto único de verdad para RRHH.',
         position: 'bottom',
@@ -1274,6 +1391,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'emp-2',
+        blockName: 'Agregar Empleado',
         title: '➕ Agregar Nuevo Empleado',
         description: 'Botón Nuevo. Completa: Datos personales (DNI importante para AFIP), Información de contacto, Domicilio legal, Cargo/Puesto, Salario acuerdo, Obra social, Beneficiario emergencia. Se valida DNI con AFIP automáticamente.',
         position: 'bottom',
@@ -1282,6 +1400,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'emp-3',
+        blockName: 'Documentación de Empleado',
         title: '📎 Documentación y Archivos',
         description: 'Sube documentos: Copia DNI, Acta de ingreso firmada, Contrato laboral, Certificado de obra social, Beneficiarios emergencia. Sistema los guarda en archivo digital. Imprescindible para auditoría laboral.',
         position: 'top',
@@ -1290,6 +1409,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'emp-4',
+        blockName: 'Desactivación de Empleado',
         title: '🔒 Desactivación al Retirarse',
         description: 'Cuando empleado se retira: NO lo eliminas (pierde historial). Lo "Desactivas" (checkbox), así mantienes historial de ventas/comisiones/nóminas, pero no aparece en cálculos futuros. Audit trail perfecto para inspecciones.',
         position: 'left',
@@ -1310,6 +1430,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'reports-1',
+        blockName: 'Suite de Reportes',
         title: '📊 Suite Completa de Reportes',
         description: 'Análisis multidimensional: Ventas (por producto, cliente, período), Inventario (rotación, caducidad, costos), Márgenes (bruto/neto por producto), Rentabilidad. Todos en tiempo real, exportables a Excel/PDF.',
         position: 'bottom',
@@ -1317,6 +1438,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'reports-2',
+        blockName: 'Reporte de Ventas',
         title: '💹 Reporte de Ventas Detallado',
         description: 'Total vendido, Productos top (ranking por volumen/valor), Clientes top (top 20 por gasto), Métodos de pago, Evolución diaria/semanal/mensual. Identificar oportunidades y tendencias.',
         position: 'bottom',
@@ -1325,6 +1447,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'reports-3',
+        blockName: 'Reporte de Inventario',
         title: '📦 Reporte de Inventario',
         description: 'Stock actual vs. mínimo (qué reponer), Rotación (cuántas veces se vendió), Productos lentos (stock acumulado sin vender), Edad de inventario, Costo total en stock. Para optimizar capital de trabajo.',
         position: 'top',
@@ -1333,6 +1456,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'reports-4',
+        blockName: 'Análisis de Márgenes',
         title: '💰 Análisis de Márgenes y Rentabilidad',
         description: 'Margen por producto (precio - costo), Margen bruto total, Rentabilidad neta, Comparativa vs. período anterior, Productos premium vs. commodities. Decisiones de pricing.',
         position: 'top',
@@ -1341,6 +1465,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'reports-5',
+        blockName: 'Exportación de Reportes',
         title: '⬇️ Exportación y Compartición',
         description: 'Todos reportes exportables a: Excel (editable para análisis), PDF (para juntas/presentaciones). Comparte automáticamente con contador/junta directiva usando links seguros.',
         position: 'left',
@@ -1362,6 +1487,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'acct-1',
+        blockName: 'Reportes Contables',
         title: '📖 Reportes Contables',
         description: 'Informes para tu contador: balance, libro mayor, estado de resultados.',
         position: 'bottom',
@@ -1370,6 +1496,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'acct-2',
         target: '[data-tutorial="balance-sheet"]',
+        blockName: 'Estado de Resultados',
         title: '📊 Estado de Resultados',
         description: 'Ingresos, gastos, utilidad generada en cada período.',
         position: 'bottom',
@@ -1379,6 +1506,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'acct-3',
         target: '[data-tutorial="book-movements"]',
+        blockName: 'Libro Mayor',
         title: '📝 Libro Mayor',
         description: 'Todas las transacciones contables clasificadas por cuenta.',
         position: 'top',
@@ -1387,6 +1515,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'acct-4',
         target: '[data-tutorial="tax-liability"]',
+        blockName: 'Obligaciones Fiscales',
         title: '🧾 Obligaciones Fiscales',
         description: 'IVA, Ganancias, ByS y otros impuestos a pagar.',
         position: 'left',
@@ -1407,6 +1536,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'email-1',
+        blockName: 'Configuración de Email',
         title: '📧 Configuración de Email',
         description: 'Configura tu dominio de correo para enviar automáticamente desde la plataforma.',
         position: 'bottom',
@@ -1415,6 +1545,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'email-2',
         target: '[data-tutorial="email-server"]',
+        blockName: 'Servidor SMTP',
         title: '🖥️ Servidor SMTP',
         description: 'Host, puerto, usuario y contraseña de tu servidor de correo.',
         position: 'bottom',
@@ -1424,6 +1555,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'email-3',
         target: '[data-tutorial="sender-address"]',
+        blockName: 'Dirección de Envío',
         title: '📤 Dirección de Envío',
         description: 'Email oficial desde el que se enviarán los correos automáticos.',
         position: 'top',
@@ -1432,6 +1564,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'email-4',
         target: '[data-tutorial="test-email"]',
+        blockName: 'Envío de Prueba',
         title: '✉️ Envío de Prueba',
         description: 'Prueba la configuración enviando un correo de prueba.',
         position: 'left',
@@ -1452,6 +1585,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'posafip-1',
+        blockName: 'Puntos de Venta AFIP',
         title: '🏪 Puntos de Venta AFIP',
         description: 'Registro de tus puntos de venta fiscalizados ante la AFIP.',
         position: 'bottom',
@@ -1460,6 +1594,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'posafip-2',
         target: '[data-tutorial="register-pdv"]',
+        blockName: 'Registrar PdV',
         title: '➕ Registrar Punto de Venta',
         description: 'Nombre, número de caja, domicilio y tipo de comprobantes a utilizar.',
         position: 'bottom',
@@ -1469,6 +1604,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'posafip-3',
         target: '[data-tutorial="voucher-types"]',
+        blockName: 'Tipos de Comprobantes',
         title: '🧾 Tipos de Comprobantes',
         description: 'Facturas A, B, Tickets, Notas de Crédito, autorizadas en ese PdV.',
         position: 'top',
@@ -1477,6 +1613,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'posafip-4',
         target: '[data-tutorial="next-voucher"]',
+        blockName: 'Próximo Comprobante',
         title: '📊 Próximo Comprobante',
         description: 'Número del próximo comprobante a emitir en cada punto de venta.',
         position: 'left',
@@ -1497,6 +1634,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'audit-1',
+        blockName: 'Logs de Auditoría',
         title: '🛡️ Logs de Auditoría',
         description: 'Registro detallado de todas las acciones: quién hizo qué, cuándo y dónde.',
         position: 'bottom',
@@ -1505,6 +1643,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'audit-2',
         target: '[data-tutorial="filter-logs"]',
+        blockName: 'Filtrar Logs',
         title: '🔍 Filtrar Logs',
         description: 'Por usuario, acción (crear, editar, eliminar), módulo, fecha y resultado.',
         position: 'bottom',
@@ -1514,6 +1653,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'audit-3',
         target: '[data-tutorial="audit-detail"]',
+        blockName: 'Detalle del Log',
         title: '📋 Detalle del Log',
         description: 'Usuario, acción, tabla afectada, valores antes/después, dirección IP.',
         position: 'top',
@@ -1522,6 +1662,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'audit-4',
         target: '[data-tutorial="export-audit"]',
+        blockName: 'Exportar Auditoría',
         title: '📄 Exportar Auditoría',
         description: 'Descarga logs para análisis técnico o requerimientos de auditoría externa.',
         position: 'left',
@@ -1542,6 +1683,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'access-1',
+        blockName: 'Logs de Acceso',
         title: '📊 Logs de Acceso',
         description: 'Registro de todos los logins, logouts e intentos fallidos de acceso.',
         position: 'bottom',
@@ -1550,6 +1692,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'access-2',
         target: '[data-tutorial="login-history"]',
+        blockName: 'Historial de Login',
         title: '📝 Historial de Login',
         description: 'Quién se conectó, cuándo, desde qué IP, si fue exitoso.',
         position: 'bottom',
@@ -1559,6 +1702,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'access-3',
         target: '[data-tutorial="failed-attempts"]',
+        blockName: 'Intentos Fallidos',
         title: '⚠️ Intentos Fallidos',
         description: 'Múltiples intentos fallidos pueden indicar intento de acceso no autorizado.',
         position: 'top',
@@ -1567,6 +1711,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'access-4',
         target: '[data-tutorial="security-alert"]',
+        blockName: 'Alertas de Seguridad',
         title: '🔒 Alertas de Seguridad',
         description: 'Se puede investigar actividad sospechosa y cambiar contraseña si es necesario.',
         position: 'left',
@@ -1586,6 +1731,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'invalerts-1',
+        blockName: 'Alertas de Inventario',
         title: '⚠️ Alertas de Inventario',
         description: 'Productos que han caído por debajo del stock mínimo configurado.',
         position: 'bottom',
@@ -1594,6 +1740,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'invalerts-2',
         target: '[data-tutorial="low-stock"]',
+        blockName: 'Stock Bajo',
         title: '📉 Stock Bajo',
         description: 'Productos casi agotados que necesitan reposición urgente.',
         position: 'bottom',
@@ -1603,6 +1750,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'invalerts-3',
         target: '[data-tutorial="critical-stock"]',
+        blockName: 'Stock Crítico',
         title: '🚨 Stock Crítico',
         description: 'Productos a punto de agotarse. Pueden no poderse vender si no repones ya!',
         position: 'top',
@@ -1611,6 +1759,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'invalerts-4',
         target: '[data-tutorial="create-po-alert"]',
+        blockName: 'Crear PO',
         title: '📦 Crear PO automática',
         description: 'Crea una orden de compra directamente desde la alerta.',
         position: 'left',
@@ -1630,6 +1779,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'whse-1',
+        blockName: 'Gestión de Almacenes',
         title: '🏢 Gestión de Almacenes',
         description: 'Si tienes múltiples depósitos, administra inventario independiente en cada uno.',
         position: 'bottom',
@@ -1638,6 +1788,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'whse-2',
         target: '[data-tutorial="create-warehouse"]',
+        blockName: 'Crear Almacén',
         title: '➕ Crear Almacén',
         description: 'Nombre del depósito, ubicación, responsable, capacidad.',
         position: 'bottom',
@@ -1647,6 +1798,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'whse-3',
         target: '[data-tutorial="warehouse-stock"]',
+        blockName: 'Stock por Almacén',
         title: '📊 Stock por Almacén',
         description: 'Cada depósito tiene su propio inventario independiente.',
         position: 'top',
@@ -1655,6 +1807,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'whse-4',
         target: '[data-tutorial="warehouse-manager"]',
+        blockName: 'Responsable de Almacén',
         title: '👤 Responsable de Almacén',
         description: 'Asigna un empleado responsable para cada depósito.',
         position: 'left',
@@ -1674,6 +1827,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'whstock-1',
+        blockName: 'Consulta de Stock',
         title: '🔍 Consulta de Stock por Depósito',
         description: 'Dónde hay más stock de cada producto en tus diferentes almacenes.',
         position: 'bottom',
@@ -1682,6 +1836,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'whstock-2',
         target: '[data-tutorial="warehouse-select"]',
+        blockName: 'Seleccionar Depósito',
         title: '📍 Seleccionar Depósito',
         description: 'Filtra por depósito para ver solo el stock de ese lugar.',
         position: 'bottom',
@@ -1691,6 +1846,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'whstock-3',
         target: '[data-tutorial="available-stock"]',
+        blockName: 'Stock Disponible',
         title: '📦 Stock Disponible',
         description: 'Stock actual, reservado, disponible para vender en ese depósito.',
         position: 'top',
@@ -1699,6 +1855,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'whstock-4',
         target: '[data-tutorial="transfer-between"]',
+        blockName: 'Transferir Stock',
         title: '↔️ Transferir Stock',
         description: 'Si un producto falta en un depósito, transfierelo desde otro.',
         position: 'left',
@@ -1718,6 +1875,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'transfer-1',
+        blockName: 'Transferencias de Stock',
         title: '↔️ Transferencias de Stock',
         description: 'Mueve productos de un depósito a otro cuando sea necesario.',
         position: 'bottom',
@@ -1726,6 +1884,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'transfer-2',
         target: '[data-tutorial="new-transfer"]',
+        blockName: 'Crear Transferencia',
         title: '➕ Crear Transferencia',
         description: 'Depósito origen, depósito destino, productos y cantidades.',
         position: 'bottom',
@@ -1735,6 +1894,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'transfer-3',
         target: '[data-tutorial="transfer-products"]',
+        blockName: 'Seleccionar Productos',
         title: '📦 Seleccionar Productos',
         description: 'Elige qué productos transferir y en qué cantidad.',
         position: 'top',
@@ -1743,6 +1903,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'transfer-4',
         target: '[data-tutorial="confirm-transfer"]',
+        blockName: 'Confirmar Transferencia',
         title: '✅ Confirmar Transferencia',
         description: 'El depósito origen pierde el stock, el destino lo recibe.',
         position: 'left',
@@ -1762,6 +1923,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'sres-1',
+        blockName: 'Reservas de Stock',
         title: '📦 Reservas de Stock',
         description: 'Cuando se crea orden no confirmada, el stock se reserva (no se vende a otro).',
         position: 'bottom',
@@ -1770,6 +1932,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'sres-2',
         target: '[data-tutorial="reserved-items"]',
+        blockName: 'Items Reservados',
         title: '⏳ Items Reservados',
         description: 'Productos reservados en órdenes pendientes de confirmación o pago.',
         position: 'bottom',
@@ -1779,6 +1942,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'sres-3',
         target: '[data-tutorial="release-reservation"]',
+        blockName: 'Liberar Reserva',
         title: '🔓 Liberar Reserva',
         description: 'Si una orden se cancela, libera el stock para que esté disponible nuevamente.',
         position: 'top',
@@ -1787,6 +1951,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'sres-4',
         target: '[data-tutorial="confirm-sale"]',
+        blockName: 'Confirmar Venta',
         title: '✅ Confirmar Venta',
         description: 'Cuando se confirma venta, la reserva se convierte en venta real.',
         position: 'left',
@@ -1807,6 +1972,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'close-1',
+        blockName: 'Cierre Mensual',
         title: '🔒 Cierre Mensual',
         description: 'Proceso de cierre: verificar datos, generar reportes finales y bloquear período.',
         position: 'bottom',
@@ -1815,6 +1981,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'close-2',
         target: '[data-tutorial="verify-data"]',
+        blockName: 'Verificar Datos',
         title: '✔️ Verificar Datos',
         description: 'Revisa que todas las transacciones del mes estén registradas correctamente.',
         position: 'bottom',
@@ -1824,6 +1991,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'close-3',
         target: '[data-tutorial="closing-checklist"]',
+        blockName: 'Checklist de Cierre',
         title: '📋 Checklist de Cierre',
         description: 'Lista de verificación: reconciliación bancaria, inventario físico, saldos.',
         position: 'top',
@@ -1832,6 +2000,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'close-4',
         target: '[data-tutorial="generate-reports"]',
+        blockName: 'Generar Reportes',
         title: '📊 Generar Reportes',
         description: 'Crea reportes finales del mes para análisis y archivos.',
         position: 'top',
@@ -1840,6 +2009,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'close-5',
         target: '[data-tutorial="lock-period"]',
+        blockName: 'Bloquear Período',
         title: '🔐 Bloquear Período',
         description: 'Una vez cerrado, no se pueden hacer cambios en transacciones del mes.',
         position: 'left',
@@ -1860,6 +2030,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'bulk-1',
+        blockName: 'Operaciones Masivas',
         title: '⚡ Operaciones Masivas',
         description: 'Realiza cambios rapidamente en múltiples registros a la vez.',
         position: 'bottom',
@@ -1868,6 +2039,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'bulk-2',
         target: '[data-tutorial="bulk-price-update"]',
+        blockName: 'Actualizar Precios',
         title: '💰 Actualizar Precios',
         description: 'Sube todos los precios un porcentaje, aplica descuento masivo, etc.',
         position: 'bottom',
@@ -1877,6 +2049,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'bulk-3',
         target: '[data-tutorial="bulk-stock-update"]',
+        blockName: 'Actualizar Stock',
         title: '📦 Actualizar Stock',
         description: 'Ajusta inventario de múltiples productos con una operación.',
         position: 'top',
@@ -1885,6 +2058,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'bulk-4',
         target: '[data-tutorial="preview"]',
+        blockName: 'Previsualizar Cambios',
         title: '👁️ Previsualizar Cambios',
         description: 'Antes de confirmar, revisa qué cambios se aplicarán.',
         position: 'left',
@@ -1905,6 +2079,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'notif-1',
+        blockName: 'Configuración de Notificaciones',
         title: '🔔 Configuración de Notificaciones',
         description: 'Controla qué alertas recibes, cuándo y por qué canales.',
         position: 'bottom',
@@ -1913,6 +2088,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'notif-2',
         target: '[data-tutorial="notification-types"]',
+        blockName: 'Tipos de Notificación',
         title: '📢 Tipos de Notificación',
         description: 'Alertas de stock bajo, nuevas órdenes, pagos recibidos, recordatorios, etc.',
         position: 'bottom',
@@ -1922,6 +2098,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'notif-3',
         target: '[data-tutorial="notification-channels"]',
+        blockName: 'Canales de Entrega',
         title: '📧 Canales de Entrega',
         description: 'En app, email, SMS, notificaciones del navegador.',
         position: 'top',
@@ -1930,6 +2107,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'notif-4',
         target: '[data-tutorial="notification-frequency"]',
+        blockName: 'Frecuencia',
         title: '⏰ Frecuencia',
         description: 'Al instante, resumen diario, semanal. Como prefieras.',
         position: 'left',
@@ -1950,6 +2128,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'integ-1',
+        blockName: 'Integraciones',
         title: '🔌 Integraciones',
         description: 'Conecta tu sistema con otras plataformas: contabilidad, e-commerce, marketplaces.',
         position: 'bottom',
@@ -1958,6 +2137,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'integ-2',
         target: '[data-tutorial="available-integrations"]',
+        blockName: 'Integraciones Disponibles',
         title: '⚙️ Integraciones Disponibles',
         description: 'Sistema contable, tienda online, marketplaces (MercadoLibre, etc).',
         position: 'bottom',
@@ -1967,6 +2147,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'integ-3',
         target: '[data-tutorial="connect-integration"]',
+        blockName: 'Conectar Integración',
         title: '🔗 Conectar Integración',
         description: 'Sigue pasos para autorizar y conectar cada plataforma.',
         position: 'top',
@@ -1975,6 +2156,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'integ-4',
         target: '[data-tutorial="integration-sync"]',
+        blockName: 'Sincronización',
         title: '🔄 Sincronización',
         description: 'Datos se sincronizan automáticamente entre plataformas.',
         position: 'left',
@@ -1995,6 +2177,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'afip-1',
+        blockName: 'Facturación AFIP',
         title: '🏪 Facturación AFIP',
         description: 'Generación de facturas electrónicas fiscalizadas ante la AFIP.',
         position: 'bottom',
@@ -2003,6 +2186,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'afip-2',
         target: '[data-tutorial="afip-status"]',
+        blockName: 'Estado de Facturación',
         title: '📊 Estado de Facturación',
         description: 'Verifica que tu empresa esté registrada y autorizada en AFIP.',
         position: 'bottom',
@@ -2012,6 +2196,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'afip-3',
         target: '[data-tutorial="invoice-types"]',
+        blockName: 'Tipos de Comprobantes',
         title: '🧾 Tipos de Comprobantes',
         description: 'Facturas A, B, Notas de Crédito/Débito autorizadas por AFIP.',
         position: 'top',
@@ -2020,6 +2205,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'afip-4',
         target: '[data-tutorial="invoice-number"]',
+        blockName: 'Numeración',
         title: '#️⃣ Numeración',
         description: 'Rango de números de factura autorizado por AFIP.',
         position: 'left',
@@ -2040,6 +2226,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'settings-1',
+        blockName: 'Configuración General',
         title: '⚙️ Configuración General',
         description: 'Aquí configuras datos de tu empresa, logo, nombre y datos fiscales.',
         position: 'bottom',
@@ -2048,6 +2235,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'settings-2',
         target: '[data-tutorial="company-info"]',
+        blockName: 'Datos de la Empresa',
         title: '🏢 Datos de la Empresa',
         description: 'Nombre, CUIT, razón social y datos de contacto que aparecen en facturas y documentos.',
         position: 'bottom',
@@ -2057,6 +2245,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       {
         id: 'settings-3',
         target: '[data-tutorial="payment-methods"]',
+        blockName: 'Métodos de Pago',
         title: '💳 Métodos de Pago',
         description: 'Aquí habilitas los métodos de pago que aceptas: efectivo, tarjeta, transferencia, etc.',
         position: 'top',
@@ -2077,6 +2266,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'migration-1',
+        blockName: 'Bienvenida a Migración',
         title: '🚀 Bienvenida a GEROS - Tu Nueva Plataforma de Gestión',
         description: 'Vas a migrar TODOS tus datos desde tu sistema anterior: Clientes, Productos, Ventas históricas, Proveedores, Empleados, Cuentas bancarias. El proceso es seguro, rápido y con validaciones que evitan perder información. Tiempo total: ~1-2 horas para empresa mediana.',
         position: 'bottom',
@@ -2086,6 +2276,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'migration-2',
+        blockName: 'Exportar Datos',
         title: '📋 PASO 1: Exporta datos de tu sistema anterior',
         description: 'En tu sistema actual accede a: Configuración → Exportar Datos. Descarga estos archivos en Excel/CSV: Clientes (nombre, teléfono, dirección, límite crédito), Productos (código, nombre, precio, stock), Proveedores, Empleados, Movimientos bancarios últimos 12 meses. Nos da datos limpios para importar.',
         position: 'bottom',
@@ -2094,6 +2285,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'migration-3',
+        blockName: 'Datos de Empresa',
         title: '🏢 PASO 2: Configura Datos Básicos de Empresa',
         description: 'En GEROS → Configuración → Datos de Empresa. Completa: Nombre (debe coincidir con CUIT), CUIT/DNI, Razón social, Email principal para notificaciones, Logo/Imagotipo. Estos datos aparecerán en TODAS las facturas/documentos, así que verifica muy bien.',
         position: 'bottom',
@@ -2103,6 +2295,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'migration-4',
+        blockName: 'Métodos de Pago',
         title: '💳 PASO 3: Configura Métodos de Pago y Cuentas Bancarias',
         description: 'GEROS → Configuración → Métodos de Pago. Habilita: Efectivo (sin recargo), Débito (sin recargo), Crédito (elige cuotas soportadas: 1/3/6/12 con sus recargos %), Cheque, Transferencia. → GEROS → Finanzas → Cuentas Bancarias. Agrega TODAS tus cuentas (corriente, caja ahorro, etc) con saldo inicial al 1 de hoy.',
         position: 'bottom',
@@ -2112,6 +2305,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'migration-5',
+        blockName: 'Importar Clientes',
         title: '👥 PASO 4: Importa tu Base de Clientes',
         description: 'GEROS → Clientes → Importar (botón arriba). Carga Excel con clientes. Sistema valida: CUIT único (no duplicados), Email formato correcto, Teléfono. Si hay errores, descarga reporte, corrigue en Excel, reintentas. Una vez importado: 20 clientes = OK, verifica 2-3 perfiles para datos correctos.',
         position: 'bottom',
@@ -2121,6 +2315,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'migration-6',
+        blockName: 'Importar Productos',
         title: '📦 PASO 5: Importa Catálogo de Productos',
         description: 'GEROS → Productos → Importar. Carga Excel con: SKU (código único), Nombre, Precio costo, Precio venta (sistema calcula margen automáticamente), Stock inicial (saldo al hoy), Categoría, Código barras (opcional). Sistema valida: SKU único, precios numéricos, códigos válidos. Verifica: Stock total coincide vs. inventario físico real.',
         position: 'bottom',
@@ -2130,6 +2325,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'migration-7',
+        blockName: 'Importar Proveedores/Empleados',
         title: '🏭 PASO 6: Importa Proveedores y Empleados',
         description: 'GEROS → Compras → Proveedores → Importar. Carga con: Nombre, CUIT, Contacto, Teléfono, Email, Condiciones de pago (plazo). → GEROS → RRHH → Empleados → Importar. Carga con: Nombre, DNI, Puesto, Salario, Obra social, Beneficiario emergencia. Verifica en ambos casos que los datos se vean correctos.',
         position: 'bottom',
@@ -2139,6 +2335,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'migration-8',
+        blockName: 'Cerrar Saldos',
         title: '💰 PASO 7: Cierra Saldos Iniciales',
         description: 'GEROS → Finanzas → Movimientos Bancarios. Registra saldo inicial en cada cuenta al 1 de hoy. GEROS → Clientes → Cuentas Corrientes. Registra saldos pendientes de clientes (deudas previas). GEROS → Compras → (verifica compras pendientes). Sistema ahora tiene TODOS tus datos históricos= base de datos limpia, lista para operaciones diarias.',
         position: 'bottom',
@@ -2148,6 +2345,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'migration-9',
+        blockName: 'Validación Final',
         title: '✅ VALIDACIÓN FINAL: Reconcilia Datos',
         description: 'GEROS → Dashboard. Revisa: Total clientes importados (debe ser X), Total productos activos (debe ser Y), Stock total valorizado (debe ser Z). GEROS → Reportes → Inventario. Descargar, comparar vs. Excel original para asegurar nada se perdió. Si todo cuadra = ¡Migración exitosa!',
         position: 'bottom',
@@ -2157,6 +2355,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'migration-10',
+        blockName: 'Próximos Pasos',
         title: '🎓 PRÓXIMOS PASOS: Capacitación de Equipo',
         description: 'Ahora que tienes datos, entrena a tu equipo: (1) Vendedores → Módulo POS (vender rápido), (2) Jefe de almacén → Inventario (reposición, stock), (3) Contador → Reportes + Finanzas (números diarios). Cada rol tiene su tutorial dedicado en Centro de Aprendizaje.',
         position: 'bottom',
@@ -2179,6 +2378,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'learning-1',
+        blockName: 'Centro de Aprendizaje',
         title: '📖 Bienvenido al Centro de Aprendizaje',
         description: 'Este es tu Hub central de tutoriales. Aquí encontrarás GUÍAS INTERACTIVAS para cada módulo: Cada tutorial explica qué hace el módulo, cómo usarlo, y sirve como capacitación para tu equipo. Todos nuestros 40+ tutoriales están organizados por categoría.',
         position: 'bottom',
@@ -2186,6 +2386,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'learning-2',
+        blockName: 'Tutoriales Organizados',
         title: '📚 Tutoriales Organizados por Categoría',
         description: 'Verás: (1) Inicio (Dashboard, Migración), (2) Ventas (POS, Facturas, Presupuestos), (3) Clientes (Base de datos, Cuentas corrientes), (4) Compras (Proveedores, Órdenes), (5) Finanzas (Bancos, Tesorería), (6) RRHH (Empleados, Nómina), (7) Reportes, (8) Administración. Cada una agrupa módulos relacionados para flujo natural de aprendizaje.',
         position: 'bottom',
@@ -2194,6 +2395,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'learning-3',
+        blockName: 'Cómo Ejecutar Tutorial',
         title: '▶️ Cómo Ejecutar un Tutorial',
         description: 'Cada tutorial tiene botón "Comenzar Tutorial" (verde). Al clickearlo: Interfaz oscurece, un panel te guía paso a paso, resalta elementos importantes, explica qué hacer. Puedes pausar en cualquier momento. Perfecto para: aprender nuevas funciones, entrenar nuevos empleados, recordar procesos olvidados.',
         position: 'bottom',
@@ -2202,6 +2404,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'learning-4',
+        blockName: 'Tiempo de Tutoriales',
         title: '⏱️ Tiempo de Cada Tutorial = 3-30 minutos',
         description: 'Tutoriales cortos (3-4 min): Explicación rápida de función simple (ej: Dashboard). Tutoriales medios (10-15 min): Procesos completos (ej: Crear venta POS). Tutoriales largos (30 min): Procesos complejos (ej: Migración de datos). Cada uno indica tiempo estimado antes de comenzar.',
         position: 'bottom',
@@ -2210,6 +2413,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'learning-5',
+        blockName: 'Compartir Tutoriales',
         title: '👥 Comparte Tutoriales con tu Equipo',
         description: 'Puedes copiar link de cualquier tutorial y enviarlo por WhatsApp/Email a tu equipo. Vendedor nuevo abre link, automáticamente entra en tutorial interactivo sin necesidad que le enseñes personalmente. Ahorra tiempo de capacitación: envía link → estudian → preguntan dudas específicas.',
         position: 'bottom',
@@ -2230,6 +2434,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'kb-1',
+        blockName: 'Base de Conocimiento',
         title: '🔍 Base de Conocimiento - Preguntas Frecuentes',
         description: 'Artículos escritos (no interactivos) sobre: Procesos (cómo facturar, cómo registrar pago), Problemas frecuentes (por qué me da error, cómo recupero datos), Mejores prácticas (qué precio poner, cómo categorizar gastos). Cada artículo tiene título claro, pasos numerados, imágenes si aplica.',
         position: 'bottom',
@@ -2237,6 +2442,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'kb-2',
+        blockName: 'Buscar por Palabra Clave',
         title: '🔎 Busca por Palabra Clave',
         description: 'Campo de búsqueda arriba. Escribe palabra (ej: "devolución", "descuento", "stock") y sistema filtra artículos relevantes. Muy útil si tienes duda específica y no quieres leer tutorial completo.',
         position: 'bottom',
@@ -2245,6 +2451,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'kb-3',
+        blockName: 'Navegar Categorías',
         title: '📂 Navega por Categorías',
         description: 'Sidebar izquierdo agrupa artículos: Vendedores (POS, facturas), Almacén (stock, reposición), Contador (reportes, impuestos), Admin (configuración, usuarios). Abre categoría y ves todos artículos disponibles de ese tema.',
         position: 'bottom',
@@ -2252,6 +2459,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'kb-4',
+        blockName: 'Artículos Recomendados',
         title: '⭐ Artículos Recomendados según tu Rol',
         description: 'Sistema aprende tu rol (vendedor, gerente, contador) y te sugiere artículos relevantes cada vez que entras. Vendedor? Te muestra "Cómo cambiar precio en POS". Contador? Te muestra "Cómo conciliar bancos". Ahorro de tiempo buscando.',
         position: 'bottom',
@@ -2272,6 +2480,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'support-1',
+        blockName: 'Centro de Soporte',
         title: '🆘 Centro de Soporte Técnico',
         description: 'Si tienes problema técnico (error en pantalla, función que no funciona, datos perdidos) o pregunta que no puedes resolver solo. Aquí contactas al equipo GEROS: Vía chat en vivo (respuesta en minutos si está online), Email, Teléfono. Cada ticket se asigna a especialista que da seguimiento.',
         position: 'bottom',
@@ -2279,6 +2488,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'support-2',
+        blockName: 'Chat en Vivo',
         title: '💬 Chat en Vivo - Soporte Inmediato',
         description: 'Botón inferior derecha en cualquier página GEROS. Abre ventana chat. Escribes consulta, especialista responde en segundos/minutos. Perfecto para: dudas rápidas, problemas urgentes, pasos que no entiendes. Horario: Lunes-Viernes 9am-6pm.',
         position: 'bottom',
@@ -2287,6 +2497,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'support-3',
+        blockName: 'Email y Tickets',
         title: '📧 Email y Tickets',
         description: 'Para consultas complejas que requieren análisis profundo: datos a revisar, problema que reproduce paso a paso. Envías email → sistema abre TICKET automático → especialista responde en 24 horas. Tienes número ticket para dar seguimiento.',
         position: 'bottom',

@@ -560,7 +560,7 @@ export default function Quotations() {
           {canCreate && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto" data-tutorial="btn-create-quotation">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo Presupuesto
                 </Button>
@@ -735,7 +735,7 @@ export default function Quotations() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table data-tutorial="quotations-table">
               <TableHeader>
                 <TableRow>
                   <TableHead>Número</TableHead>
