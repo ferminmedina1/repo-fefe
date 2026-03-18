@@ -91,7 +91,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     }, 0);
   }, []);
 
-  // Ir al siguiente paso
+  // FIX #1 + #2: Evitar trigger doble en último paso + Sincronizar isRunning
   const nextStep = useCallback(() => {
     setTutorialState(prev => {
       const tutorial = getTutorialByModuleId(prev.activeModuleId!);
@@ -100,12 +100,12 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       const newIndex = prev.currentStepIndex + 1;
       const currentStep = tutorial.steps[prev.currentStepIndex];
 
+      // Si es el último paso, solo limpia estado sin navegar (TutorialRunner maneja triggerCompletion)
       if (newIndex >= tutorial.steps.length) {
-        // Tutorial completado - volver al Centro de Aprendizaje si vino de ahí
         if (navigateRef.current && prev.originRoute === RETURN_ROUTE) {
           setTimeout(() => {
             navigateRef.current!(RETURN_ROUTE);
-          }, 0);
+          }, 2800);
         }
         return {
           ...prev,
@@ -118,25 +118,22 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
 
       const nextStepData = tutorial.steps[newIndex];
       
-      // Si el próximo paso requiere navegación, lo hacemos asincrónico para evitar race-conditions con Joyride
+      // Si el próximo paso requiere navegación, navega sin apagar Joyride
       if (nextStepData.route && navigateRef.current) {
+        navigateRef.current!(nextStepData.route!);
         setTimeout(() => {
-          navigateRef.current!(nextStepData.route!);
-          // Pequeño delay adicional para permitir mount del nuevo componente
-          setTimeout(() => {
-            setTutorialState(currentState => ({
-              ...currentState,
-              currentStepIndex: newIndex,
-              completedSteps: [...currentState.completedSteps, currentStep.id],
-              isRunning: true,
-            }));
-          }, 400);
-        }, 0);
+          setTutorialState(currentState => ({
+            ...currentState,
+            currentStepIndex: newIndex,
+            completedSteps: [...currentState.completedSteps, currentStep.id],
+            isRunning: true,
+          }));
+        }, 400);
         
-        // Congelamos el status momentáneamente cambiando isRunning a false temporalmente
+        // Mantén isRunning: true para que Joyride no se apague durante transición
         return {
           ...prev,
-          isRunning: false, 
+          isRunning: true, 
         };
       }
 
@@ -148,7 +145,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Ir al paso anterior
+  // FIX #2: previousStep - Mantén isRunning durante transición
   const previousStep = useCallback(() => {
     setTutorialState(prev => {
       const tutorial = getTutorialByModuleId(prev.activeModuleId!);
@@ -158,20 +155,18 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       
       const prevStepData = tutorial.steps[newIndex];
       if (prevStepData.route && navigateRef.current) {
+        navigateRef.current!(prevStepData.route!);
         setTimeout(() => {
-          navigateRef.current!(prevStepData.route!);
-          setTimeout(() => {
-            setTutorialState(currentState => ({
-              ...currentState,
-              currentStepIndex: newIndex,
-              isRunning: true,
-            }));
-          }, 400);
-        }, 0);
+          setTutorialState(currentState => ({
+            ...currentState,
+            currentStepIndex: newIndex,
+            isRunning: true,
+          }));
+        }, 400);
         
         return {
           ...prev,
-          isRunning: false,
+          isRunning: true,
         };
       }
       
@@ -182,7 +177,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Saltar a un paso específico
+  // FIX #2: goToStep - Mantén isRunning durante transición
   const goToStep = useCallback((stepIndex: number) => {
     setTutorialState(prev => {
       const tutorial = getTutorialByModuleId(prev.activeModuleId!);
@@ -192,20 +187,18 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       const stepData = tutorial.steps[clampedIndex];
       
       if (stepData.route && navigateRef.current) {
+        navigateRef.current!(stepData.route!);
         setTimeout(() => {
-          navigateRef.current!(stepData.route!);
-          setTimeout(() => {
-            setTutorialState(currentState => ({
-              ...currentState,
-              currentStepIndex: clampedIndex,
-              isRunning: true,
-            }));
-          }, 400);
-        }, 0);
+          setTutorialState(currentState => ({
+            ...currentState,
+            currentStepIndex: clampedIndex,
+            isRunning: true,
+          }));
+        }, 400);
 
         return {
           ...prev,
-          isRunning: false,
+          isRunning: true,
         };
       }
 
@@ -233,7 +226,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Saltar tutorial
+  // FIX #6: skipTutorial - Preserva progreso antes de saltar
   const skipTutorial = useCallback(() => {
     setTutorialState(prev => {
       if (navigateRef.current && prev.originRoute === RETURN_ROUTE) {
@@ -245,7 +238,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
         activeModuleId: null,
         currentStepIndex: 0,
         isRunning: false,
-        completedSteps: [],
+        completedSteps: prev.completedSteps,
         originRoute: undefined,
       };
     });

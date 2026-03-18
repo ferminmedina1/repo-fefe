@@ -43,6 +43,40 @@ function StepDots({ total, current }: { total: number; current: number }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Enterprise-grade target validation
+// ─────────────────────────────────────────────────────────────
+function isValidTarget(selector: string | undefined): boolean {
+  if (!selector) return false;
+  try {
+    const element = document.querySelector(selector);
+    if (!element) return false;
+    
+    // Check if element is visible
+    const style = window.getComputedStyle(element);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+      return false;
+    }
+    
+    // Check if element has dimensions
+    const rect = element.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      return false;
+    }
+    
+    // Check if element has content (not empty)
+    const text = element.textContent?.trim();
+    const hasChildren = element.children.length > 0;
+    if (!text && !hasChildren) {
+      return false;
+    }
+    
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 // Narration Card — for steps WITHOUT a target element.
 // Shown as a bottom slide-up panel. No dark overlay.
 // ─────────────────────────────────────────────────────────────
@@ -60,11 +94,12 @@ interface NarrationCardProps {
   onBack: () => void;
   onSkip: () => void;
   onMinimize: () => void;
+  targetUnavailable?: boolean;
 }
 
 function NarrationCard({
   stepIndex, totalSteps, tutorialName, title, description,
-  blockName, action, isLastStep, canGoBack, onNext, onBack, onSkip, onMinimize
+  blockName, action, isLastStep, canGoBack, onNext, onBack, onSkip, onMinimize, targetUnavailable
 }: NarrationCardProps) {
   return (
     <div className={cn(
@@ -88,7 +123,9 @@ function NarrationCard({
           ) : (
             <>
               <FileText className="h-3 w-3 text-primary" />
-              <span className="text-[11px] font-bold text-primary uppercase tracking-wider">Vista general</span>
+              <span className="text-[11px] font-bold text-primary uppercase tracking-wider">
+                {targetUnavailable ? '⚠️ Elemento no disponible' : 'Vista general'}
+              </span>
             </>
           )}
         </div>
@@ -105,6 +142,15 @@ function NarrationCard({
             <h3 className="text-sm font-bold text-foreground leading-snug">{title}</h3>
           </div>
         </div>
+
+        {/* Warning if target unavailable */}
+        {targetUnavailable && (
+          <div className="mb-3 p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+            <p className="text-xs text-yellow-700 dark:text-yellow-200">
+              El elemento de enfoque no está visible en esta página. Continúa para más instrucciones.
+            </p>
+          </div>
+        )}
 
         {/* Controls top-right */}
         <div className="absolute top-[calc(3px+10px)] right-3 flex gap-1">
@@ -268,7 +314,7 @@ const CustomTooltip = ({
           </div>
         </div>
 
-        {/* Block indicator badge — Shows which section/block is being highlighted — IMPROVED VISIBILITY */}
+        {/* Block indicator badge */}
         {originalStep?.blockName && (
           <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary/15 to-primary/10 border border-primary/30 shadow-sm shadow-primary/20">
             <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-sm shadow-primary/50" />
@@ -382,9 +428,11 @@ export function TutorialRunner() {
   const [minimized, setMinimized] = useState(false);
   const [completedName, setCompletedName] = useState('');
   const [showCompletion, setShowCompletion] = useState(false);
+  const [invalidTargets, setInvalidTargets] = useState<Set<string>>(new Set());
 
   // Refs to avoid stale closures in completion callbacks
   const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const validationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentTutorial = getCurrentTutorial();
 
   useEffect(() => { setNavigate(navigate); }, [navigate, setNavigate]);
@@ -402,20 +450,69 @@ export function TutorialRunner() {
   // Reset minimized on step change
   useEffect(() => { setMinimized(false); }, [tutorialState.currentStepIndex]);
 
-  // Derive current step — null means "no target" step
+  // Continuously validate current target (enterprise: 3 sec retry)
+  useEffect(() => {
+    if (!isRunning || minimized) {
+      if (validationTimerRef.current) clearInterval(validationTimerRef.current);
+      return;
+    }
+    
+    const currentStep = currentTutorial?.steps[tutorialState.currentStepIndex];
+    if (!currentStep?.target) return;
+
+    // Check immediately
+    if (!isValidTarget(currentStep.target)) {
+      setInvalidTargets(prev => new Set([...prev, currentStep.target!]));
+    } else {
+      // Target is valid, remove from invalid set
+      setInvalidTargets(prev => {
+        const updated = new Set(prev);
+        updated.delete(currentStep.target!);
+        return updated;
+      });
+    }
+
+    // Retry every 500ms for 3 seconds (async loading)
+    let attempts = 0;
+    validationTimerRef.current = setInterval(() => {
+      attempts++;
+      if (isValidTarget(currentStep.target!)) {
+        // Target became valid
+        setInvalidTargets(prev => {
+          const updated = new Set(prev);
+          updated.delete(currentStep.target!);
+          return updated;
+        });
+        if (validationTimerRef.current) clearInterval(validationTimerRef.current);
+      } else if (attempts >= 6) {
+        // 3 seconds passed (6 × 500ms), target definitely unavailable
+        setInvalidTargets(prev => new Set([...prev, currentStep.target!]));
+        if (validationTimerRef.current) clearInterval(validationTimerRef.current);
+      }
+    }, 500);
+
+    return () => {
+      if (validationTimerRef.current) clearInterval(validationTimerRef.current);
+    };
+  }, [isRunning, tutorialState.currentStepIndex, minimized, currentTutorial]);
+
+  // Derive current step — check if target is valid
   const stepIndex = tutorialState.currentStepIndex;
   const currentOriginalStep = currentTutorial?.steps[stepIndex] ?? null;
-  const isUntargetedStep = isRunning && currentOriginalStep && !currentOriginalStep.target;
+  
+  // If target exists but is invalid in DOM, treat as untargeted (fallback to narration)
+  const targetIsInvalid = currentOriginalStep?.target && invalidTargets.has(currentOriginalStep.target);
+  const isUntargetedStep = isRunning && currentOriginalStep && (!currentOriginalStep.target || targetIsInvalid);
   const isLastStep = !!currentTutorial && stepIndex === currentTutorial.steps.length - 1;
 
   // Build Joyride steps (only targeted ones will be spotlighted)
   useEffect(() => {
     if (!currentTutorial) { setJoyrideSteps([]); return; }
     const steps: Step[] = currentTutorial.steps.map(step => ({
-      target: step.target || 'body',
+      target: (step.target && !invalidTargets.has(step.target)) ? step.target : 'body',
       title: step.title,
       content: step.description,
-      placement: step.target
+      placement: (step.target && !invalidTargets.has(step.target))
         ? (step.position === 'top' ? 'top' : step.position === 'bottom' ? 'bottom' : step.position === 'left' ? 'left' : step.position === 'right' ? 'right' : 'auto')
         : 'center',
       disableBeacon: true,
@@ -425,7 +522,7 @@ export function TutorialRunner() {
       floaterProps: { disableAnimation: true },
     }));
     setJoyrideSteps(steps);
-  }, [currentTutorial, minimized]);
+  }, [currentTutorial, invalidTargets, minimized]);
 
   // Trigger completion flash
   const triggerCompletion = useCallback((name: string) => {
@@ -455,11 +552,10 @@ export function TutorialRunner() {
     if (action === ACTIONS.CLOSE && type === EVENTS.STEP_AFTER) endTutorial();
   }, [currentTutorial, endTutorial, goToStep, triggerCompletion]);
 
-  // NarrationCard handlers (for untargeted steps)
+  // NarrationCard handlers
   const handleNarrationNext = useCallback(() => {
     if (isLastStep && currentTutorial) {
       triggerCompletion(currentTutorial.moduleName);
-      // Use nextStep which handles route + state cleanup
       nextStep();
     } else {
       nextStep();
@@ -473,12 +569,11 @@ export function TutorialRunner() {
   // MiniBar advance
   const handleMiniBarNext = useCallback(() => {
     setMinimized(false);
-    if (isLastStep && currentTutorial) triggerCompletion(currentTutorial.moduleName);
     setTimeout(() => nextStep(), 160);
-  }, [isLastStep, currentTutorial, nextStep, triggerCompletion]);
+  }, [nextStep]);
 
   // Joyride should be running only when:
-  // - isRunning AND not minimized AND current step HAS a target
+  // - isRunning AND not minimized AND current step HAS a VALID target
   const shouldRunJoyride = isRunning && !minimized && !isUntargetedStep;
 
   if (!isRunning && !showCompletion) return null;
@@ -512,14 +607,13 @@ export function TutorialRunner() {
               boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.3), 0 0 20px rgba(59, 130, 246, 0.4)',
             },
             overlay: {
-              // Hide overlay entirely when untargeted step is shown (NarrationCard handles it)
               mixBlendMode: 'normal',
             },
           }}
         />
       )}
 
-      {/* NarrationCard — untargeted steps only, no overlay */}
+      {/* NarrationCard — untargeted steps or invalid targets, no overlay */}
       {isRunning && isUntargetedStep && !minimized && currentOriginalStep && (
         <NarrationCard
           stepIndex={stepIndex}
@@ -535,6 +629,7 @@ export function TutorialRunner() {
           onBack={handleNarrationBack}
           onSkip={() => { skipTutorial(); }}
           onMinimize={() => setMinimized(true)}
+          targetUnavailable={targetIsInvalid}
         />
       )}
 
