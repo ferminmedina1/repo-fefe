@@ -112,9 +112,9 @@ function validateTarget(selector: string | undefined, debug = false): Validation
       zIndexOk: parseInt(style.zIndex) >= 0 || style.zIndex === 'auto',
     };
 
-    // Only require: exists, visible, hasDimensions, inViewport
-    // Don't block on hasContent (element can be loading)
-    const allValid = checks.exists && checks.visible && checks.hasDimensions && checks.inViewport;
+    // Only require: exists, visible, hasDimensions
+    // inViewport is NOT a blocker since Joyride will scroll it into view
+    const allValid = checks.exists && checks.visible && checks.hasDimensions;
 
     if (debug) {
       console.log(`[Tutorial] Target validation for "${selector}":`, {
@@ -133,7 +133,6 @@ function validateTarget(selector: string | undefined, debug = false): Validation
       if (!checks.exists) failureReasons.push('Element not in DOM');
       if (!checks.visible) failureReasons.push('Element hidden (display/visibility/opacity)');
       if (!checks.hasDimensions) failureReasons.push(`No dimensions (${rect.width}x${rect.height})`);
-      if (!checks.inViewport) failureReasons.push(`Out of viewport (top=${rect.top.toFixed(0)}, bottom=${rect.bottom.toFixed(0)})`);
       
       return {
         isValid: false,
@@ -182,23 +181,14 @@ function NarrationCard({
   blockName, action, isLastStep, canGoBack, onNext, onBack, onSkip, onMinimize, targetUnavailable, targetFailureReason
 }: NarrationCardProps) {
   return (
-    <div className={cn(
-      'fixed bottom-6 left-1/2 -translate-x-1/2 z-[10001]',
-      'w-[400px] max-w-[calc(100vw-24px)]',
-      'bg-card/95 backdrop-blur-xl rounded-2xl overflow-hidden',
-      'border border-border/70 shadow-[0_16px_48px_rgba(0,0,0,0.22)]',
-      'animate-in slide-in-from-bottom-4 fade-in-0 duration-300 ease-out'
-    )}>
-      {/* Accent bar */}
-      <div className="h-[3px] w-full bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
-
-      {/* Block name or "General Overview" badge — IMPROVED VISIBILITY */}
-      <div className="absolute top-[10px] left-1/2 -translate-x-1/2 z-10">
-        <div className="flex items-center gap-1.5 bg-gradient-to-r from-primary/15 to-primary/10 border border-primary/30 rounded-lg px-3 py-1.5 shadow-sm shadow-primary/20">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10001] w-[400px] max-w-[calc(100vw-24px)]">
+      {/* Block name or "General Overview" badge — positioned ABOVE card, not clipped */}
+      <div className="flex justify-center mb-3">
+        <div className="flex items-center gap-1.5 bg-gradient-to-r from-primary/15 to-primary/10 border border-primary/30 rounded-lg px-3 py-1.5 shadow-sm shadow-primary/20 whitespace-nowrap">
           {blockName ? (
             <>
               <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-sm shadow-primary/50" />
-              <span className="text-[11px] font-bold text-primary uppercase tracking-wider whitespace-nowrap">{blockName}</span>
+              <span className="text-[11px] font-bold text-primary uppercase tracking-wider">{blockName}</span>
             </>
           ) : (
             <>
@@ -210,6 +200,15 @@ function NarrationCard({
           )}
         </div>
       </div>
+
+      {/* Main card */}
+      <div className={cn(
+        'bg-card/95 backdrop-blur-xl rounded-2xl overflow-hidden',
+        'border border-border/70 shadow-[0_16px_48px_rgba(0,0,0,0.22)]',
+        'animate-in slide-in-from-bottom-4 fade-in-0 duration-300 ease-out'
+      )}>
+        {/* Accent bar */}
+        <div className="h-[3px] w-full bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
 
       <div className="p-5 pt-7">
         {/* Header */}
@@ -300,6 +299,7 @@ function NarrationCard({
             {!isLastStep && <ChevronRight className="h-3.5 w-3.5 ml-1" />}
           </Button>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -578,6 +578,16 @@ export function TutorialRunner() {
     let observer: IntersectionObserver | null = null;
 
     const checkAndUpdateTarget = () => {
+      // Force scroll element into view before validating
+      try {
+        const element = document.querySelector(selector);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      } catch (e) {
+        // Ignore scroll errors
+      }
+      
       const validation = validateTarget(selector, attempts === 0);
       
       if (validation.isValid) {
@@ -782,7 +792,7 @@ export function TutorialRunner() {
           callback={handleJoyrideCallback}
           continuous
           scrollToFirstStep
-          scrollOffset={150}
+          scrollOffset={280}
           showProgress={false}
           showSkipButton
           disableScrollParentFix
