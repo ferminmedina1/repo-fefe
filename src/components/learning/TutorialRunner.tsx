@@ -94,21 +94,32 @@ function validateTarget(selector: string | undefined, debug = false): Validation
     const parentStyle = parent ? window.getComputedStyle(parent) : null;
 
     // Detailed checks
+    // NOTE: hasContent is NOT a blocker - elements can be loading (skeleton/placeholder)
+    // What matters: exists, visible, has minimal dimensions, in viewport
+    const hasMinimalContent = !!(element.textContent?.trim() || element.children.length > 0);
+    const isLoadingState = element.classList.contains('animate-pulse') || 
+                          element.classList.contains('skeleton') ||
+                          element.classList.contains('loading') ||
+                          element.getAttribute('aria-busy') === 'true';
+
     const checks = {
       exists: true,
       visible: style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0',
       hasDimensions: rect.width > 0 && rect.height > 0,
-      hasContent: !!(element.textContent?.trim() || element.children.length > 0),
+      hasContent: hasMinimalContent || isLoadingState, // Accept if it has content OR is in loading state
       inViewport: rect.top < window.innerHeight && rect.bottom > 0 && rect.left < window.innerWidth && rect.right > 0,
       notHidden: style.overflow !== 'hidden' || rect.height > 0,
       zIndexOk: parseInt(style.zIndex) >= 0 || style.zIndex === 'auto',
     };
 
-    const allValid = checks.exists && checks.visible && checks.hasDimensions && checks.hasContent;
+    // Only require: exists, visible, hasDimensions, inViewport
+    // Don't block on hasContent (element can be loading)
+    const allValid = checks.exists && checks.visible && checks.hasDimensions && checks.inViewport;
 
     if (debug) {
       console.log(`[Tutorial] Target validation for "${selector}":`, {
         ...checks,
+        isLoadingState,
         rect: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, width: rect.width, height: rect.height },
         display: style.display,
         visibility: style.visibility,
@@ -122,7 +133,6 @@ function validateTarget(selector: string | undefined, debug = false): Validation
       if (!checks.exists) failureReasons.push('Element not in DOM');
       if (!checks.visible) failureReasons.push('Element hidden (display/visibility/opacity)');
       if (!checks.hasDimensions) failureReasons.push(`No dimensions (${rect.width}x${rect.height})`);
-      if (!checks.hasContent) failureReasons.push('Element empty (no text/children)');
       if (!checks.inViewport) failureReasons.push(`Out of viewport (top=${rect.top.toFixed(0)}, bottom=${rect.bottom.toFixed(0)})`);
       
       return {
@@ -564,7 +574,7 @@ export function TutorialRunner() {
 
     const selector = currentStep.target;
     let attempts = 0;
-    const maxAttempts = 16; // 8 seconds with varying intervals
+    const maxAttempts = 24; // 12 seconds with varying intervals (more time for async loads)
     let observer: IntersectionObserver | null = null;
 
     const checkAndUpdateTarget = () => {
@@ -632,10 +642,12 @@ export function TutorialRunner() {
     validationTimerRef.current = setInterval(() => {
       attempts++;
       
-      // Dynamic intervals: fast start (200ms), then slower (500ms), then even slower (1000ms)
-      let nextInterval = 200;
-      if (attempts > 8) nextInterval = 1000;
-      else if (attempts > 4) nextInterval = 500;
+      // Progressive backoff: faster retries early, slower later (better for async loading)
+      let nextInterval = 250;
+      if (attempts > 16) nextInterval = 1500; // Very slow (long waits)
+      else if (attempts > 8) nextInterval = 1000; // Slow (1 sec each)
+      else if (attempts > 4) nextInterval = 500; // Medium (half sec each)
+      // else: 250ms for first 4 attempts
 
       if (checkAndUpdateTarget()) {
         // Found! Stop searching
@@ -695,8 +707,11 @@ export function TutorialRunner() {
       disableBeacon: true,
       disableOverlayClose: true,
       spotlightClicks: minimized,
-      spotlightPadding: 10,
-      floaterProps: { disableAnimation: true },
+      spotlightPadding: 13,
+      floaterProps: { 
+        disableAnimation: true,
+        autoUpdate: true, // Recalculate position on scroll/resize
+      },
     }));
     setJoyrideSteps(steps);
   }, [currentTutorial, invalidTargets, minimized]);
@@ -767,7 +782,7 @@ export function TutorialRunner() {
           callback={handleJoyrideCallback}
           continuous
           scrollToFirstStep
-          scrollOffset={100}
+          scrollOffset={150}
           showProgress={false}
           showSkipButton
           disableScrollParentFix
@@ -778,7 +793,7 @@ export function TutorialRunner() {
           styles={{
             options: {
               zIndex: 10000,
-              overlayColor: 'rgba(0, 0, 0, 0.20)',
+              overlayColor: 'rgba(0, 0, 0, 0.35)',
               arrowColor: 'transparent',
               backgroundColor: 'transparent',
               textColor: 'transparent',
@@ -790,6 +805,7 @@ export function TutorialRunner() {
             },
             overlay: {
               mixBlendMode: 'normal',
+              zIndex: 10000,
             },
             tooltip: {
               backgroundColor: 'transparent',
