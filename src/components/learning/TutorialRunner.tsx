@@ -9,9 +9,9 @@ import {
 import { cn } from '@/lib/utils';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Spotlight pulse animation
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const spotlightStyles = `
   @keyframes spotlight-pulse {
     0%, 100% {
@@ -27,9 +27,9 @@ const spotlightStyles = `
   }
 `;
 
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Step dots / progress indicator
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StepDots({ total, current }: { total: number; current: number }) {
   if (total > 10) {
     const progress = Math.round(((current + 1) / total) * 100);
@@ -60,9 +60,9 @@ function StepDots({ total, current }: { total: number; current: number }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Advanced target validation with detailed diagnostics
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface ValidationResult {
   isValid: boolean;
   reason?: string;
@@ -154,10 +154,10 @@ function isValidTarget(selector: string | undefined): boolean {
   return validateTarget(selector).isValid;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Narration Card — for steps WITHOUT a target element.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Narration Card â€” for steps WITHOUT a target element.
 // Shown as a bottom slide-up panel. No dark overlay.
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface NarrationCardProps {
   stepIndex: number;
   totalSteps: number;
@@ -182,7 +182,7 @@ function NarrationCard({
 }: NarrationCardProps) {
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10001] w-[400px] max-w-[calc(100vw-24px)]">
-      {/* Block name or "General Overview" badge — positioned ABOVE card, not clipped */}
+      {/* Block name or "General Overview" badge â€” positioned ABOVE card, not clipped */}
       <div className="flex justify-center mb-3">
         <div className="flex items-center gap-1.5 bg-gradient-to-r from-primary/15 to-primary/10 border border-primary/30 rounded-lg px-3 py-1.5 shadow-sm shadow-primary/20 whitespace-nowrap">
           {blockName ? (
@@ -194,7 +194,7 @@ function NarrationCard({
             <>
               <FileText className="h-3 w-3 text-primary" />
               <span className="text-[11px] font-bold text-primary uppercase tracking-wider">
-                {targetUnavailable ? '⚠️ Elemento no disponible' : 'Vista general'}
+                {targetUnavailable ? 'âš ï¸ Elemento no disponible' : 'Vista general'}
               </span>
             </>
           )}
@@ -203,7 +203,7 @@ function NarrationCard({
 
       {/* Main card */}
       <div className={cn(
-        'bg-card/95 backdrop-blur-xl rounded-2xl overflow-hidden',
+        'bg-card rounded-2xl overflow-hidden',
         'border border-border/70 shadow-[0_16px_48px_rgba(0,0,0,0.22)]',
         'animate-in slide-in-from-bottom-4 fade-in-0 duration-300 ease-out'
       )}>
@@ -226,7 +226,7 @@ function NarrationCard({
         {targetUnavailable && (
           <div className="mb-3 p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
             <p className="text-xs text-yellow-700 dark:text-yellow-200 font-medium">
-              ⏳ El elemento de enfoque no está disponible aún.
+              â³ El elemento de enfoque no estÃ¡ disponible aÃºn.
             </p>
             {targetFailureReason && (
               <p className="text-xs text-yellow-700/70 dark:text-yellow-200/70 mt-1">
@@ -234,7 +234,7 @@ function NarrationCard({
               </p>
             )}
             <p className="text-xs text-yellow-700/60 dark:text-yellow-200/60 mt-1">
-              Continúa con la siguiente instrucción.
+              ContinÃºa con la siguiente instrucciÃ³n.
             </p>
           </div>
         )}
@@ -282,7 +282,7 @@ function NarrationCard({
           {canGoBack && (
             <Button variant="outline" size="sm" onClick={onBack}
               className="h-8 px-3 text-xs rounded-xl border-border/60 hover:bg-muted/60">
-              <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Atrás
+              <ChevronLeft className="h-3.5 w-3.5 mr-1" /> AtrÃ¡s
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={onSkip}
@@ -295,7 +295,7 @@ function NarrationCard({
                 ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                 : 'bg-primary text-primary-foreground hover:bg-primary/90'
             )}>
-            {isLastStep ? '🎉 ¡Completar!' : 'Siguiente'}
+            {isLastStep ? 'ðŸŽ‰ Â¡Completar!' : 'Siguiente'}
             {!isLastStep && <ChevronRight className="h-3.5 w-3.5 ml-1" />}
           </Button>
         </div>
@@ -305,9 +305,9 @@ function NarrationCard({
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Mini-bar — shown when any step is minimized
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Mini-bar â€” shown when any step is minimized
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface MiniBarProps {
   stepTitle: string;
   stepAction?: string;
@@ -324,7 +324,7 @@ const MiniBar = ({ stepTitle, stepAction, stepIndex, totalSteps, tutorialName, o
     <div className={cn(
       'fixed bottom-6 left-1/2 -translate-x-1/2 z-[10002]',
       'flex items-center gap-3 pl-3 pr-2 py-2 rounded-2xl',
-      'bg-background/95 border border-border/80 backdrop-blur-xl',
+      'bg-background dark:bg-card border border-border/80',
       'shadow-[0_8px_32px_rgba(0,0,0,0.18)]',
       'animate-in slide-in-from-bottom-3 duration-300 ease-out'
     )} style={{ maxWidth: 'calc(100vw - 24px)' }}>
@@ -341,7 +341,7 @@ const MiniBar = ({ stepTitle, stepAction, stepIndex, totalSteps, tutorialName, o
 
       <div className="flex flex-col min-w-0 max-w-[200px]">
         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate leading-none mb-0.5">
-          {stepAction ? '⚡ Tu turno' : tutorialName}
+          {stepAction ? 'âš¡ Tu turno' : tutorialName}
         </span>
         <span className="text-sm font-semibold text-foreground truncate leading-tight">{stepAction || stepTitle}</span>
       </div>
@@ -360,15 +360,15 @@ const MiniBar = ({ stepTitle, stepAction, stepIndex, totalSteps, tutorialName, o
             : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/25'
         )}>
         <CheckCircle2 className="h-3.5 w-3.5" />
-        {isLastStep ? 'Finalizar' : 'Listo ✓'}
+        {isLastStep ? 'Finalizar' : 'Listo âœ“'}
       </Button>
     </div>
   );
 };
 
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Arrow pointer for visual guidance
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function TooltipArrow() {
   return (
     <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10">
@@ -390,35 +390,38 @@ const CustomTooltip = ({
   const hasAction = !!originalStep?.action;
 
   return (
-    <div {...tooltipProps} className={cn(
-      'relative w-[400px] max-w-[calc(100vw-24px)]',
-      'bg-card/98 backdrop-blur-xl rounded-2xl overflow-hidden',
-      'border border-border/70 shadow-[0_16px_48px_rgba(0,0,0,0.22)]',
-      'animate-in slide-in-from-bottom-4 fade-in-0 duration-300 ease-out'
-    )}>
-      <div className="h-[3px] w-full bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
-
-      <div className="p-5 pt-7">
-        {/* Header */}
-        <div className="flex gap-3 mb-3 pr-8">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-            <span className="text-xs font-bold text-primary tabular-nums">{index + 1}</span>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">{tutorial?.moduleName}</p>
-            <h3 className="text-sm font-bold text-foreground leading-snug">{originalStep?.title || step.title}</h3>
+    <div {...tooltipProps} className="relative w-[400px] max-w-[calc(100vw-24px)] flex flex-col items-center">
+      {/* Block indicator badge — positioned ABOVE card, just like NarrationCard */}
+      {originalStep?.blockName && (
+        <div className="flex justify-center mb-3">
+          <div className="flex items-center gap-1.5 bg-card border border-primary/30 rounded-lg px-3 py-1.5 shadow-sm shadow-primary/20 whitespace-nowrap z-10">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-sm shadow-primary/50" />
+            <span className="text-[11px] font-bold text-primary uppercase tracking-wide">{originalStep.blockName}</span>
           </div>
         </div>
+      )}
 
-        {/* Block indicator badge */}
-        {originalStep?.blockName && (
-          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary/15 to-primary/10 border border-primary/30 shadow-sm shadow-primary/20">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-sm shadow-primary/50" />
-            <span className="text-[11px] font-bold text-primary uppercase tracking-wide whitespace-nowrap">{originalStep.blockName}</span>
+      {/* Main card content */}
+      <div className={cn(
+        'w-full bg-card rounded-2xl overflow-hidden relative',
+        'border border-border/70 shadow-[0_16px_48px_rgba(0,0,0,0.22)]',
+        'animate-in slide-in-from-bottom-4 fade-in-0 duration-300 ease-out'
+      )}>
+        <div className="h-[3px] w-full bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
+
+        <div className="p-5 pt-7">
+          {/* Header */}
+          <div className="flex gap-3 mb-3 pr-8">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+              <span className="text-xs font-bold text-primary tabular-nums">{index + 1}</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">{tutorial?.moduleName}</p>
+              <h3 className="text-sm font-bold text-foreground leading-snug">{originalStep?.title || step.title}</h3>
+            </div>
           </div>
-        )}
 
-        {/* Controls top-right */}
+          {/* Controls top-right */}
         <div className="absolute top-[calc(3px+10px)] right-3 flex gap-1">
           {hasAction && (
             <Button variant="ghost" size="icon" onClick={onMinimize}
@@ -458,7 +461,7 @@ const CustomTooltip = ({
         <div className="flex gap-2">
           {index > 0 && (
             <Button variant="outline" {...backProps} className="h-8 px-3 text-xs rounded-xl border-border/60 hover:bg-muted/60 shrink-0">
-              <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Atrás
+              <ChevronLeft className="h-3.5 w-3.5 mr-1" /> AtrÃ¡s
             </Button>
           )}
           <Button variant="ghost" {...skipProps}
@@ -470,29 +473,28 @@ const CustomTooltip = ({
               ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm shadow-emerald-500/25'
               : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/20'
           )}>
-            {isLastStep ? '🎉 ¡Completar!' : 'Siguiente'}
+            {isLastStep ? 'ðŸŽ‰ Â¡Completar!' : 'Siguiente'}
             {!isLastStep && <ChevronRight className="h-3.5 w-3.5 ml-1" />}
           </Button>
         </div>
 
         {originalStep?.duration && (
-          <p className="text-[10px] text-muted-foreground/40 mt-3 text-center">⏱ ~{originalStep.duration}s</p>
+          <p className="text-[10px] text-muted-foreground/40 mt-3 text-center">â± ~{originalStep.duration}s</p>
         )}
-      </div>
-    </div>
+      </div>      </div>    </div>
   );
 };
 
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Completion flash
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function CompletionFlash({ tutorialName }: { tutorialName: string }) {
   return (
     <div className="fixed inset-0 z-[20000] flex items-center justify-center pointer-events-none">
       <div className="animate-in zoom-in-75 fade-in-0 duration-250 text-center">
         <div className={cn(
           'inline-flex flex-col items-center gap-3 px-8 py-6 rounded-3xl',
-          'bg-card/95 backdrop-blur-xl border border-border/60 shadow-2xl',
+          'bg-card border border-border/60 shadow-2xl',
           'animate-out zoom-out-95 fade-out-0 duration-350 fill-mode-forwards',
           '[animation-delay:2000ms]'
         )}>
@@ -500,7 +502,7 @@ function CompletionFlash({ tutorialName }: { tutorialName: string }) {
             <CheckCircle2 className="h-8 w-8 text-emerald-500" />
           </div>
           <div>
-            <p className="text-base font-bold text-foreground">¡Tutorial completado! 🎉</p>
+            <p className="text-base font-bold text-foreground">Â¡Tutorial completado! ðŸŽ‰</p>
             <p className="text-sm text-muted-foreground mt-0.5">{tutorialName}</p>
           </div>
         </div>
@@ -509,9 +511,9 @@ function CompletionFlash({ tutorialName }: { tutorialName: string }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Main TutorialRunner
-// ─────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function TutorialRunner() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -695,7 +697,7 @@ export function TutorialRunner() {
     };
   }, [isRunning, tutorialState.currentStepIndex, minimized, currentTutorial]);
 
-  // Derive current step — check if target is valid
+  // Derive current step â€” check if target is valid
   const stepIndex = tutorialState.currentStepIndex;
   const currentOriginalStep = currentTutorial?.steps[stepIndex] ?? null;
   
@@ -736,7 +738,7 @@ export function TutorialRunner() {
 
   useEffect(() => () => { if (completionTimerRef.current) clearTimeout(completionTimerRef.current); }, []);
 
-  // Joyride callback — only relevant for targeted steps
+  // Joyride callback â€” only relevant for targeted steps
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
     const { action, index, status, type } = data;
 
@@ -782,7 +784,7 @@ export function TutorialRunner() {
 
   return (
     <>
-      {/* Joyride — only for targeted steps */}
+      {/* Joyride â€” only for targeted steps */}
       {isRunning && joyrideSteps.length > 0 && (
         <Joyride
           key={currentTutorial?.moduleId}
@@ -803,7 +805,7 @@ export function TutorialRunner() {
           styles={{
             options: {
               zIndex: 10000,
-              overlayColor: 'rgba(0, 0, 0, 0.35)',
+              overlayColor: 'rgba(0, 0, 0, 0.65)',
               arrowColor: 'transparent',
               backgroundColor: 'transparent',
               textColor: 'transparent',
@@ -830,7 +832,7 @@ export function TutorialRunner() {
         />
       )}
 
-      {/* NarrationCard — untargeted steps or invalid targets, no overlay */}
+      {/* NarrationCard â€” untargeted steps or invalid targets, no overlay */}
       {isRunning && isUntargetedStep && !minimized && currentOriginalStep && (
         <NarrationCard
           stepIndex={stepIndex}
@@ -851,7 +853,7 @@ export function TutorialRunner() {
         />
       )}
 
-      {/* MiniBar — when any step is minimized */}
+      {/* MiniBar â€” when any step is minimized */}
       {isRunning && minimized && currentOriginalStep && (
         <MiniBar
           stepTitle={currentOriginalStep.title}
