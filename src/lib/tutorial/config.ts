@@ -169,6 +169,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'customers-1',
+        target: '[data-tutorial="customer-table"]',
         blockName: 'Base de Clientes',
         title: '👥 Base de Clientes Completa',
         description: 'Registro centralizado de todos tus clientes: Nombre, Teléfono, Email, Dirección, CUIT/DNI, Límite de crédito, Saldo pendiente, Última compra, Total gasto histórico. Es la fuente de verdad para gestionar relaciones.',
@@ -177,6 +178,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'customers-2',
+        target: '[data-tutorial="btn-create-customer"]',
         blockName: 'Nuevo Cliente',
         title: '➕ Agregar Nuevo Cliente',
         description: 'Haz clic en "Nuevo Cliente" (arriba derecha). Completa: Nombre completo, Teléfono, Email (para enviar cotizaciones/facturas), Dirección completa, CUIT/DNI, Límite de crédito para venta a crédito, se sugiere categorizar (mayorista, minorista, consumidor).',
@@ -186,15 +188,17 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'customers-3',
+        target: '[data-tutorial="customer-table"]',
         blockName: 'Perfil del Cliente',
         title: '🎯 Perfil del Cliente',
-        description: 'Haz clic en cliente para ver: resumen completo, todas sus compras (historial), movimientos de cuenta corriente, deuda acumulada, descuentos aplicados, datos para contacto. Lugar central para todo sobre ese cliente.',
-        position: 'right',
+        description: 'Haz clic en el icono "Ver cuenta corriente" en cualquier cliente para ver: resumen completo, todas sus compras (historial), movimientos de cuenta corriente, deuda acumulada, descuentos aplicados, datos para contacto. Lugar central para todo sobre ese cliente.',
+        position: 'top',
         action: 'Abre perfil de un cliente existente',
         duration: 2,
       },
       {
         id: 'customers-4',
+        target: '[data-tutorial="customer-filters"]',
         blockName: 'Búsqueda Rápida',
         title: '🔍 Búsqueda Rápida',
         description: 'La barra de búsqueda superior busca por: nombre del cliente, teléfono, email, CUIT/DNI. Escribe parcial y te autocompleta. Muy útil para encontrar rápido durante una venta al teléfono.',
@@ -217,6 +221,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'inventory-1',
+        target: '[data-tutorial="inventory-alerts-panel"]',
         blockName: 'Centro de Control',
         title: '📦 Centro de Control de Stock',
         description: 'Vista centralizada de QUÉ productos tienen bajo stock. El sistema monitorea automáticamente todos tus productos contra su nivel mínimo configurado. Es tu early warning system para evitar desabastecimiento.',
@@ -225,6 +230,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'inventory-2',
+        target: '[data-tutorial="critical-alerts"]',
         blockName: 'Panel de Alertas',
         title: '🚨 Panel de Alertas Críticas',
         description: 'Los productos que aparecen aquí están por debajo del mínimo establecido. Colores: Verde (OK), Naranja (Próximo a mínimo), Rojo (Crítico, reponer urgente). Cada alerta muestra el gap: cuánto falta para llegar a mínimo.',
@@ -234,6 +240,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'inventory-3',
+        target: '[data-tutorial="stock-table"]',
         blockName: 'Tabla de Stock',
         title: '📊 Tabla Completa de Stock',
         description: 'Ves todos tus productos con: Nombre, Código, Stock Actual, Stock Mínimo configurado, Diferencia, Última compra fecha, Rotación (veces/mes que se vende). Te permite priorizar qué reponer primero.',
@@ -243,6 +250,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'inventory-4',
+        target: '[data-tutorial="btn-create-order"]',
         blockName: 'Orden de Recompra',
         title: '📝 Crear Orden de Recompra Automática',
         description: 'Selecciona productos de la lista y haz clic "Crear Orden". Se genera automáticamente una orden de compra pre-cargada con cantidad sugerida (para llegar a mínimo + 1 mes de venta promedio).',
@@ -265,6 +273,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'pos-1',
+        target: '[data-tutorial="pos-interface"]',
         blockName: 'Interfaz POS Completa',
         title: '🛒 Terminal de Punto de Venta (POS)',
         description: 'Este es tu caja rápida. Aquí capturarás ventas del mostrador en segundos: busca producto, agrega cantidad, selecciona método de pago, confirma. El flujo está optimizado para velocidad. Se genera automáticamente recibo o factura fiscal.',
@@ -273,6 +282,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'pos-2',
+        target: '[data-tutorial="pos-search"]',
         blockName: 'Búsqueda de Productos',
         title: '🔍 Búsqueda de Productos',
         description: 'Campo de entrada en la izquierda superior. Puedes: (1) Escribir nombre del producto (ej: "Leche"), (2) Escanear código de barras directamente (si tienes lector), (3) Escribir SKU del producto. Autocompleta mientras escribes.',
@@ -282,6 +292,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'pos-3',
+        target: '[data-tutorial="pos-cart"]',
         blockName: 'Carrito de Compra',
         title: '🛍️ Carrito de Compra (Derecha)',
         description: 'Lado derecho muestraItems agregados. Cada línea: Nombre, Precio unitario, Cantidad (controles + -), Subtotal. Botones: Editar cantidad, Eliminar (🗑). En rojo alertas si no hay stock. Scroll si hay muchos items.',
@@ -291,6 +302,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'pos-4',
+        target: '[data-tutorial="pos-payment"]',
         blockName: 'Método de Pago',
         title: '💳 Método de Pago',
         description: 'Selector debajo del carrito. Opciones: Efectivo (sin recargo), Tarjeta débito (sin recargo), Tarjeta crédito (con opciones de cuotas 3/6/12, cada una con su recargo %), Cheque (a fecha), Transferencia. Selecciona según cliente.',
@@ -300,6 +312,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'pos-5',
+        target: '[data-tutorial="pos-checkout"]',
         blockName: 'Finalizar Venta',
         title: '✅ Resumen y Finalizar Venta',
         description: 'En botones finales: Total en ARS grande, Descuentos aplicables, Botón "Cobrar" verde. Al clickear: verifica pago (efectivo, tarjeta, etc.), genera comprobante AFIP automático, actualiza stock, guarda venta. Se muestra recibo para imprimir.',
@@ -322,6 +335,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'quotations-1',
+        target: '[data-tutorial="quotations-table"]',
         blockName: 'Gestión de Presupuestos',
         title: '📋 Gestión de Presupuestos',
         description: 'Crea cotizaciones detalladas para tus clientes antes de cerrar ventas. Presupuestos incluyen: Cliente, Productos con precios, Descuentos, Validez (días hasta vencimiento), Notas comerciales, Total final.',
@@ -330,6 +344,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'quotations-2',
+        target: '[data-tutorial="btn-create-quotation"]',
         blockName: 'Crear Presupuesto',
         title: '➕ Crear Nuevo Presupuesto',
         description: 'Botón "Nuevo Presupuesto" arriba. Selecciona cliente, agrega productos misma interfaz que POS, establece días de validez (ej: 7, 15, 30 días), agrega notas especiales si aplica (volumen, términos de pago especiales).',
@@ -339,6 +354,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'quotations-3',
+        target: '[data-tutorial="quotations-table"]',
         blockName: 'Historial y Estados',
         title: '📊 Historial y Estados',
         description: 'Tabla con: Número presupuesto, Fecha creación, Cliente, Total, Estado (Pendiente = esperando respuesta cliente, Aceptado, Rechazado, Vencido). Cada presupuesto tiene fecha autocalculada de vencimiento.',
@@ -347,6 +363,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'quotations-4',
+        target: '[data-tutorial="quotations-table"]',
         blockName: 'Exportar a PDF',
         title: '📄 Enviar y Exportar a PDF',
         description: 'Cada presupuesto puede: Enviarse por mail directamente al cliente (con email precompletado), Descargarse en PDF profesional (con logo empresa), Convertirse en venta confirma (si cliente acepta).',

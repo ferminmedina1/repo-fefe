@@ -598,8 +598,8 @@ export default function InventoryAlerts() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <Card className="p-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4" data-tutorial="inventory-alerts-panel">
+        <Card className="p-4" data-tutorial="critical-alerts">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Stock Bajo</p>
@@ -657,7 +657,7 @@ export default function InventoryAlerts() {
         />
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" data-tutorial="stock-table">
         <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="my-alerts" className="flex-1 min-w-[100px] text-xs sm:text-sm">Mis Alertas</TabsTrigger>
           <TabsTrigger value="low-stock" className="flex-1 min-w-[100px] text-xs sm:text-sm">Stock Bajo</TabsTrigger>

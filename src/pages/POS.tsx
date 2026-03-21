@@ -1068,7 +1068,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
 
   return (
     <Layout>
-      <div className="space-y-4 md:space-y-6">
+      <div className="space-y-4 md:space-y-6" data-tutorial="pos-interface">
         {/* Encabezado */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -1101,6 +1101,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(sanitizeSearchQuery(e.target.value))}
                 className="pl-10 h-10"
+                data-tutorial="pos-search"
               />
             </div>
 
@@ -1178,7 +1179,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
           </div>
 
           {/* Panel de carrito y checkout */}
-          <div className="space-y-4 order-1 lg:order-2">
+          <div className="space-y-4 order-1 lg:order-2" data-tutorial="pos-cart">
             <Card>
               <CardHeader className="p-3 md:p-6">
                 <CardTitle className="flex items-center gap-2 text-base md:text-lg">
@@ -1385,7 +1386,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
                           )}
                         </div>
                         
-                        <div className="space-y-2">
+                        <div className="space-y-2" data-tutorial="pos-payment">
                           <Label className="text-xs text-muted-foreground">Método de Pago</Label>
                           <Select value={currentPaymentMethod} onValueChange={setCurrentPaymentMethod}>
                             <SelectTrigger>
@@ -1570,6 +1571,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
                           onClick={() => processSaleMutation.mutate()} 
                           disabled={processSaleMutation.isPending || remaining > 0.01} 
                           className="flex-1 hover:scale-105 transition-transform"
+                          data-tutorial="pos-checkout"
                         >
                           <Receipt className="mr-2 h-4 w-4" />
                           {processSaleMutation.isPending ? "Procesando..." : "Cobrar"}
