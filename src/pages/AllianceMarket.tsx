@@ -29,6 +29,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { allianceMarketRepository } from '@/data/allianceMarket/allianceMarketRepository';
 import { AllianceMarketCard } from '@/components/allianceMarket/AllianceMarketCard';
 import { AllianceMarketDrawer } from '@/components/allianceMarket/AllianceMarketDrawer';
+import { AllianceMarketConfigDrawer } from '@/components/allianceMarket/AllianceMarketConfigDrawer';
 import type {
   AllianceMarketProfileDTO,
   ProfileType,
@@ -190,18 +191,27 @@ export default function AllianceMarket() {
               Alianzas estratégicas y clientes potenciales identificados por IA
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ['alliance-market-profiles', companyId] });
-              queryClient.invalidateQueries({ queryKey: ['alliance-market-kpis', companyId] });
-              toast.info('Actualizando perfiles...');
-            }}
-          >
-            <RefreshCw className="w-4 h-4 mr-1.5" />
-            Actualizar
-          </Button>
+          <div className="flex gap-2">
+            <AllianceMarketConfigDrawer
+              companyId={companyId}
+              onGenerateProfiles={() => {
+                queryClient.invalidateQueries({ queryKey: ['alliance-market-profiles', companyId] });
+                queryClient.invalidateQueries({ queryKey: ['alliance-market-kpis', companyId] });
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['alliance-market-profiles', companyId] });
+                queryClient.invalidateQueries({ queryKey: ['alliance-market-kpis', companyId] });
+                toast.info('Actualizando perfiles...');
+              }}
+            >
+              <RefreshCw className="w-4 h-4 mr-1.5" />
+              Actualizar
+            </Button>
+          </div>
         </div>
 
         {/* KPI Cards */}
