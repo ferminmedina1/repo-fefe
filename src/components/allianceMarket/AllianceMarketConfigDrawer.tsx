@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Settings, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { generateAllianceProfilesWithClaude } from '@/lib/allianceMarketAI';
 
 interface AllianceMarketConfig {
   id: string;
@@ -162,46 +163,97 @@ export function AllianceMarketConfigDrawer({
   };
 
   const handleGenerateProfiles = async () => {
+    if (!formData.company_description) {
+      toast.error('Por favor completa la descripción de tu empresa primero');
+      return;
+    }
+
+    setGenerating(true);
+
     try {
-      setGenerating(true);
+      toast.loading('🤖 Generando perfiles con Claude IA...');
 
-      if (!formData.company_description) {
-        toast.error('Please fill company description first');
-        return;
-      }
-
-      // Call Edge Function
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-alliance-profiles`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${
-              (await supabase.auth.getSession()).data.session?.access_token
-            }`,
-          },
-          body: JSON.stringify({ company_id: companyId }),
-        }
+      // Generate profiles using Claude
+      const profiles = await generateAllianceProfilesWithClaude(
+        formData.company_description,
+        formData.products_summary || 'No especificado',
+        formData.target_industries,
+        formData.target_relation_types,
+        formData.ai_search_keywords
       );
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Error generating profiles');
+      if (!profiles || profiles.length === 0) {
+        throw new Error('No se generaron perfiles');
       }
 
+      // 1️⃣ Eliminar perfiles anteriores sugeridos por IA
+      const { data: oldProfiles } = await supabase
+        .from('alliance_market_profiles')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('status', 'suggested')
+        .eq('is_ai_generated', true);
+
+      if (oldProfiles && oldProfiles.length > 0) {
+        await supabase
+          .from('alliance_market_profiles')
+          .delete()
+          .in('id', oldProfiles.map(p => p.id));
+      }
+
+      // 2️⃣ Insertar nuevos perfiles
+      const now = new Date();
+      const { data, error } = await supabase
+        .from('alliance_market_profiles')
+        .insert(
+          profiles.map((profile) => ({
+            ...profile,
+            company_id: companyId,
+            is_ai_generated: true,
+            status: 'suggested',
+            created_at: now,
+            updated_at: now,
+            last_ai_refresh_at: now,
+          }))
+        )
+        .select();
+
+      if (error) {
+        throw error;
+      }
+
+      // 3️⃣ Actualizar estado de generación
+      await supabase
+        .from('alliance_market_scoring_config')
+        .update({
+          ai_generation_status: 'completed',
+          last_ai_generation_at: now,
+        })
+        .eq('company_id', companyId);
+
+      toast.dismiss();
       toast.success(
-        `Generated ${result.profiles_generated} alliance profiles!`
+        `✨ ¡Generados ${profiles.length} perfiles nuevos con Claude IA! (${oldProfiles?.length || 0} anteriores eliminados)`
       );
+
       if (onGenerateProfiles) {
         onGenerateProfiles();
       }
     } catch (error) {
+      toast.dismiss();
       console.error('Error generating profiles:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Error generating profiles'
-      );
+
+      let errorMsg = 'Error generando perfiles';
+      if (error instanceof Error) {
+        errorMsg = error.message;
+        if (errorMsg.includes('API')) {
+          errorMsg = 'Error en la API de Claude - verifica tu clave ANTHROPIC_API_KEY';
+        } else if (errorMsg.includes('JSON')) {
+          errorMsg = 'Error procesando respuesta de Claude - intenta de nuevo';
+        }
+      }
+
+      toast.error(errorMsg);
     } finally {
       setGenerating(false);
     }

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alliance Market - Test Endpoint</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 600px;
+      width: 100%;
+      padding: 40px;
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 24px;
+    }
+    
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    label {
+      display: block;
+      color: #333;
+      font-weight: 500;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    
+    input, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 14px;
+    }
+    
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+    }
+    
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      width: 100%;
+      transition: all 0.3s ease;
+    }
+    
+    button:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.2);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .loading {
+      display: none;
+      text-align: center;
+      color: #667eea;
+      font-weight: 500;
+      margin-top: 20px;
+    }
+    
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(102, 126, 234, 0.2);
+      border-top-color: #667eea;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .result {
+      margin-top: 30px;
+      padding: 15px;
+      border-radius: 6px;
+      display: none;
+    }
+    
+    .result.success {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      color: #166534;
+    }
+    
+    .result.error {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      color: #991b1b;
+    }
+    
+    .result.info {
+      background: #f0f4ff;
+      border: 1px solid #bfdbfe;
+      color: #1e3a8a;
+    }
+    
+    .result pre {
+      background: rgba(0,0,0,0.05);
+      padding: 12px;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 12px;
+      margin-top: 10px;
+      font-family: 'Monaco', 'Courier New', monospace;
+    }
+    
+    .info-box {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #666;
+      line-height: 1.5;
+    }
+    
+    .info-box strong {
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚀 Test Alliance Market Endpoint</h1>
+    <p class="subtitle">Genera perfiles de alianzas con Claude AI</p>
+    
+    <div class="info-box">
+      <strong>⚠️ Importante:</strong> Asegúrate de que:<br>
+      • Supabase SQL Migration ejecutada ✓<br>
+      • Edge Function desplegada en Supabase ✓<br>
+      • ANTHROPIC_API_KEY configurada en Supabase ✓
+    </div>
+    
+    <form id="testForm">
+      <div class="form-group">
+        <label for="url">URL Base (Supabase Project):</label>
+        <input 
+          type="text" 
+          id="url" 
+          placeholder="https://your-project.supabase.co"
+          value="https://your-project.supabase.co"
+          required
+        >
+      </div>
+      
+      <div class="form-group">
+        <label for="token">Session Access Token:</label>
+        <textarea 
+          id="token" 
+          placeholder="Pega tu token aquí (desde DevTools o después de login)"
+          required
+        ></textarea>
+      </div>
+      
+      <div class="form-group">
+        <label for="companyId">Company ID (UUID):</label>
+        <input 
+          type="text" 
+          id="companyId" 
+          placeholder="11111111-2222-3333-4444-555555555555"
+          required
+        >
+      </div>
+      
+      <button type="submit" id="submitBtn">
+        Generar Perfiles 🤖
+      </button>
+      
+      <div class="loading" id="loading">
+        <span class="spinner"></span>
+        Procesando con Claude...
+      </div>
+    </form>
+    
+    <div class="result" id="result"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById('testForm');
+    const loading = document.getElementById('loading');
+    const result = document.getElementById('result');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Cargar valores del localStorage
+    window.addEventListener('load', () => {
+      const savedUrl = localStorage.getItem('allianceTestUrl');
+      const savedToken = localStorage.getItem('allianceTestToken');
+      const savedCompanyId = localStorage.getItem('allianceTestCompanyId');
+      
+      if (savedUrl) document.getElementById('url').value = savedUrl;
+      if (savedToken) document.getElementById('token').value = savedToken;
+      if (savedCompanyId) document.getElementById('companyId').value = savedCompanyId;
+    });
+    
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const url = document.getElementById('url').value.trim();
+      const token = document.getElementById('token').value.trim();
+      const companyId = document.getElementById('companyId').value.trim();
+      
+      if (!url || !token || !companyId) {
+        showResult('Completa todos los campos', 'error');
+        return;
+      }
+      
+      // Guardar en localStorage
+      localStorage.setItem('allianceTestUrl', url);
+      localStorage.setItem('allianceTestToken', token);
+      localStorage.setItem('allianceTestCompanyId', companyId);
+      
+      loading.style.display = 'block';
+      result.style.display = 'none';
+      submitBtn.disabled = true;
+      
+      try {
+        const endpoint = `${url}/functions/v1/generate-alliance-profiles`;
+        
+        console.log('📤 Enviando request a:', endpoint);
+        
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ company_id: companyId }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+          showResult(
+            `✅ ${data.profiles_generated} perfiles generados exitosamente`,
+            'success',
+            JSON.stringify(data, null, 2)
+          );
+        } else {
+          showResult(
+            `❌ Error: ${data.error || 'Unknown error'}`,
+            'error',
+            JSON.stringify(data, null, 2)
+          );
+        }
+      } catch (error) {
+        showResult(
+          `❌ Error de red: ${error.message}`,
+          'error',
+          error.toString()
+        );
+      } finally {
+        loading.style.display = 'none';
+        submitBtn.disabled = false;
+      }
+    });
+    
+    function showResult(message, type, details = null) {
+      result.className = `result ${type}`;
+      result.innerHTML = `<strong>${message}</strong>${
+        details ? `<pre>${details}</pre>` : ''
+      }`;
+      result.style.display = 'block';
+      result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  </script>
+</body>
+</html>

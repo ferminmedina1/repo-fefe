@@ -176,24 +176,56 @@ async function updateGenerationStatus(
 }
 
 serve(async (req) => {
-  // CORS headers
+  // CORS headers - IMPORTANTE: deben estar en TODAS las respuestas
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Max-Age": "3600",
   };
 
+  // Responder a preflight requests
   if (req.method === "OPTIONS") {
-    return new Response("OK", { headers: corsHeaders });
+    return new Response(null, { 
+      status: 204,
+      headers: corsHeaders 
+    });
+  }
+
+  // Solo aceptar POST
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }),
+      { 
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
+    );
   }
 
   try {
-    const { company_id } = await req.json();
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON in request body" }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    const { company_id } = body;
 
     if (!company_id) {
       return new Response(
         JSON.stringify({ error: "company_id is required" }),
-        { status: 400, headers: corsHeaders }
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
       );
     }
 
@@ -208,12 +240,28 @@ serve(async (req) => {
       .eq("company_id", company_id)
       .single();
 
-    if (configError || !config) {
+    if (configError) {
+      console.error("Config error:", configError);
+      return new Response(
+        JSON.stringify({
+          error: "Could not fetch company config: " + (configError.message || "Unknown error"),
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    if (!config) {
       return new Response(
         JSON.stringify({
           error: "Company configuration not found. Please set up Alliance Market config first.",
         }),
-        { status: 404, headers: corsHeaders }
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
       );
     }
 
@@ -223,7 +271,10 @@ serve(async (req) => {
         JSON.stringify({
           error: "Company description is required. Please fill it in the Alliance Market configuration.",
         }),
-        { status: 400, headers: corsHeaders }
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
       );
     }
 
@@ -251,15 +302,23 @@ serve(async (req) => {
         profiles_generated: profiles.length,
         profiles: inserted,
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { 
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      }
     );
   } catch (error) {
     console.error("Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMessage,
+        details: error instanceof Error ? error.stack : undefined,
       }),
-      { status: 500, headers: corsHeaders }
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      }
     );
   }
 });

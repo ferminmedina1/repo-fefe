@@ -26,6 +26,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
+import { supabase } from '@/integrations/supabase/client';
 import { allianceMarketRepository } from '@/data/allianceMarket/allianceMarketRepository';
 import { AllianceMarketCard } from '@/components/allianceMarket/AllianceMarketCard';
 import { AllianceMarketDrawer } from '@/components/allianceMarket/AllianceMarketDrawer';
@@ -55,6 +56,7 @@ export default function AllianceMarket() {
   const [sortBy, setSortBy] = useState<SortOption>('compatibility_score');
   const [selectedProfile, setSelectedProfile] = useState<AllianceMarketProfileDTO | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const companyId = currentCompany?.id ?? '';
 
@@ -91,6 +93,44 @@ export default function AllianceMarket() {
     enabled: !!companyId,
     staleTime: 1000 * 60 * 10,
   });
+
+  // ── Actualizar perfiles - Elimina anteriores y recarga ──
+  const handleRefreshProfiles = async () => {
+    if (!companyId) return;
+    
+    setRefreshing(true);
+    try {
+      // Obtener todos los perfiles "sugeridos" generados por IA
+      const { data: oldProfiles } = await supabase
+        .from('alliance_market_profiles')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('status', 'suggested')
+        .eq('is_ai_generated', true);
+
+      // Eliminar perfiles anteriores
+      if (oldProfiles && oldProfiles.length > 0) {
+        await supabase
+          .from('alliance_market_profiles')
+          .delete()
+          .in('id', oldProfiles.map(p => p.id));
+        
+        toast.info(`Eliminados ${oldProfiles.length} perfiles anteriores`);
+      }
+
+      // Recargar datos
+      queryClient.invalidateQueries({ queryKey: ['alliance-market-profiles', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['alliance-market-kpis', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['alliance-market-industries', companyId] });
+      
+      toast.success('Perfiles actualizados y limpios');
+    } catch (error) {
+      console.error('Error refreshing profiles:', error);
+      toast.error('Error actualizando perfiles');
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   // ── Mutation: registrar conexión ──
   const connectMutation = useMutation({
@@ -202,14 +242,12 @@ export default function AllianceMarket() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                queryClient.invalidateQueries({ queryKey: ['alliance-market-profiles', companyId] });
-                queryClient.invalidateQueries({ queryKey: ['alliance-market-kpis', companyId] });
-                toast.info('Actualizando perfiles...');
-              }}
+              onClick={handleRefreshProfiles}
+              disabled={refreshing}
+              className="gap-2"
             >
-              <RefreshCw className="w-4 h-4 mr-1.5" />
-              Actualizar
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Limpiando...' : 'Limpiar & Actualizar'}
             </Button>
           </div>
         </div>
