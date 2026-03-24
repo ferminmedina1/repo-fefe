@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import Anthropic from '@anthropic-ai/sdk';
+import https from 'https';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 app.use(cors());
@@ -116,7 +119,24 @@ app.post('/api/save-profiles', async (req, res) => {
   res.json({ success: true });
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Alliance Market proxy server running on http://localhost:${PORT}`);
-  console.log(`   POST /api/generate-alliance-profiles - Generate profiles with Claude`);
-});
+// Start server - use HTTPS in production, HTTP in development
+const certPath = path.join('/home/appsync/certs', 'cert.pem');
+const keyPath = path.join('/home/appsync/certs', 'key.pem');
+
+if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+  // Production: Use HTTPS
+  const options = {
+    cert: fs.readFileSync(certPath),
+    key: fs.readFileSync(keyPath),
+  };
+  https.createServer(options, app).listen(PORT, () => {
+    console.log(`✅ Alliance Market proxy server running on https://0.0.0.0:${PORT}`);
+    console.log(`   POST /api/generate-alliance-profiles - Generate profiles with Claude`);
+  });
+} else {
+  // Development: Use HTTP
+  app.listen(PORT, () => {
+    console.log(`✅ Alliance Market proxy server running on http://0.0.0.0:${PORT}`);
+    console.log(`   POST /api/generate-alliance-profiles - Generate profiles with Claude`);
+  });
+}
