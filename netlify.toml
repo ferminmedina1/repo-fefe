@@ -16,5 +16,5 @@ to = "/index.html"
 status = 200
 
 # Function settings
-[[functions]]
+[functions]
 node_bundler = "esbuild"
