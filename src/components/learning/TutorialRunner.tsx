@@ -82,70 +82,16 @@ function validateTarget(selector: string | undefined, debug = false): Validation
   if (!selector) {
     return { isValid: false, reason: 'No selector provided' };
   }
-  
   try {
     const element = document.querySelector(selector);
     if (!element) {
-      return { isValid: false, reason: 'Element not found in DOM', details: { exists: false, visible: false, hasDimensions: false, hasContent: false, inViewport: false, notHidden: false, zIndexOk: false } };
+      console.log(`[Tutorial Debug] validateTarget FAIL: "${selector}" no se encontró en el DOM.`);
+      return { isValid: false, reason: 'Element not found in DOM' };
     }
-
-    const style = window.getComputedStyle(element);
-    const rect = element.getBoundingClientRect();
-    const parent = element.parentElement;
-    const parentStyle = parent ? window.getComputedStyle(parent) : null;
-
-    // Detailed checks
-    // NOTE: hasContent is NOT a blocker - elements can be loading (skeleton/placeholder)
-    // What matters: exists, visible, has minimal dimensions, in viewport
-    const hasMinimalContent = !!(element.textContent?.trim() || element.children.length > 0);
-    const isLoadingState = element.classList.contains('animate-pulse') || 
-                          element.classList.contains('skeleton') ||
-                          element.classList.contains('loading') ||
-                          element.getAttribute('aria-busy') === 'true';
-
-    const checks = {
-      exists: true,
-      visible: style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0',
-      hasDimensions: rect.width > 0 && rect.height > 0,
-      hasContent: hasMinimalContent || isLoadingState, // Accept if it has content OR is in loading state
-      inViewport: rect.top < window.innerHeight && rect.bottom > 0 && rect.left < window.innerWidth && rect.right > 0,
-      notHidden: style.overflow !== 'hidden' || rect.height > 0,
-      zIndexOk: parseInt(style.zIndex) >= 0 || style.zIndex === 'auto',
-    };
-
-    // Only require: exists, visible, hasDimensions
-    // inViewport is NOT a blocker since Joyride will scroll it into view
-    const allValid = checks.exists && checks.visible && checks.hasDimensions;
-
-    if (debug) {
-      console.log(`[Tutorial] Target validation for "${selector}":`, {
-        ...checks,
-        isLoadingState,
-        rect: { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, width: rect.width, height: rect.height },
-        display: style.display,
-        visibility: style.visibility,
-        opacity: style.opacity,
-        parentOverflow: parentStyle?.overflow,
-      });
-    }
-
-    if (!allValid) {
-      const failureReasons = [];
-      if (!checks.exists) failureReasons.push('Element not in DOM');
-      if (!checks.visible) failureReasons.push('Element hidden (display/visibility/opacity)');
-      if (!checks.hasDimensions) failureReasons.push(`No dimensions (${rect.width}x${rect.height})`);
-      
-      return {
-        isValid: false,
-        reason: failureReasons.join('; '),
-        details: checks,
-      };
-    }
-
-    return {
-      isValid: true,
-      details: checks,
-    };
+    console.log(`[Tutorial Debug] validateTarget OK: "${selector}" encontrado.`);
+    // Extremely permissive: if it's in the DOM, let Joyride attempt to highlight it.
+    // This fixes issues where zero-height parents or opacity 0 during animations falsely invalidated targets.
+    return { isValid: true };
   } catch (e) {
     return { isValid: false, reason: `Error during validation: ${(e as Error).message}` };
   }
@@ -577,11 +523,12 @@ export function TutorialRunner() {
 
     const selector = currentStep.target;
     let attempts = 0;
-    const maxAttempts = 24; // 12 seconds with varying intervals (more time for async loads)
+    const maxAttempts = 20; // 10 seconds total (500ms each)
     let observer: IntersectionObserver | null = null;
 
     const checkAndUpdateTarget = () => {
       const validation = validateTarget(selector, attempts === 0);
+      console.log(`[Tutorial Debug] checkAndUpdateTarget Attempt ${attempts} for "${selector}", isValid=${validation.isValid}`);
       
       if (validation.isValid) {
         // Target is valid, ensure it's not in invalid set
@@ -641,27 +588,19 @@ export function TutorialRunner() {
       console.warn(`[Tutorial] Could not set up IntersectionObserver for "${selector}"`);
     }
 
-    // Retry with exponential backoff: fast at first, slower over time
+    // Retry every 500ms
     validationTimerRef.current = setInterval(() => {
       attempts++;
       
-      // Progressive backoff: faster retries early, slower later (better for async loading)
-      let nextInterval = 250;
-      if (attempts > 16) nextInterval = 1500; // Very slow (long waits)
-      else if (attempts > 8) nextInterval = 1000; // Slow (1 sec each)
-      else if (attempts > 4) nextInterval = 500; // Medium (half sec each)
-      // else: 250ms for first 4 attempts
-
       if (checkAndUpdateTarget()) {
-        // Found! Stop searching
         return;
       }
 
       if (attempts >= maxAttempts) {
-        // 8+ seconds passed, mark as permanently unavailable
+        // 10+ seconds passed, mark as permanently unavailable
         const validation = validateTarget(selector);
         console.warn(
-          `[Tutorial] Target \"${selector}\" not found after ${maxAttempts} attempts`,
+          `[Tutorial Debug] Target "${selector}" not found after ${maxAttempts} attempts. Marcándolo como inválido.`,
           validation
         );
         
@@ -680,7 +619,7 @@ export function TutorialRunner() {
         }
         if (observer) observer.disconnect();
       }
-    }, 200); // Start fast, intervals increase inside the loop
+    }, 500);
 
     return () => {
       if (validationTimerRef.current) clearInterval(validationTimerRef.current);
@@ -716,6 +655,8 @@ export function TutorialRunner() {
         autoUpdate: true, // Recalculate position on scroll/resize
       },
     }));
+    
+    console.log(`[Tutorial Debug] Generando joyrideSteps:`, steps.map(s => s.target));
     setJoyrideSteps(steps);
   }, [currentTutorial, invalidTargets, minimized]);
 
@@ -788,11 +729,12 @@ export function TutorialRunner() {
           scrollOffset={280}
           showProgress={false}
           showSkipButton
-          disableScrollParentFix
+          disableScrollParentFix={false}
           floaterProps={{ disableAnimation: true }}
-          tooltipComponent={(props: TooltipRenderProps) => (
-            <CustomTooltip {...props} onMinimize={() => setMinimized(true)} />
-          )}
+          tooltipComponent={(props: TooltipRenderProps) => {
+            if (isUntargetedStep) return <div style={{ display: 'none' }} />;
+            return <CustomTooltip {...props} onMinimize={() => setMinimized(true)} />;
+          }}
           styles={{
             options: {
               zIndex: 10000,
