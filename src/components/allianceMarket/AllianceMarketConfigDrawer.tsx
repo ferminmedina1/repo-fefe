@@ -171,7 +171,7 @@ export function AllianceMarketConfigDrawer({
     setGenerating(true);
 
     try {
-      toast.loading('🤖 Generando perfiles con Claude IA...');
+      toast.loading('🔍 Buscando perfiles con Claude IA...');
 
       // Generate profiles using Claude
       const profiles = await generateAllianceProfilesWithClaude(
@@ -183,7 +183,7 @@ export function AllianceMarketConfigDrawer({
       );
 
       if (!profiles || profiles.length === 0) {
-        throw new Error('No se generaron perfiles');
+        throw new Error('No se encontraron perfiles');
       }
 
       // 1️⃣ Eliminar perfiles anteriores sugeridos por IA
@@ -233,7 +233,7 @@ export function AllianceMarketConfigDrawer({
 
       toast.dismiss();
       toast.success(
-        `✨ ¡Generados ${profiles.length} perfiles nuevos con Claude IA! (${oldProfiles?.length || 0} anteriores eliminados)`
+        `✨ ¡Encontrados ${profiles.length} perfiles! ${oldProfiles?.length || 0} anteriores eliminados`
       );
 
       if (onGenerateProfiles) {
@@ -241,13 +241,13 @@ export function AllianceMarketConfigDrawer({
       }
     } catch (error) {
       toast.dismiss();
-      console.error('Error generating profiles:', error);
+      console.error('Error buscando perfiles:', error);
 
-      let errorMsg = 'Error generando perfiles';
+      let errorMsg = 'Error buscando perfiles';
       if (error instanceof Error) {
         errorMsg = error.message;
         if (errorMsg.includes('API')) {
-          errorMsg = 'Error en la API de Claude - verifica tu clave ANTHROPIC_API_KEY';
+          errorMsg = 'Error en Claude API - verifica tu clave ANTHROPIC_API_KEY';
         } else if (errorMsg.includes('JSON')) {
           errorMsg = 'Error procesando respuesta de Claude - intenta de nuevo';
         }
@@ -526,7 +526,7 @@ export function AllianceMarketConfigDrawer({
                     className="gap-2"
                   >
                     {generating && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Generate Profiles
+                    Buscar perfiles
                   </Button>
                 </div>
               </div>
