@@ -45,18 +45,12 @@ export async function generateAllianceProfilesWithClaude(
   }
 
   try {
-    // Determine which endpoint to use based on environment
-    let profilesUrl: string;
+    // Use proxy server URL (configured via VITE_PROXY_URL environment variable)
+    // Falls back to localhost:3001 in development if not set
+    const proxyUrl = import.meta.env.VITE_PROXY_URL || 'http://localhost:3001';
+    const profilesUrl = `${proxyUrl}/api/generate-alliance-profiles`;
     
-    if (import.meta.env.DEV) {
-      // Development: Use local proxy server
-      profilesUrl = import.meta.env.VITE_PROXY_URL || 'http://localhost:3001/api/generate-alliance-profiles';
-      console.log('Development mode - calling local proxy:', profilesUrl);
-    } else {
-      // Production: Use Netlify Function
-      profilesUrl = '/.netlify/functions/generate-alliance-profiles';
-      console.log('Production mode - calling Netlify Function:', profilesUrl);
-    }
+    console.log('Calling proxy server:', profilesUrl);
     
     const response = await fetch(profilesUrl, {
       method: 'POST',
