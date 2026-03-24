@@ -15,15 +15,21 @@ import { useNavigate, useLocation } from 'react-router-dom';
 const spotlightStyles = `
   @keyframes spotlight-pulse {
     0%, 100% {
-      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.6), 0 0 0 8px rgba(59, 130, 246, 0.3), 0 0 30px rgba(59, 130, 246, 0.7), 0 0 60px rgba(59, 130, 246, 0.5), inset 0 0 25px rgba(59, 130, 246, 0.25) !important;
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.6), 0 0 0 8px rgba(59, 130, 246, 0.2), 0 0 20px rgba(59, 130, 246, 0.4) !important;
     }
     50% {
-      box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.8), 0 0 0 12px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.8), 0 0 80px rgba(59, 130, 246, 0.6), inset 0 0 35px rgba(59, 130, 246, 0.35) !important;
+      box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.8), 0 0 0 12px rgba(59, 130, 246, 0.3), 0 0 30px rgba(59, 130, 246, 0.6) !important;
     }
   }
   
   .react-joyride__spotlight {
     animation: spotlight-pulse 2s ease-in-out infinite !important;
+    border-radius: 14px !important;
+  }
+  
+  /* Disable body scroll when tutorial is running *and* target is valid */
+  body.tutorial-active-locked {
+    overflow: hidden !important;
   }
 `;
 
@@ -194,7 +200,7 @@ function NarrationCard({
             <>
               <FileText className="h-3 w-3 text-primary" />
               <span className="text-[11px] font-bold text-primary uppercase tracking-wider">
-                {targetUnavailable ? 'âš ï¸ Elemento no disponible' : 'Vista general'}
+                {targetUnavailable ? '⚠️ Elemento no disponible' : 'Vista general'}
               </span>
             </>
           )}
@@ -226,7 +232,7 @@ function NarrationCard({
         {targetUnavailable && (
           <div className="mb-3 p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
             <p className="text-xs text-yellow-700 dark:text-yellow-200 font-medium">
-              â³ El elemento de enfoque no estÃ¡ disponible aÃºn.
+              ⏳ El elemento de enfoque no está disponible aún.
             </p>
             {targetFailureReason && (
               <p className="text-xs text-yellow-700/70 dark:text-yellow-200/70 mt-1">
@@ -234,7 +240,7 @@ function NarrationCard({
               </p>
             )}
             <p className="text-xs text-yellow-700/60 dark:text-yellow-200/60 mt-1">
-              ContinÃºa con la siguiente instrucciÃ³n.
+              Continúa con la siguiente instrucción.
             </p>
           </div>
         )}
@@ -282,7 +288,7 @@ function NarrationCard({
           {canGoBack && (
             <Button variant="outline" size="sm" onClick={onBack}
               className="h-8 px-3 text-xs rounded-xl border-border/60 hover:bg-muted/60">
-              <ChevronLeft className="h-3.5 w-3.5 mr-1" /> AtrÃ¡s
+              <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Atrás
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={onSkip}
@@ -295,7 +301,7 @@ function NarrationCard({
                 ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                 : 'bg-primary text-primary-foreground hover:bg-primary/90'
             )}>
-            {isLastStep ? 'ðŸŽ‰ Â¡Completar!' : 'Siguiente'}
+            {isLastStep ? '🎉 ¡Completar!' : 'Siguiente'}
             {!isLastStep && <ChevronRight className="h-3.5 w-3.5 ml-1" />}
           </Button>
         </div>
@@ -341,7 +347,7 @@ const MiniBar = ({ stepTitle, stepAction, stepIndex, totalSteps, tutorialName, o
 
       <div className="flex flex-col min-w-0 max-w-[200px]">
         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate leading-none mb-0.5">
-          {stepAction ? 'âš¡ Tu turno' : tutorialName}
+          {stepAction ? '⚡ Tu turno' : tutorialName}
         </span>
         <span className="text-sm font-semibold text-foreground truncate leading-tight">{stepAction || stepTitle}</span>
       </div>
@@ -360,7 +366,7 @@ const MiniBar = ({ stepTitle, stepAction, stepIndex, totalSteps, tutorialName, o
             : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/25'
         )}>
         <CheckCircle2 className="h-3.5 w-3.5" />
-        {isLastStep ? 'Finalizar' : 'Listo âœ“'}
+        {isLastStep ? 'Finalizar' : 'Listo ✓'}
       </Button>
     </div>
   );
@@ -461,7 +467,7 @@ const CustomTooltip = ({
         <div className="flex gap-2">
           {index > 0 && (
             <Button variant="outline" {...backProps} className="h-8 px-3 text-xs rounded-xl border-border/60 hover:bg-muted/60 shrink-0">
-              <ChevronLeft className="h-3.5 w-3.5 mr-1" /> AtrÃ¡s
+              <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Atrás
             </Button>
           )}
           <Button variant="ghost" {...skipProps}
@@ -473,13 +479,13 @@ const CustomTooltip = ({
               ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm shadow-emerald-500/25'
               : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shadow-primary/20'
           )}>
-            {isLastStep ? 'ðŸŽ‰ Â¡Completar!' : 'Siguiente'}
+            {isLastStep ? '🎉 ¡Completar!' : 'Siguiente'}
             {!isLastStep && <ChevronRight className="h-3.5 w-3.5 ml-1" />}
           </Button>
         </div>
 
         {originalStep?.duration && (
-          <p className="text-[10px] text-muted-foreground/40 mt-3 text-center">â± ~{originalStep.duration}s</p>
+          <p className="text-[10px] text-muted-foreground/40 mt-3 text-center">⏱️ ~{originalStep.duration}s</p>
         )}
       </div>      </div>    </div>
   );
@@ -580,16 +586,6 @@ export function TutorialRunner() {
     let observer: IntersectionObserver | null = null;
 
     const checkAndUpdateTarget = () => {
-      // Force scroll element into view before validating
-      try {
-        const element = document.querySelector(selector);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      } catch (e) {
-        // Ignore scroll errors
-      }
-      
       const validation = validateTarget(selector, attempts === 0);
       
       if (validation.isValid) {
@@ -738,6 +734,16 @@ export function TutorialRunner() {
 
   useEffect(() => () => { if (completionTimerRef.current) clearTimeout(completionTimerRef.current); }, []);
 
+  // Manage body scroll lock
+  useEffect(() => {
+    if (isRunning && !minimized && joyrideSteps.length > 0) {
+      document.body.classList.add('tutorial-active-locked');
+    } else {
+      document.body.classList.remove('tutorial-active-locked');
+    }
+    return () => document.body.classList.remove('tutorial-active-locked');
+  }, [isRunning, minimized, joyrideSteps.length]);
+
   // Joyride callback â€” only relevant for targeted steps
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
     const { action, index, status, type } = data;
@@ -813,10 +819,9 @@ export function TutorialRunner() {
             },
             spotlight: {
               borderRadius: '14px',
-              boxShadow: '0 0 0 4px rgba(59, 130, 246, 0.6), 0 0 0 8px rgba(59, 130, 246, 0.3), 0 0 30px rgba(59, 130, 246, 0.7), 0 0 60px rgba(59, 130, 246, 0.5), inset 0 0 25px rgba(59, 130, 246, 0.25)',
+              backgroundColor: 'transparent',
             },
             overlay: {
-              mixBlendMode: 'normal',
               zIndex: 10000,
             },
             tooltip: {

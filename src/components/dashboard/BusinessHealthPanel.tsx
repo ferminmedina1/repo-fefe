@@ -189,7 +189,7 @@ export function BusinessHealthPanel({ companyId }: BusinessHealthPanelProps) {
 
       {/* Priority Alerts */}
       {recentAlerts && recentAlerts.length > 0 && (
-        <Card>
+        <Card data-tutorial="stock-alerts">
           <CardHeader className="flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-orange-500" />
