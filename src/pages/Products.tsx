@@ -3065,18 +3065,29 @@ export default function Products() {
                           </div>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          <span className={`font-semibold text-xs sm:text-sm ${
-                            product.stock <= (product.min_stock || 0) 
-                              ? 'text-red-600 dark:text-red-500' 
-                              : product.stock <= (product.min_stock || 0) * 1.5
-                              ? 'text-yellow-600 dark:text-yellow-500'
-                              : 'text-green-600 dark:text-green-500'
-                          }`}>
-                            {product.stock}
-                          </span>
+                          {product.is_digital ? (
+                            <span className="font-semibold text-xs sm:text-sm text-blue-600 dark:text-blue-500">
+                              -
+                            </span>
+                          ) : (
+                            <span className={`font-semibold text-xs sm:text-sm ${
+                              product.stock <= (product.min_stock || 0)
+                                ? 'text-red-600 dark:text-red-500'
+                                : product.stock <= (product.min_stock || 0) * 1.5
+                                ? 'text-yellow-600 dark:text-yellow-500'
+                                : 'text-green-600 dark:text-green-500'
+                            }`}>
+                              {product.stock}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
-                          {product.stock <= (product.min_stock || 0) ? (
+                          {product.is_digital ? (
+                            <Badge variant="secondary" className="flex items-center gap-1 w-fit text-xs bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300">
+                              <Info className="h-3 w-3" />
+                              Digital
+                            </Badge>
+                          ) : product.stock <= (product.min_stock || 0) ? (
                             <Badge variant="destructive" className="flex items-center gap-1 w-fit text-xs">
                               <AlertCircle className="h-3 w-3" />
                               Bajo
@@ -3113,35 +3124,39 @@ export default function Products() {
                               </Tooltip>
                             </TooltipProvider>
                             
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    onClick={(e) => { 
-                                      e.stopPropagation(); 
-                                      navigate(`/purchases?product=${product.id}`);
-                                    }}
-                                  >
-                                    <ShoppingCart className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Crear orden de compra</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          {canEdit && (
-                            <>
+{!product.is_digital && (
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleStockAdjust(product); }}>
-                                      <Package className="h-4 w-4" />
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/purchases?product=${product.id}`);
+                                      }}
+                                    >
+                                      <ShoppingCart className="h-4 w-4" />
                                     </Button>
                                   </TooltipTrigger>
-                                  <TooltipContent>Ajustar stock</TooltipContent>
+                                  <TooltipContent>Crear orden de compra</TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
+                            )}
+                          {canEdit && (
+                            <>
+                              {!product.is_digital && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleStockAdjust(product); }}>
+                                        <Package className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Ajustar stock</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
                               
                               <TooltipProvider>
                                 <Tooltip>

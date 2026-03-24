@@ -49,6 +49,7 @@ import {
   LifeBuoy,
   Plus,
   HelpCircle,
+  Network,
 } from "lucide-react";
 import { useActiveModules } from "@/hooks/useActiveModules";
 import { usePermissions, Module } from "@/hooks/usePermissions";
@@ -409,6 +410,19 @@ export function Sidebar() {
       ],
     },
 
+    // Alianzas & Negocios
+    {
+      section: "Alianzas",
+      items: [
+        {
+          title: "Alliance Market",
+          href: "/alliance-market",
+          icon: Network,
+          module: "alliance_market",
+        },
+      ],
+    },
+
     // RRHH
     {
       section: "RRHH",
@@ -634,6 +648,7 @@ export function Sidebar() {
       'integrations': 'integrations',
       'afip': 'afip',
       'pos_afip': 'pos_afip',
+      'alliance_market': 'alliance_market',
     };
     return moduleMap[sidebarModule] || null;
   };

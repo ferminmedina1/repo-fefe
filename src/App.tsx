@@ -80,6 +80,7 @@ const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRe
 const LearningCenter = lazy(() => import("./pages/LearningCenter"));
 const KnowledgeBaseCenter = lazy(() => import("./pages/KnowledgeBaseCenter"));
 const SetupWizardPage = lazy(() => import("./pages/SetupWizardPage"));
+const AllianceMarket = lazy(() => import("./pages/AllianceMarket"));
 
 const queryClient = new QueryClient();
 
@@ -350,6 +351,7 @@ const App = () => (
             <Route path="/customer-account" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><CustomerAccount /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/accounts-receivable" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><AccountsReceivable /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/promotions" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="promotions"><Promotions /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/alliance-market" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="alliance_market"><AllianceMarket /></ModuleProtectedRoute></ProtectedRoute>} />
             
             {/* Inventario & Compras */}
             <Route path="/suppliers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="suppliers"><Suppliers /></ModuleProtectedRoute></ProtectedRoute>} />
