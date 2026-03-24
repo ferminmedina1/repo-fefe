@@ -45,11 +45,20 @@ export async function generateAllianceProfilesWithClaude(
   }
 
   try {
-    // Get proxy URL from environment or use localhost for development
-    const proxyUrl = import.meta.env.VITE_PROXY_URL || 'http://localhost:3001';
-    console.log('Calling proxy server for profile generation:', proxyUrl);
+    // Determine which endpoint to use based on environment
+    let profilesUrl: string;
     
-    const response = await fetch(`${proxyUrl}/api/generate-alliance-profiles`, {
+    if (import.meta.env.DEV) {
+      // Development: Use local proxy server
+      profilesUrl = import.meta.env.VITE_PROXY_URL || 'http://localhost:3001/api/generate-alliance-profiles';
+      console.log('Development mode - calling local proxy:', profilesUrl);
+    } else {
+      // Production: Use Netlify Function
+      profilesUrl = '/.netlify/functions/generate-alliance-profiles';
+      console.log('Production mode - calling Netlify Function:', profilesUrl);
+    }
+    
+    const response = await fetch(profilesUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -63,7 +72,7 @@ export async function generateAllianceProfilesWithClaude(
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Proxy server error');
+      throw new Error(error.error || 'Server error');
     }
 
     const data = await response.json();
@@ -73,7 +82,13 @@ export async function generateAllianceProfilesWithClaude(
 
     return data.profiles;
   } catch (err) {
-    console.error('Proxy server error:', err);
-    throw new Error(`Error generating profiles: ${err instanceof Error ? err.message : 'Unknown error'}\n\nMake sure proxy server is running: npm run proxy`);
+    console.error('Profile generation error:', err);
+    const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+    
+    if (import.meta.env.DEV) {
+      throw new Error(`Error generating profiles: ${errorMsg}\n\nDevelopment: Make sure proxy server is running: npm run proxy`);
+    } else {
+      throw new Error(`Error generating profiles: ${errorMsg}`);
+    }
   }
 }
