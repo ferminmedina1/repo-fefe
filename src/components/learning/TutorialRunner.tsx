@@ -26,11 +26,6 @@ const spotlightStyles = `
     animation: spotlight-pulse 2s ease-in-out infinite !important;
     border-radius: 14px !important;
   }
-  
-  /* Disable body scroll when tutorial is running *and* target is valid */
-  body.tutorial-active-locked {
-    overflow: hidden !important;
-  }
 `;
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -733,16 +728,6 @@ export function TutorialRunner() {
   }, []);
 
   useEffect(() => () => { if (completionTimerRef.current) clearTimeout(completionTimerRef.current); }, []);
-
-  // Manage body scroll lock
-  useEffect(() => {
-    if (isRunning && !minimized && joyrideSteps.length > 0) {
-      document.body.classList.add('tutorial-active-locked');
-    } else {
-      document.body.classList.remove('tutorial-active-locked');
-    }
-    return () => document.body.classList.remove('tutorial-active-locked');
-  }, [isRunning, minimized, joyrideSteps.length]);
 
   // Joyride callback â€” only relevant for targeted steps
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
