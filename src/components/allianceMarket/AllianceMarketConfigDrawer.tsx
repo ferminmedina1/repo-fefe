@@ -172,15 +172,21 @@ export function AllianceMarketConfigDrawer({
 
     try {
       toast.loading('🔍 Buscando perfiles con Claude IA...');
+      
+      console.log('Starting profile generation for company:', companyId);
+      console.log('API Key available:', !!import.meta.env.VITE_ANTHROPIC_API_KEY);
 
-      // Generate profiles using Claude
+      // Generate profiles using Claude (via Supabase Edge Function or direct API)
       const profiles = await generateAllianceProfilesWithClaude(
+        companyId,
         formData.company_description,
         formData.products_summary || 'No especificado',
         formData.target_industries,
         formData.target_relation_types,
         formData.ai_search_keywords
       );
+
+      console.log('Profiles generated:', profiles.length);
 
       if (!profiles || profiles.length === 0) {
         throw new Error('No se encontraron perfiles');

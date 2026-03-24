@@ -30,7 +30,8 @@ async function generateProfilesWithClaude(
   productsSummary: string,
   targetIndustries: string[],
   targetRelationTypes: string[],
-  searchKeywords: string[]
+  searchKeywords: string[],
+  apiKey: string  // Accept API key as parameter
 ): Promise<AllianceProfile[]> {
   const prompt = `You are an expert business strategist. Based on the following company information and search criteria, generate 5-7 potential alliance or client profiles.
 
@@ -88,7 +89,7 @@ Generate diverse profiles with real companies. Focus on ACTION - find actual bus
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": claudeApiKey,
+      "x-api-key": apiKey,  // Use the passed API key
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
@@ -217,13 +218,26 @@ serve(async (req) => {
       );
     }
 
-    const { company_id } = body;
+    const { company_id, anthropic_api_key } = body;
 
     if (!company_id) {
       return new Response(
         JSON.stringify({ error: "company_id is required" }),
         { 
           status: 400, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    // Usar la API key pasada desde el client o la del environment
+    const apiKey = anthropic_api_key || claudeApiKey;
+    
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
+        { 
+          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" }
         }
       );
@@ -281,13 +295,14 @@ serve(async (req) => {
     // Update status to generating
     await updateGenerationStatus(supabase, company_id, "generating");
 
-    // Generate profiles with Claude
+    // Generate profiles with Claude - USE THE PROVIDED API KEY
     const profiles = await generateProfilesWithClaude(
       config.company_description,
       config.products_summary || "Not specified",
       config.target_industries || [],
       config.target_relation_types || [],
-      config.ai_search_keywords || []
+      config.ai_search_keywords || [],
+      apiKey  // Pass the API key explicitly
     );
 
     // Insert profiles
