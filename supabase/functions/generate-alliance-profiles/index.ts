@@ -372,11 +372,6 @@ serve(async (req: Request) => {
 
     // Call Claude API
     console.log("[GENERATE_PROFILES] Calling Claude API...");
-    console.log("[GENERATE_PROFILES] Request body length:", JSON.stringify({
-      model: "claude-3-5-sonnet-20241022",
-      max_tokens: 4096,
-      messages: [{ role: "user", content: prompt }]
-    }).length);
     
     try {
       const profiles = await generateProfilesWithClaude(request, apiKey);

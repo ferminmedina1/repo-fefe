@@ -3,102 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { subDays, startOfYear, eachDayOfInterval, format, getMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-// Ultra Futuristic Crystallized Glass Animation Styles
-const futuristicStyles = `
-  @keyframes crystallizeBorder {
-    0% {
-      border-color: rgba(59, 130, 246, 0.4);
-      box-shadow: 
-        0 0 20px rgba(59, 130, 246, 0.3),
-        inset 0 0 20px rgba(139, 92, 246, 0.05),
-        0 0 40px rgba(14, 165, 233, 0.2) inset;
-    }
-    25% {
-      border-color: rgba(139, 92, 246, 0.6);
-      box-shadow: 
-        0 0 30px rgba(139, 92, 246, 0.5),
-        inset 0 0 30px rgba(59, 130, 246, 0.1),
-        0 0 60px rgba(236, 72, 153, 0.3) inset;
-    }
-    50% {
-      border-color: rgba(14, 165, 233, 0.5);
-      box-shadow: 
-        0 0 40px rgba(14, 165, 233, 0.4),
-        inset 0 0 40px rgba(139, 92, 246, 0.08),
-        0 0 80px rgba(34, 197, 94, 0.2) inset;
-    }
-    75% {
-      border-color: rgba(236, 72, 153, 0.5);
-      box-shadow: 
-        0 0 35px rgba(236, 72, 153, 0.4),
-        inset 0 0 35px rgba(59, 130, 246, 0.1),
-        0 0 70px rgba(139, 92, 246, 0.25) inset;
-    }
-    100% {
-      border-color: rgba(59, 130, 246, 0.4);
-      box-shadow: 
-        0 0 20px rgba(59, 130, 246, 0.3),
-        inset 0 0 20px rgba(139, 92, 246, 0.05),
-        0 0 40px rgba(14, 165, 233, 0.2) inset;
-    }
-  }
-
-  @keyframes prismaticShine {
-    0% {
-      left: -100%;
-      opacity: 0;
-    }
-    50% {
-      opacity: 0.4;
-    }
-    100% {
-      left: 100%;
-      opacity: 0;
-    }
-  }
-
-  @keyframes floatingCrystals {
-    0% {
-      transform: translateY(0) translateX(0) rotate(0deg);
-      opacity: 0.2;
-    }
-    25% {
-      transform: translateY(-15px) translateX(10px) rotate(45deg);
-      opacity: 0.4;
-    }
-    50% {
-      transform: translateY(-25px) translateX(-5px) rotate(90deg);
-      opacity: 0.3;
-    }
-    75% {
-      transform: translateY(-10px) translateX(-15px) rotate(180deg);
-      opacity: 0.4;
-    }
-    100% {
-      transform: translateY(0) translateX(0) rotate(360deg);
-      opacity: 0.2;
-    }
-  }
-
-  @keyframes backgroundShift {
-    0% {
-      filter: hue-rotate(0deg) brightness(1);
-    }
-    25% {
-      filter: hue-rotate(30deg) brightness(1.05);
-    }
-    50% {
-      filter: hue-rotate(60deg) brightness(1.1);
-    }
-    75% {
-      filter: hue-rotate(30deg) brightness(1.05);
-    }
-    100% {
-      filter: hue-rotate(0deg) brightness(1);
-    }
-  }
-
-  @keyframes innerGlow {
+// Professional Minimal Styles
+const professionalStyles = `
+  @keyframes subtleGlow {
     0% {
       background-position: 0% 50%;
     }
@@ -110,94 +17,36 @@ const futuristicStyles = `
     }
   }
 
-  .futuristic-card {
+  .professional-card {
     position: relative;
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(10px);
-    background-image: linear-gradient(
-      135deg,
-      rgba(59, 130, 246, 0.1) 0%,
-      rgba(139, 92, 246, 0.08) 50%,
-      rgba(14, 165, 233, 0.1) 100%
-    );
-    border: 2px solid;
-    border-image: linear-gradient(135deg, 
-      rgba(59, 130, 246, 0.5) 0%, 
-      rgba(139, 92, 246, 0.7) 50%, 
-      rgba(14, 165, 233, 0.5) 100%) 1;
-    animation: crystallizeBorder 8s ease-in-out infinite;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
     overflow: hidden;
-    border-radius: 12px;
   }
 
-  /* Crystalline shimmer effect */
-  .futuristic-card::before {
+  /* Professional background animation - behind content */
+  .professional-card::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.25),
-      transparent
-    );
-    animation: prismaticShine 4s ease-in-out infinite;
-    pointer-events: none;
-    z-index: 10;
-  }
-
-  /* Inner crystalline glow */
-  .futuristic-card::after {
-    content: '';
-    position: absolute;
-    inset: -2px;
+    inset: 0;
     background: linear-gradient(
       135deg,
-      rgba(59, 130, 246, 0.15) 0%,
-      transparent 25%,
-      transparent 75%,
-      rgba(14, 165, 233, 0.15) 100%
+      rgba(59, 130, 246, 0.02) 0%,
+      rgba(107, 114, 128, 0.01) 50%,
+      rgba(59, 130, 246, 0.02) 100%
     );
     background-size: 200% 200%;
-    animation: innerGlow 6s ease-in-out infinite;
-    border-radius: 12px;
+    animation: subtleGlow 6s ease-in-out infinite;
     pointer-events: none;
     z-index: 0;
   }
 
-  /* Floating crystal particles */
-  .crystal-particle {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    background: radial-gradient(circle, rgba(139, 92, 246, 0.6), transparent);
-    border-radius: 50%;
-    filter: blur(0.5px);
-    pointer-events: none;
+  .professional-overlay {
+    position: relative;
+    z-index: 1;
   }
-
-  .crystal-particle-1 {
-    width: 3px;
-    height: 3px;
-    left: 20%;
-    top: 30%;
-    animation: floatingCrystals 12s ease-in-out infinite;
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
-  }
-
-  .crystal-particle-2 {
-    width: 2px;
-    height: 2px;
-    left: 80%;
-    top: 20%;
-    animation: floatingCrystals 14s ease-in-out infinite reverse;
-    box-shadow: 0 0 8px rgba(139, 92, 246, 0.5);
-  }
-
-  .crystal-particle-3 {
+`;
     width: 2px;
     height: 2px;
     left: 50%;
