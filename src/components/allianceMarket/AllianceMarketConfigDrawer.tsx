@@ -8,6 +8,7 @@ import { Loader2, Settings, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { generateAllianceProfilesWithClaude } from '@/lib/allianceMarketAI';
+import { clsx } from 'clsx';
 
 interface AllianceMarketConfig {
   id: string;
@@ -408,11 +409,12 @@ export function AllianceMarketConfigDrawer({
                                   ? 'default'
                                   : 'outline'
                               }
-                              className={`cursor-pointer transition-all duration-200 ${
+                              className={clsx(
+                                'cursor-pointer transition-all duration-200',
                                 formData.target_industries.includes(industry)
                                   ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-lg'
                                   : 'hover:border-emerald-400 hover:text-emerald-600'
-                              }`}
+                              )}
                               onClick={() => toggleIndustry(industry)}
                             >
                               {industry}
@@ -444,11 +446,12 @@ export function AllianceMarketConfigDrawer({
                                         ? 'default'
                                         : 'outline'
                                     }
-                                    className={`cursor-pointer text-xs transition-all duration-200 ${
+                                    className={clsx(
+                                      'cursor-pointer text-xs transition-all duration-200',
                                       formData.target_relation_types.includes(val)
                                         ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
                                         : 'hover:border-purple-400 hover:text-purple-600'
-                                    }`}
+                                    )}
                                     onClick={() => toggleRelationType(val)}
                                   >
                                     {val.replace(/-/g, ' ')}
