@@ -193,8 +193,9 @@ async function generateProfilesWithClaude(
 
   if (!claudeResponse.ok) {
     const errorData = await claudeResponse.json();
-    console.error("[CLAUDE_ERROR]", errorData);
-    throw new Error(`Claude API error: ${errorData.error?.message || "Unknown error"}`);
+    console.error("[CLAUDE_ERROR] Status:", claudeResponse.status);
+    console.error("[CLAUDE_ERROR] Response:", JSON.stringify(errorData, null, 2));
+    throw new Error(`Claude API error (${claudeResponse.status}): ${errorData.error?.message || "Unknown error"}`);
   }
 
   const claudeData = await claudeResponse.json();
@@ -351,27 +352,58 @@ serve(async (req: Request) => {
       );
     }
 
+    if (apiKey.length < 10) {
+      console.error(
+        "[GENERATE_PROFILES] ANTHROPIC_API_KEY appears to be invalid (too short)"
+      );
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Server configuration error: ANTHROPIC_API_KEY is invalid",
+          code: "INTERNAL_ERROR",
+        } as ErrorResponse),
+        {
+          status: 500,
+          headers: corsHeaders,
+        }
+      );
+    }
+
+    console.log("[GENERATE_PROFILES] API Key configured, length:", apiKey.length);
+
     // Call Claude API
-    console.log("[GENERATE_PROFILES] Calling Claude API");
-    const profiles = await generateProfilesWithClaude(request, apiKey);
+    console.log("[GENERATE_PROFILES] Calling Claude API...");
+    console.log("[GENERATE_PROFILES] Request body length:", JSON.stringify({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 4096,
+      messages: [{ role: "user", content: prompt }]
+    }).length);
+    
+    try {
+      const profiles = await generateProfilesWithClaude(request, apiKey);
+      
+      const executionTime = Date.now() - startTime;
+      console.log(
+        `[GENERATE_PROFILES] Success: ${profiles.length} profiles generated in ${executionTime}ms`
+      );
 
-    const executionTime = Date.now() - startTime;
-    console.log(
-      `[GENERATE_PROFILES] Success: ${profiles.length} profiles generated in ${executionTime}ms`
-    );
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        profiles_generated: profiles.length,
-        profiles,
-        execution_time_ms: executionTime,
-      } as SuccessResponse),
-      {
-        status: 200,
-        headers: corsHeaders,
-      }
-    );
+      return new Response(
+        JSON.stringify({
+          success: true,
+          profiles_generated: profiles.length,
+          profiles,
+          execution_time_ms: executionTime,
+        } as SuccessResponse),
+        {
+          status: 200,
+          headers: corsHeaders,
+        }
+      );
+    } catch (callError) {
+      const callErrorMsg = callError instanceof Error ? callError.message : String(callError);
+      console.error("[GENERATE_PROFILES] Claude call error:", callErrorMsg);
+      throw callError;
+    }
   } catch (error) {
     const executionTime = Date.now() - startTime;
     const errorMsg = error instanceof Error ? error.message : String(error);
@@ -389,13 +421,17 @@ serve(async (req: Request) => {
 
     if (errorMsg.includes("Claude API error")) {
       errorCode = "CLAUDE_API_ERROR";
-      httpStatus = 503;
+      httpStatus = 502;
+      console.error("[GENERATE_PROFILES] Claude API failed - check API key and quotas");
     } else if (errorMsg.includes("Could not extract JSON")) {
       errorCode = "PARSE_ERROR";
       httpStatus = 502;
     } else if (errorMsg.includes("Profile missing")) {
       errorCode = "VALIDATION_ERROR";
       httpStatus = 502;
+    } else if (errorMsg.includes("not configured")) {
+      errorCode = "CONFIG_ERROR";
+      httpStatus = 500;
     }
 
     return new Response(

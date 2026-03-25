@@ -134,18 +134,24 @@ export function EmployeeWorkLog() {
     enabled: !!currentCompany?.id,
   });
 
-  // Calculate contribution data for heatmap
+  // Calculate contribution data for heatmap - filtered by selected employees
   const contributionData = useMemo(() => {
-    if (!Array.isArray(yearlyWorkLogs)) return [];
+    if (!Array.isArray(yearlyWorkLogs) || yearlyWorkLogs.length === 0) return [];
+    
+    // If no employees selected, show data from all employees
+    // If employees selected, filter by selected employees
+    const logsToUse = selectedEmployees.size === 0 
+      ? yearlyWorkLogs 
+      : yearlyWorkLogs.filter((log: any) => selectedEmployees.has(log.employee_id));
     
     const dateMap = new Map<string, number>();
-    yearlyWorkLogs.forEach((log: any) => {
+    logsToUse.forEach((log: any) => {
       if (log && log.task_date) {
         dateMap.set(log.task_date, (dateMap.get(log.task_date) || 0) + 1);
       }
     });
     return Array.from(dateMap.entries()).map(([date, count]) => ({ date, count }));
-  }, [yearlyWorkLogs]);
+  }, [yearlyWorkLogs, selectedEmployees]);
 
   // Filter logs by selected employees
   const filteredLogs = useMemo(() => {
