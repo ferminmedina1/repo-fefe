@@ -101,40 +101,40 @@ const KPIHeroCard = ({
   currency?: string;
   insight?: string;
 }) => (
-  <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-slate-900/50 to-slate-800/50 border border-slate-700/50 p-6 backdrop-blur-sm">
-    <div className="absolute -right-20 -top-20 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl" />
+  <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-blue-950/20 dark:via-indigo-950/20 dark:to-purple-950/20 border border-blue-200/40 dark:border-blue-800/40 p-8 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow">
+    <div className="absolute -right-20 -top-20 w-40 h-40 bg-gradient-to-r from-blue-400/10 to-purple-400/10 rounded-full blur-3xl" />
     
     <div className="relative space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
             {label}
           </p>
-          <h2 className="text-4xl md:text-5xl font-bold text-white">
+          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">
             {formatCurrency(value, currency)}
           </h2>
         </div>
-        <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
-          <DollarSign className="h-6 w-6 text-blue-400" />
+        <div className="p-4 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-500 shadow-lg">
+          <DollarSign className="h-8 w-8 text-white" />
         </div>
       </div>
 
       {trend !== undefined && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pt-2">
           {trend >= 0 ? (
-            <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+            <ArrowUpRight className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
           ) : (
-            <ArrowDownRight className="h-4 w-4 text-red-500" />
+            <ArrowDownRight className="h-5 w-5 text-red-600 dark:text-red-400" />
           )}
-          <span className={trend >= 0 ? 'text-emerald-500' : 'text-red-500'}>
+          <span className={`font-semibold ${trend >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
             {Math.abs(trend).toFixed(2)}%
           </span>
-          <span className="text-xs text-slate-400">vs período anterior</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">vs período anterior</span>
         </div>
       )}
 
       {insight && (
-        <div className="text-xs text-slate-300 pt-2 border-t border-slate-700/50">
+        <div className="text-sm text-gray-700 dark:text-gray-300 pt-3 border-t border-blue-200/50 dark:border-blue-800/50">
           {insight}
         </div>
       )}
@@ -162,31 +162,31 @@ const CurrencyRateCard = ({
   };
 
   return (
-    <div className="group relative overflow-hidden rounded-lg bg-slate-800/50 border border-slate-700/50 p-4 hover:bg-slate-800/80 transition-all duration-300 hover:border-slate-600/80 hover:shadow-lg hover:shadow-blue-500/10">
-      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 to-blue-500/0 group-hover:from-blue-500/5 group-hover:to-blue-500/10 transition-all" />
+    <div className="group relative overflow-hidden rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/40 dark:to-gray-800/40 border border-gray-200/60 dark:border-gray-700/60 p-4 hover:shadow-md transition-all duration-300 hover:border-blue-300/60 dark:hover:border-blue-600/60">
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 to-blue-400/0 group-hover:from-blue-400/5 group-hover:to-blue-400/10 transition-all" />
       
       <div className="relative space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg">{flags[rate.currency] || '💱'}</span>
-            <span className="font-semibold text-sm text-white">{rate.currency}</span>
+            <span className="text-xl">{flags[rate.currency] || '💱'}</span>
+            <span className="font-semibold text-sm text-gray-900 dark:text-white">{rate.currency}</span>
           </div>
-          <Badge variant="outline" className="text-xs bg-slate-700/50 border-slate-600/50">
+          <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-blue-800/60">
             {rate.currency !== 'ARS' ? 'Cotización' : 'Local'}
           </Badge>
         </div>
 
         <div className="space-y-1">
-          <div className="text-2xl font-bold text-white">
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
             ARS {formatNumber(rate.rate)}
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-gray-600 dark:text-gray-400">
             1 {rate.currency} = ARS {rate.rate.toFixed(2)}
           </p>
         </div>
 
         {previousRate && (
-          <div className={`flex items-center gap-2 text-sm font-medium ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+          <div className={`flex items-center gap-2 text-sm font-medium ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
             {isPositive ? (
               <ArrowUpRight className="h-4 w-4" />
             ) : (
@@ -196,7 +196,7 @@ const CurrencyRateCard = ({
           </div>
         )}
 
-        <p className="text-xs text-slate-500 pt-2 border-t border-slate-700/50">
+        <p className="text-xs text-gray-500 dark:text-gray-500 pt-2 border-t border-gray-200/50 dark:border-gray-700/50">
           ↻ {format(new Date(rate.updated_at), 'HH:mm', { locale: es })}
         </p>
       </div>
@@ -236,27 +236,27 @@ const InventoryCard = ({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-slate-800/60 to-slate-800/40 border border-slate-700/50 p-5 hover:border-slate-600/80 transition-all">
-      <div className={`absolute inset-0 opacity-5 ${marginBg}`} />
+    <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-gray-50 via-blue-50/50 to-gray-50 dark:from-gray-900/40 dark:via-indigo-950/20 dark:to-gray-900/40 border border-gray-200/60 dark:border-gray-700/60 p-5 hover:border-blue-300/60 dark:hover:border-blue-600/60 transition-all hover:shadow-md">
+      <div className={`absolute inset-0 opacity-20 ${marginBg}`} />
       
       <div className="relative space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl">{flags[item.currency] || '💱'}</span>
-            <span className="font-semibold text-white">{item.currency}</span>
+            <span className="text-2xl">{flags[item.currency] || '💱'}</span>
+            <span className="font-semibold text-gray-900 dark:text-white text-lg">{item.currency}</span>
           </div>
-          <Badge variant="secondary" className="text-xs bg-slate-700/50">
+          <Badge variant="secondary" className="text-xs bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border-indigo-200/60 dark:border-indigo-800/60">
             {item.productCount} {item.productCount === 1 ? 'producto' : 'productos'}
           </Badge>
         </div>
 
         <div className="space-y-1">
-          <p className="text-xs text-slate-400">Inventario</p>
-          <p className="text-2xl font-bold text-white">
+          <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Inventario</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
             {formatCurrency(item.totalValue, item.currency)}
           </p>
           {item.currency !== 'ARS' && (
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               ≈ {formatCurrency(item.valueInARS, 'ARS')}
             </p>
           )}
@@ -264,8 +264,8 @@ const InventoryCard = ({
 
         <div className={`rounded-lg border ${marginBg} p-3 space-y-2`}>
           <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-300">Margen de Ganancia</p>
-            <span className={`font-bold text-sm ${marginColor}`}>
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Margen</p>
+            <span className={`font-bold text-lg ${marginColor}`}>
               {margin.toFixed(1)}%
             </span>
           </div>
@@ -274,8 +274,8 @@ const InventoryCard = ({
           </p>
         </div>
 
-        <div className="pt-2 border-t border-slate-700/50">
-          <p className="text-xs text-slate-500">Costo Base: {formatCurrency(item.totalCost, item.currency)}</p>
+        <div className="pt-3 border-t border-gray-200/50 dark:border-gray-700/50">
+          <p className="text-xs text-gray-600 dark:text-gray-500">Costo Base: {formatCurrency(item.totalCost, item.currency)}</p>
         </div>
       </div>
     </div>
@@ -371,39 +371,39 @@ export const CurrencyDashboardNew: React.FC<CurrencyDashboardNewProps> = ({
 
       {/* KPI Grid */}
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-4 space-y-3">
+        <div className="rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/40 dark:to-gray-800/40 border border-gray-200/60 dark:border-gray-700/60 p-5 space-y-3 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-400 uppercase">Margen Global</p>
-            {kpis.globalMargin >= 20 && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+            <p className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider">Margen Global</p>
+            {kpis.globalMargin >= 20 && <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
           </div>
-          <p className={`text-3xl font-bold ${getMarginColor(kpis.globalMargin)}`}>
+          <p className={`text-4xl font-bold ${getMarginColor(kpis.globalMargin)}`}>
             {kpis.globalMargin.toFixed(1)}%
           </p>
-          <p className="text-xs text-slate-400">Rentabilidad promedio</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400">Rentabilidad promedio</p>
         </div>
 
-        <div className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-4 space-y-3">
+        <div className="rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/40 dark:to-gray-800/40 border border-gray-200/60 dark:border-gray-700/60 p-5 space-y-3 hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-400 uppercase">Productos Activos</p>
-            <Info className="h-4 w-4 text-blue-400" />
+            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Productos Activos</p>
+            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </div>
-          <p className="text-3xl font-bold text-white">{kpis.totalProducts}</p>
-          <p className="text-xs text-slate-400">En {inventoryByCurrency.length} moneda{inventoryByCurrency.length > 1 ? 's' : ''}</p>
+          <p className="text-4xl font-bold text-gray-900 dark:text-white">{kpis.totalProducts}</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400">En {inventoryByCurrency.length} moneda{inventoryByCurrency.length > 1 ? 's' : ''}</p>
         </div>
 
-        <div className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-4 space-y-3">
-          <p className="text-xs font-semibold text-slate-400 uppercase">Costo de Compra</p>
-          <p className="text-2xl font-bold text-white">{formatCurrency(kpis.totalCost, 'ARS')}</p>
-          <p className="text-xs text-slate-400">Inversión actual</p>
+        <div className="rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/40 dark:to-gray-800/40 border border-gray-200/60 dark:border-gray-700/60 p-5 space-y-3 hover:shadow-md transition-shadow">
+          <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Costo de Compra</p>
+          <p className="text-3xl font-bold text-gray-900 dark:text-white">{formatCurrency(kpis.totalCost, 'ARS')}</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400">Inversión actual</p>
         </div>
       </div>
 
       {/* Exchange Rates */}
       {exchangeRates.length > 0 && (
         <div>
-          <div className="mb-3 flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-slate-400" />
-            <h3 className="text-sm font-semibold text-white">Cotizaciones</h3>
+          <div className="mb-4 flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Cotizaciones Actuales</h3>
           </div>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {exchangeRates.map((rate) => (
@@ -421,10 +421,10 @@ export const CurrencyDashboardNew: React.FC<CurrencyDashboardNewProps> = ({
       {historicalRates.length > 3 && (
         <div>
           <div className="mb-4">
-            <h3 className="text-sm font-semibold text-white mb-2">Evolución de Cotizaciones (30 días)</h3>
-            <p className="text-xs text-slate-400">Tendencia de cambio en monedas principales</p>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Evolución de Cotizaciones (30 días)</h3>
+            <p className="text-xs text-gray-600 dark:text-gray-400">Tendencia de cambio en monedas principales</p>
           </div>
-          <div className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-4">
+          <div className="rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/40 dark:to-gray-800/40 border border-gray-200/60 dark:border-gray-700/60 p-5">
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={historicalRates}>
                 <defs>
@@ -437,24 +437,22 @@ export const CurrencyDashboardNew: React.FC<CurrencyDashboardNewProps> = ({
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(100, 116, 139, 0.2)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(156, 163, 175, 0.2)" />
                 <XAxis 
                   dataKey="date" 
-                  stroke="rgb(148, 163, 184)"
+                  stroke="rgb(107, 114, 128)"
                   style={{ fontSize: '12px' }}
                 />
                 <YAxis 
-                  stroke="rgb(148, 163, 184)"
+                  stroke="rgb(107, 114, 128)"
                   style={{ fontSize: '12px' }}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: 'hsl(215, 28%, 17%)',
-                    border: '1px solid hsl(217, 33%, 30%)',
+                    backgroundColor: 'hsl(0, 0%, 100%)',
+                    border: '1px solid hsl(0, 0%, 90%)',
                     borderRadius: '8px',
                   }}
-                  cursor={{ stroke: 'rgba(59, 130, 246, 0.3)' }}
-                  formatter={(value: number) => [`ARS ${value.toFixed(2)}`, '']}
                 />
                 <Legend />
                 <Line
@@ -480,9 +478,9 @@ export const CurrencyDashboardNew: React.FC<CurrencyDashboardNewProps> = ({
       {/* Inventory by Currency */}
       {inventoryByCurrency.length > 0 && (
         <div>
-          <div className="mb-3 flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-slate-400" />
-            <h3 className="text-sm font-semibold text-white">Valorización por Moneda</h3>
+          <div className="mb-4 flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Valorización por Moneda</h3>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             {inventoryByCurrency.map((item) => (

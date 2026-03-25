@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { subDays, startOfYear, eachDayOfInterval, format, getWeek, getMonth } from 'date-fns';
+import { subDays, startOfYear, eachDayOfInterval, format, getMonth } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface ContributionData {
   date: string;
@@ -12,15 +13,19 @@ interface ContributionHeatmapProps {
   title?: string;
 }
 
-export function ContributionHeatmap({ data, title = 'Actividad Último Año' }: ContributionHeatmapProps) {
+export function ContributionHeatmap({ data = [], title = 'Actividad Último Año' }: ContributionHeatmapProps) {
   const heatmapData = useMemo(() => {
+    if (!Array.isArray(data)) return { weeks: [], allDays: [] };
+    
     const oneYearAgo = subDays(new Date(), 365);
     const yearStart = startOfYear(oneYearAgo);
     
     // Crear mapa de fechas con conteos
     const dateMap = new Map<string, number>();
-    data.forEach(item => {
-      dateMap.set(item.date, item.count);
+    data.forEach((item: any) => {
+      if (item && item.date) {
+        dateMap.set(item.date, item.count || 0);
+      }
     });
 
     // Generar todos los días del intervalo
@@ -73,7 +78,7 @@ export function ContributionHeatmap({ data, title = 'Actividad Último Año' }: 
         const month = getMonth(day.date);
         if (!monthMap.has(month)) {
           monthMap.set(month, weekIndex);
-          const monthName = format(day.date, 'MMM', { locale: { code: 'es' } as any });
+          const monthName = format(day.date, 'MMM', { locale: es });
           monthLabels.push({ month: monthName.toUpperCase(), weekIndex });
         }
       });
@@ -96,69 +101,75 @@ export function ContributionHeatmap({ data, title = 'Actividad Último Año' }: 
         <CardTitle className="text-lg">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto pb-4">
-          <div className="inline-block min-w-full">
-            {/* Month labels */}
-            <div className="flex gap-1 pb-2 pl-12">
-              {months.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="text-xs text-slate-400 font-medium"
-                  style={{ minWidth: `${item.weekIndex > 0 ? 16 : 0}px` }}
-                >
-                  {item.month}
-                </div>
-              ))}
-            </div>
-
-            {/* Day labels + heatmap grid */}
-            <div className="flex gap-1">
-              {/* Day labels (left side) */}
-              <div className="flex flex-col gap-1">
-                {dayLabels.map((label, idx) => (
+        {!heatmapData.weeks || heatmapData.weeks.length === 0 ? (
+          <div className="text-sm text-slate-500 py-8">
+            No hay datos de actividad para mostrar
+          </div>
+        ) : (
+          <div className="overflow-x-auto pb-4">
+            <div className="inline-block min-w-full">
+              {/* Month labels */}
+              <div className="flex gap-1 pb-2 pl-12">
+                {months.map((item, idx) => (
                   <div
                     key={idx}
-                    className="h-3 w-10 flex items-center justify-end pr-2 text-xs text-slate-400 font-medium"
+                    className="text-xs text-slate-400 font-medium"
+                    style={{ minWidth: `${item.weekIndex > 0 ? 16 : 0}px` }}
                   >
-                    {label}
+                    {item.month}
                   </div>
                 ))}
               </div>
 
-              {/* Heatmap weeks */}
+              {/* Day labels + heatmap grid */}
               <div className="flex gap-1">
-                {heatmapData.weeks.map((week, weekIdx) => (
-                  <div key={weekIdx} className="flex flex-col gap-1">
-                    {week.map((day, dayIdx) => {
-                      const dateStr = format(day.date, 'yyyy-MM-dd');
-                      const dataPoint = data.find(d => d.date === dateStr);
-                      const count = dataPoint?.count || 0;
+                {/* Day labels (left side) */}
+                <div className="flex flex-col gap-1">
+                  {dayLabels.map((label, idx) => (
+                    <div
+                      key={idx}
+                      className="h-3 w-10 flex items-center justify-end pr-2 text-xs text-slate-400 font-medium"
+                    >
+                      {label}
+                    </div>
+                  ))}
+                </div>
 
-                      return (
-                        <div
-                          key={`${weekIdx}-${dayIdx}`}
-                          title={`${format(day.date, 'dd/MM/yyyy')}: ${getTooltip(count)}`}
-                          className={`h-3 w-3 rounded-sm border cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all ${getColor(count)}`}
-                        />
-                      );
-                    })}
-                  </div>
-                ))}
+                {/* Heatmap weeks */}
+                <div className="flex gap-1">
+                  {heatmapData.weeks.map((week, weekIdx) => (
+                    <div key={weekIdx} className="flex flex-col gap-1">
+                      {week.map((day, dayIdx) => {
+                        const dateStr = format(day.date, 'yyyy-MM-dd');
+                        const dataPoint = data.find(d => d.date === dateStr);
+                        const count = dataPoint?.count || 0;
+
+                        return (
+                          <div
+                            key={`${weekIdx}-${dayIdx}`}
+                            title={`${format(day.date, 'dd/MM/yyyy')}: ${getTooltip(count)}`}
+                            className={`h-3 w-3 rounded-sm border cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all ${getColor(count)}`}
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Legend */}
-            <div className="flex items-center gap-2 mt-4 text-xs text-slate-400">
-              <span>Menos</span>
-              <div className="h-3 w-3 bg-slate-800 border border-slate-700 rounded-sm" />
-              <div className="h-3 w-3 bg-green-900/40 border border-green-700/30 rounded-sm" />
-              <div className="h-3 w-3 bg-green-700/50 border border-green-600/40 rounded-sm" />
-              <div className="h-3 w-3 bg-green-600/60 border border-green-500/50 rounded-sm" />
-              <div className="h-3 w-3 bg-green-500/70 border border-green-400/60 rounded-sm" />
-              <span>Más</span>
+              {/* Legend */}
+              <div className="flex items-center gap-2 mt-4 text-xs text-slate-400">
+                <span>Menos</span>
+                <div className="h-3 w-3 bg-slate-800 border border-slate-700 rounded-sm" />
+                <div className="h-3 w-3 bg-green-900/40 border border-green-700/30 rounded-sm" />
+                <div className="h-3 w-3 bg-green-700/50 border border-green-600/40 rounded-sm" />
+                <div className="h-3 w-3 bg-green-600/60 border border-green-500/50 rounded-sm" />
+                <div className="h-3 w-3 bg-green-500/70 border border-green-400/60 rounded-sm" />
+                <span>Más</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
