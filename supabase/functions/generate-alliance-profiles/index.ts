@@ -17,6 +17,7 @@ interface GenerateProfilesRequest {
   targetIndustries?: string[];
   targetRelationTypes?: string[];
   searchKeywords?: string[];
+  companyId?: string;
 }
 
 interface AllianceProfile {
@@ -37,6 +38,7 @@ interface AllianceProfile {
   synergy_tags: string[];
   compatibility_breakdown: Record<string, number>;
   badge?: "hot" | "new" | "verified";
+  ai_comment?: string;
 }
 
 interface SuccessResponse {
@@ -116,7 +118,8 @@ RETURN ONLY A VALID JSON ARRAY:
       "size_fit": 80,
       "growth_potential": 75
     },
-    "badge": "hot" or "new" or "verified" or null
+    "badge": "hot" or "new" or "verified" or null,
+    "ai_comment": "Personal comment as a friend would give. E.g., 'This could be a great fit - they have strong market presence in your region and complementary products!'"
   }
 ]
 
@@ -161,6 +164,7 @@ function parseJsonResponse(text: string): AllianceProfile[] {
       synergy_tags: Array.isArray(p.synergy_tags) ? p.synergy_tags : [],
       compatibility_breakdown: (p.compatibility_breakdown as Record<string, number>) || {},
       badge: (p.badge as "hot" | "new" | "verified") || undefined,
+      ai_comment: (p.ai_comment as string) || "Great opportunity to explore!",
     } as AllianceProfile;
   });
 }
@@ -180,7 +184,7 @@ async function generateProfilesWithClaude(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-5",
       max_tokens: 4096,
       messages: [
         {
@@ -258,6 +262,73 @@ async function updateGenerationStatus(
   if (error) {
     console.error("Error updating generation status:", error);
   }
+}
+
+// Check daily limit (5 per day per user)
+async function checkDailyLimit(
+  supabase: any,
+  companyId: string
+): Promise<{ allowed: boolean; remaining: number; message: string }> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const { data, error } = await supabase
+    .from("alliance_market_generation_log")
+    .select("count")
+    .eq("company_id", companyId)
+    .gte("created_at", today.toISOString())
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error("[LIMIT_CHECK] Error checking limit:", error);
+    // If table doesn't exist, allow (first time)
+    return { allowed: true, remaining: 5, message: "No limit data found" };
+  }
+
+  const count = data?.count || 0;
+  const remaining = Math.max(0, 5 - count);
+  const allowed = remaining > 0;
+
+  return {
+    allowed,
+    remaining,
+    message: allowed ? `${remaining} búsquedas restantes hoy` : "Has alcanzado el límite de 5 búsquedas por día",
+  };
+}
+
+// Log generation attempt
+async function logGenerationAttempt(
+  supabase: any,
+  companyId: string
+) {
+  const { error } = await supabase
+    .from("alliance_market_generation_log")
+    .insert({
+      company_id: companyId,
+      created_at: new Date().toISOString(),
+    });
+
+  if (error) {
+    console.error("[LOG_GENERATION] Error logging attempt:", error);
+  }
+}
+
+// Get existing profiles to avoid repetition
+async function getExistingProfileNames(
+  supabase: any,
+  companyId: string
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("alliance_market_profiles")
+    .select("business_name")
+    .eq("company_id", companyId);
+
+  if (error) {
+    console.error("[EXISTING_PROFILES] Error fetching:", error);
+    return new Set();
+  }
+
+  return new Set(data?.map((p: any) => p.business_name) || []);
 }
 
 serve(async (req: Request) => {
@@ -370,8 +441,30 @@ serve(async (req: Request) => {
 
     console.log("[GENERATE_PROFILES] API Key configured, length:", apiKey.length);
 
-    // Call Claude API
-    console.log("[GENERATE_PROFILES] Calling Claude API...");
+    // Create Supabase client for limit checking
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
+
+    // Check daily limit if companyId is provided
+    if (request.companyId) {
+      const limitCheck = await checkDailyLimit(supabase, request.companyId);
+      if (!limitCheck.allowed) {
+        console.warn("[GENERATE_PROFILES] Daily limit exceeded for company:", request.companyId);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: limitCheck.message,
+            code: "DAILY_LIMIT_EXCEEDED",
+          } as ErrorResponse),
+          {
+            status: 429,
+            headers: corsHeaders,
+          }
+        );
+      }
+      console.log(`[GENERATE_PROFILES] Limit check passed: ${limitCheck.remaining} remaining`);
+    }
     
     try {
       const profiles = await generateProfilesWithClaude(request, apiKey);
@@ -380,6 +473,11 @@ serve(async (req: Request) => {
       console.log(
         `[GENERATE_PROFILES] Success: ${profiles.length} profiles generated in ${executionTime}ms`
       );
+
+      // Log the successful generation attempt
+      if (request.companyId) {
+        await logGenerationAttempt(supabase, request.companyId);
+      }
 
       return new Response(
         JSON.stringify({

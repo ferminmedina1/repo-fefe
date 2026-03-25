@@ -107,7 +107,88 @@ export const AllianceMarketCard = memo(function AllianceMarketCard({
   const colorClass = getIndustryColor(profile.industry);
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 hover:border-emerald-500/40 hover:shadow-sm transition-all duration-200 flex flex-col gap-3">
+    <div className="relative">
+      <style>{`
+        @keyframes aiFloat {
+          0%, 100% { transform: translateY(0px) rotateY(0deg); }
+          50% { transform: translateY(-10px) rotateY(1deg); }
+        }
+        @keyframes aiGlowPulse {
+          0%, 100% { 
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5), 
+                        0 0 40px rgba(139, 92, 246, 0.3),
+                        inset 0 0 20px rgba(59, 130, 246, 0.1);
+          }
+          50% { 
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.8), 
+                        0 0 60px rgba(139, 92, 246, 0.5),
+                        inset 0 0 30px rgba(59, 130, 246, 0.2);
+          }
+        }
+        @keyframes cardHover {
+          0% { transform: translateY(0); }
+          100% { transform: translateY(-2px); }
+        }
+        .ai-comment-bubble {
+          position: absolute;
+          bottom: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.92) 0%, rgba(139, 92, 246, 0.92) 100%);
+          color: white;
+          padding: 14px 18px;
+          border-radius: 14px;
+          font-size: 13px;
+          font-weight: 500;
+          max-width: 220px;
+          z-index: 1000;
+          margin-bottom: 12px;
+          backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          opacity: 0;
+          pointer-events: none;
+          animation: aiFloat 3s ease-in-out infinite, aiGlowPulse 4s ease-in-out infinite;
+          box-shadow: 0 0 20px rgba(59, 130, 246, 0.5), 
+                      0 0 40px rgba(139, 92, 246, 0.3),
+                      inset 0 0 20px rgba(59, 130, 246, 0.1);
+          white-space: pre-wrap;
+          word-break: break-word;
+          line-height: 1.5;
+          text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+          transition: opacity 0.4s ease-out;
+        }
+        .ai-comment-bubble::after {
+          content: '';
+          position: absolute;
+          bottom: -8px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 0;
+          border-left: 8px solid transparent;
+          border-right: 8px solid transparent;
+          border-top: 8px solid rgba(59, 130, 246, 0.92);
+          filter: drop-shadow(0 2px 4px rgba(139, 92, 246, 0.3));
+        }
+        .alliance-card {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .alliance-card:hover {
+          animation: cardHover 0.3s ease-out forwards;
+        }
+        .alliance-card:hover .ai-comment-bubble {
+          opacity: 1;
+          pointer-events: auto;
+        }
+      `}</style>
+      
+      <div className="alliance-card bg-card border border-border rounded-xl p-4 hover:border-emerald-500/50 hover:shadow-xl transition-all duration-300 flex flex-col gap-3">
+        {/* AI Comment Bubble */}
+        {profile.ai_comment && (
+          <div className="ai-comment-bubble">
+            💭 {profile.ai_comment}
+          </div>
+        )}
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -229,6 +310,7 @@ export const AllianceMarketCard = memo(function AllianceMarketCard({
           <UserPlus className="w-3 h-3 mr-1.5" />
           Conectar
         </Button>
+      </div>
       </div>
     </div>
   );

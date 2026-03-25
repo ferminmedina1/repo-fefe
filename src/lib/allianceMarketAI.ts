@@ -19,6 +19,7 @@ export interface AllianceProfile {
   synergy_tags: string[];
   compatibility_breakdown: Record<string, number>;
   badge?: "hot" | "new" | "verified";
+  ai_comment?: string;
 }
 
 export async function generateAllianceProfilesWithClaude(
@@ -50,6 +51,7 @@ export async function generateAllianceProfilesWithClaude(
     // Call Supabase Edge Function
     const { data, error } = await supabase.functions.invoke('generate-alliance-profiles', {
       body: {
+        companyId,
         companyDescription: config.company_description,
         productsSummary: config.products_summary || 'Not specified',
         targetIndustries: config.target_industries || [],

@@ -142,6 +142,7 @@ export function AllianceMarketConfigDrawer({
         return;
       }
 
+      // 1. Save configuration
       const { error } = await supabase
         .from('alliance_market_scoring_config')
         .update(formData)
@@ -149,14 +150,16 @@ export function AllianceMarketConfigDrawer({
 
       if (error) throw error;
 
-      toast.success('Configuration saved successfully');
+      toast.success('Configuración guardada');
       if (onConfigUpdated) {
         onConfigUpdated({ ...config, ...formData } as AllianceMarketConfig);
       }
-      setIsOpen(false);
+
+      // 2. Automatically generate profiles after saving
+      await handleGenerateProfiles();
     } catch (error) {
       console.error('Error saving config:', error);
-      toast.error('Error saving configuration');
+      toast.error('Error guardando configuración');
     } finally {
       setSaving(false);
     }
@@ -192,22 +195,8 @@ export function AllianceMarketConfigDrawer({
         throw new Error('No se encontraron perfiles');
       }
 
-      // 1️⃣ Eliminar perfiles anteriores sugeridos por IA
-      const { data: oldProfiles } = await supabase
-        .from('alliance_market_profiles')
-        .select('id')
-        .eq('company_id', companyId)
-        .eq('status', 'suggested')
-        .eq('is_ai_generated', true);
-
-      if (oldProfiles && oldProfiles.length > 0) {
-        await supabase
-          .from('alliance_market_profiles')
-          .delete()
-          .in('id', oldProfiles.map(p => p.id));
-      }
-
-      // 2️⃣ Insertar nuevos perfiles
+      // ✅ INSERT nuevos perfiles SIN eliminar los anteriores
+      // El historial de alianzas y clientes se mantiene
       const now = new Date();
       const { data, error } = await supabase
         .from('alliance_market_profiles')
@@ -228,7 +217,7 @@ export function AllianceMarketConfigDrawer({
         throw error;
       }
 
-      // 3️⃣ Actualizar estado de generación
+      // Actualizar estado de generación
       await supabase
         .from('alliance_market_scoring_config')
         .update({
@@ -239,12 +228,15 @@ export function AllianceMarketConfigDrawer({
 
       toast.dismiss();
       toast.success(
-        `✨ ¡Encontrados ${profiles.length} perfiles! ${oldProfiles?.length || 0} anteriores eliminados`
+        `✨ ¡Encontrados ${profiles.length} perfiles! Acciones previas se mantienen.`
       );
 
       if (onGenerateProfiles) {
         onGenerateProfiles();
       }
+
+      // Cerrar drawer después de completar
+      setIsOpen(false);
     } catch (error) {
       toast.dismiss();
       console.error('Error buscando perfiles:', error);
@@ -312,27 +304,29 @@ export function AllianceMarketConfigDrawer({
       </Button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm">
           <div className="min-h-screen flex items-start justify-end">
-            <div className="w-full max-w-xl bg-white rounded-l-lg shadow-lg">
-              <div className="flex flex-col h-full">
-                {/* Header */}
-                <div className="border-b px-6 py-4 flex justify-between items-center">
-                  <h2 className="text-lg font-semibold flex items-center gap-2">
+            <div className="w-full max-w-xl bg-white dark:bg-slate-950 rounded-l-2xl shadow-2xl flex flex-col h-screen">
+              {/* Header with Gradient */}
+              <div className="bg-gradient-to-r from-blue-600/95 to-purple-600/95 backdrop-blur-md border-b border-white/10 px-6 py-5 flex justify-between items-center rounded-tl-2xl">
+                <h2 className="text-lg font-bold flex items-center gap-3 text-white">
+                  <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
                     <Settings className="h-5 w-5" />
-                    Alliance Market Config
-                  </h2>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    ✕
-                  </Button>
-                </div>
+                  </div>
+                  <span>Alliance Market</span>
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsOpen(false)}
+                  className="text-white/80 hover:text-white hover:bg-white/10"
+                >
+                  ✕
+                </Button>
+              </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-transparent via-transparent to-blue-50/10 dark:to-slate-900/20">
                   {loading ? (
                     <div className="flex justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin" />
@@ -340,12 +334,13 @@ export function AllianceMarketConfigDrawer({
                   ) : (
                     <>
                       {/* Company Description */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">
-                          Company Description *
+                      <div className="space-y-3">
+                        <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                          Descripción de tu Empresa *
                         </label>
                         <Textarea
-                          placeholder="Describe your company: what you do, mission, vision, specialties, unique value proposition..."
+                          placeholder="Describe tu empresa: qué haces, misión, visión, especialidades, propuesta única..."
                           value={formData.company_description}
                           onChange={(e) =>
                             setFormData((prev) => ({
@@ -353,20 +348,21 @@ export function AllianceMarketConfigDrawer({
                               company_description: e.target.value,
                             }))
                           }
-                          className="min-h-24"
+                          className="min-h-24 border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-blue-500/20 rounded-lg transition-all"
                         />
-                        <p className="text-xs text-gray-500">
-                          Claude AI will use this to find compatible allies
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Claude IA usará esto para encontrar aliados compatibles
                         </p>
                       </div>
 
                       {/* Products Summary */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">
-                          Products/Services Summary
+                      <div className="space-y-3">
+                        <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                          Resumen de Productos/Servicios
                         </label>
                         <Textarea
-                          placeholder="Main products, categories, price range, digital/physical, target market..."
+                          placeholder="Productos principales, categorías, rango de precios, digital/físico, mercado objetivo..."
                           value={formData.products_summary}
                           onChange={(e) =>
                             setFormData((prev) => ({
@@ -374,17 +370,18 @@ export function AllianceMarketConfigDrawer({
                               products_summary: e.target.value,
                             }))
                           }
-                          className="min-h-20"
+                          className="min-h-20 border-slate-200 dark:border-slate-700 focus:border-amber-500 focus:ring-amber-500/20 rounded-lg transition-all"
                         />
                       </div>
 
                       {/* Market Positioning */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">
-                          Market Positioning
+                      <div className="space-y-3">
+                        <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-600"></span>
+                          Posicionamiento en Mercado
                         </label>
                         <Input
-                          placeholder="e.g., Premium, Accessible, Scalable, B2B, B2C..."
+                          placeholder="Ej: Premium, Accesible, Escalable, B2B, B2C..."
                           value={formData.market_positioning}
                           onChange={(e) =>
                             setFormData((prev) => ({
@@ -392,13 +389,15 @@ export function AllianceMarketConfigDrawer({
                               market_positioning: e.target.value,
                             }))
                           }
+                          className="border-slate-200 dark:border-slate-700 focus:border-cyan-500 focus:ring-cyan-500/20 transition-all"
                         />
                       </div>
 
                       {/* Target Industries */}
                       <div className="space-y-3">
-                        <label className="text-sm font-medium">
-                          Target Industries for Matches
+                        <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                          Industrias Objetivo
                         </label>
                         <div className="flex flex-wrap gap-2">
                           {INDUSTRIES.map((industry) => (
@@ -409,7 +408,11 @@ export function AllianceMarketConfigDrawer({
                                   ? 'default'
                                   : 'outline'
                               }
-                              className="cursor-pointer"
+                              className={`cursor-pointer transition-all duration-200 ${
+                                formData.target_industries.includes(industry)
+                                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-lg'
+                                  : 'hover:border-emerald-400 hover:text-emerald-600'
+                              }`}
                               onClick={() => toggleIndustry(industry)}
                             >
                               {industry}
@@ -420,14 +423,15 @@ export function AllianceMarketConfigDrawer({
 
                       {/* Target Relation Types */}
                       <div className="space-y-3">
-                        <label className="text-sm font-medium">
-                          Seeking Alliance Types
+                        <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
+                          Tipos de Relación Buscada
                         </label>
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {Object.entries(RELATION_TYPES).map(([type, values]) => (
                             <div key={type}>
-                              <p className="text-xs font-medium mb-2 capitalize">
-                                {type} Relations:
+                              <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide opacity-70">
+                                {type === 'alliance' ? '🤝 Alianzas' : '👥 Clientes'}
                               </p>
                               <div className="flex flex-wrap gap-2">
                                 {values.map((val) => (
@@ -440,10 +444,14 @@ export function AllianceMarketConfigDrawer({
                                         ? 'default'
                                         : 'outline'
                                     }
-                                    className="cursor-pointer text-xs"
+                                    className={`cursor-pointer text-xs transition-all duration-200 ${
+                                      formData.target_relation_types.includes(val)
+                                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                                        : 'hover:border-purple-400 hover:text-purple-600'
+                                    }`}
                                     onClick={() => toggleRelationType(val)}
                                   >
-                                    {val}
+                                    {val.replace(/-/g, ' ')}
                                   </Badge>
                                 ))}
                               </div>
@@ -454,12 +462,13 @@ export function AllianceMarketConfigDrawer({
 
                       {/* AI Search Keywords */}
                       <div className="space-y-3">
-                        <label className="text-sm font-medium">
-                          AI Search Keywords
+                        <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-pink-600"></span>
+                          Palabras Clave para búsqueda IA
                         </label>
-                        <div className="flex gap-2 mb-2">
+                        <div className="flex gap-2 mb-3">
                           <Input
-                            placeholder="Add keyword..."
+                            placeholder="Ej: distribuidores, retailers, integradores..."
                             onKeyPress={(e) => {
                               if (e.key === 'Enter') {
                                 addKeyword(
@@ -468,6 +477,7 @@ export function AllianceMarketConfigDrawer({
                                 (e.target as HTMLInputElement).value = '';
                               }
                             }}
+                            className="border-slate-200 dark:border-slate-700 focus:border-pink-500 focus:ring-pink-500/20 transition-all"
                           />
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -475,31 +485,31 @@ export function AllianceMarketConfigDrawer({
                             <Badge
                               key={keyword}
                               variant="secondary"
-                              className="cursor-pointer"
+                              className="cursor-pointer bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300 hover:bg-pink-200 dark:hover:bg-pink-900/60 transition-all"
                               onClick={() => removeKeyword(keyword)}
                             >
-                              {keyword} ✕
+                              {keyword} <span className="ml-1">✕</span>
                             </Badge>
                           ))}
                         </div>
-                        <p className="text-xs text-gray-500">
-                          e.g., "distributors", "retailers", "integrators",
-                          "B2B platforms"
-                        </p>
+                        {formData.ai_search_keywords.length === 0 && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                            Presiona Enter para agregar palabras clave...
+                          </p>
+                        )}
                       </div>
 
                       {/* Last Generation Status */}
                       {config?.last_ai_generation_at && (
-                        <Card className="bg-blue-50 border-blue-200">
+                        <Card className="bg-gradient-to-br from-blue-50/80 to-purple-50/80 dark:from-blue-950/30 dark:to-purple-950/30 border-blue-200/50 dark:border-blue-900/50 backdrop-blur-sm">
                           <CardContent className="pt-4">
-                            <p className="text-sm">
-                              Last generated:{' '}
-                              {new Date(
+                            <p className="text-sm font-medium text-slate-900 dark:text-white">
+                              ✨ Última generación: <span className="text-blue-600 dark:text-blue-400">{new Date(
                                 config.last_ai_generation_at
-                              ).toLocaleDateString()}
+                              ).toLocaleDateString()}</span>
                             </p>
-                            <p className="text-xs text-gray-600">
-                              Status: {config.ai_generation_status}
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                              Status: <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-xs font-medium">{config.ai_generation_status}</span>
                             </p>
                           </CardContent>
                         </Card>
@@ -509,30 +519,22 @@ export function AllianceMarketConfigDrawer({
                 </div>
 
                 {/* Footer */}
-                <div className="border-t px-6 py-4 flex gap-3 bg-gray-50">
+                <div className="border-t border-white/10 px-6 py-4 flex gap-3 bg-gradient-to-r from-slate-50 to-blue-50/30 dark:from-slate-900 dark:to-slate-800/50 backdrop-blur-sm rounded-bl-2xl">
                   <Button
                     variant="outline"
                     onClick={() => setIsOpen(false)}
                     disabled={saving || generating}
+                    className="border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200"
                   >
-                    Cancel
+                    Cancelar
                   </Button>
                   <Button
                     onClick={handleSave}
                     disabled={saving || generating || !formData.company_description}
-                    className="gap-2"
+                    className="gap-2 flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium shadow-lg hover:shadow-blue-500/30 transition-all duration-300 disabled:opacity-50"
                   >
-                    {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                    <Save className="h-4 w-4" />
-                    Save Config
-                  </Button>
-                  <Button
-                    onClick={handleGenerateProfiles}
-                    disabled={generating || !formData.company_description}
-                    className="gap-2"
-                  >
-                    {generating && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Buscar perfiles
+                    {(saving || generating) && <Loader2 className="h-4 w-4 animate-spin" />}
+                    ✨ Actualizar
                   </Button>
                 </div>
               </div>
