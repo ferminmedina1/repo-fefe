@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { UserCog, Mail, UserPlus } from "lucide-react";
+import { UserCog, Mail, UserPlus, RefreshCw } from "lucide-react";
 import { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
@@ -44,8 +44,26 @@ export function EmployeeRoleAssignment() {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<AppRole>("employee");
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["company-users", currentCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["company-users-roles", currentCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["employees-for-roles", currentCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["company-user-profiles", currentCompany?.id] }),
+      ]);
+      toast.success("Datos actualizados correctamente");
+    } catch (error) {
+      toast.error("Error al actualizar los datos");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Fetch company users with their roles
   const { data: companyUsers, isLoading } = useQuery({
@@ -315,13 +333,23 @@ export function EmployeeRoleAssignment() {
             <UserCog className="h-5 w-5 text-primary shrink-0" />
             <CardTitle>Asignación de Roles</CardTitle>
           </div>
-          <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">
-                <UserPlus className="mr-2 h-4 w-4" />
-                Invitar Usuario
-              </Button>
-            </DialogTrigger>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Actualizando...' : 'Actualizar'}
+            </Button>
+            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full sm:w-auto">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Invitar Usuario
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Invitar Usuario a la Empresa</DialogTitle>
@@ -369,7 +397,8 @@ export function EmployeeRoleAssignment() {
                 </Button>
               </div>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </div>
         <CardDescription>
           Asigna roles a los usuarios de la empresa para controlar sus permisos

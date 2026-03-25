@@ -15,13 +15,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Users, Plus, Edit, Trash2, Shield, Clock, AlertTriangle, EyeOff, HelpCircle } from "lucide-react";
+import { Users, Plus, Edit, Trash2, Shield, Clock, AlertTriangle, EyeOff, HelpCircle, Linkedin, Facebook, Instagram, Briefcase } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { EmployeePermissionsManager } from "@/components/employees/EmployeePermissionsManager";
 import { EmployeeRoleAssignment } from "@/components/employees/EmployeeRoleAssignment";
 import { EmployeeTimeTracking } from "@/components/employees/EmployeeTimeTracking";
 import { EmployeeSelfTimeTracking } from "@/components/employees/EmployeeSelfTimeTracking";
+import { EmployeeWorkLog } from "@/components/employees/EmployeeWorkLog";
 
 interface EmployeeFormData {
   first_name: string;
@@ -34,6 +35,9 @@ interface EmployeeFormData {
   base_salary: number;
   salary_type: string;
   role: string;
+  linkedin_url?: string;
+  facebook_url?: string;
+  instagram_username?: string;
 }
 
 const initialFormData: EmployeeFormData = {
@@ -47,6 +51,9 @@ const initialFormData: EmployeeFormData = {
   base_salary: 0,
   salary_type: "monthly",
   role: "employee",
+  linkedin_url: "",
+  facebook_url: "",
+  instagram_username: "",
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -359,6 +366,9 @@ const Employees = () => {
       base_salary: employee.base_salary || 0,
       salary_type: employee.salary_type || "monthly",
       role: normalizedRole,
+      linkedin_url: employee.linkedin_url || "",
+      facebook_url: employee.facebook_url || "",
+      instagram_username: employee.instagram_username || "",
     });
     setDialogOpen(true);
   };
@@ -398,6 +408,10 @@ const Employees = () => {
             <TabsTrigger value="list" className="flex-1 min-w-[100px] text-xs sm:text-sm">
               <Users className="mr-1 sm:mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Empleados</span>
+            </TabsTrigger>
+            <TabsTrigger value="work" className="flex-1 min-w-[80px] text-xs sm:text-sm">
+              <Briefcase className="mr-1 sm:mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Trabajo</span>
             </TabsTrigger>
             {showMyTime && (
               <TabsTrigger value="my-time" className="flex-1 min-w-[100px] text-xs sm:text-sm">
@@ -574,6 +588,51 @@ const Employees = () => {
                               />
                             </div>
                           )}
+
+                          <div className="col-span-2 border-t border-border pt-4 mt-2">
+                            <h3 className="text-sm font-semibold mb-4">Redes Sociales (Opcional)</h3>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="linkedin_url" className="flex items-center gap-2">
+                              <Linkedin className="h-4 w-4 text-blue-700" />
+                              LinkedIn
+                            </Label>
+                            <Input
+                              id="linkedin_url"
+                              value={formData.linkedin_url || ""}
+                              onChange={(e) => setFormData({ ...formData, linkedin_url: e.target.value })}
+                              placeholder="https://linkedin.com/in/usuario"
+                              type="url"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="facebook_url" className="flex items-center gap-2">
+                              <Facebook className="h-4 w-4 text-blue-600" />
+                              Facebook
+                            </Label>
+                            <Input
+                              id="facebook_url"
+                              value={formData.facebook_url || ""}
+                              onChange={(e) => setFormData({ ...formData, facebook_url: e.target.value })}
+                              placeholder="https://facebook.com/usuario"
+                              type="url"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="instagram_username" className="flex items-center gap-2">
+                              <Instagram className="h-4 w-4 text-pink-600" />
+                              Instagram
+                            </Label>
+                            <Input
+                              id="instagram_username"
+                              value={formData.instagram_username || ""}
+                              onChange={(e) => setFormData({ ...formData, instagram_username: e.target.value })}
+                              placeholder="@usuario"
+                            />
+                          </div>
                         </div>
                         <div className="flex justify-end gap-2">
                           <Button variant="outline" onClick={() => setDialogOpen(false)}>
@@ -605,6 +664,7 @@ const Employees = () => {
                         <TableHead className="hidden md:table-cell">Rol</TableHead>
                         <TableHead className="hidden lg:table-cell">Ingreso</TableHead>
                         {!isEmployee && <TableHead className="hidden md:table-cell">Salario</TableHead>}
+                        <TableHead className="hidden xl:table-cell">Redes</TableHead>
                         <TableHead>Estado</TableHead>
                         {(canEdit || canDelete) && <TableHead>Acciones</TableHead>}
                       </TableRow>
@@ -645,6 +705,43 @@ const Employees = () => {
                               ${employee.base_salary?.toLocaleString() || 0}
                             </TableCell>
                           )}
+                          <TableCell className="hidden xl:table-cell">
+                            <div className="flex gap-2">
+                              {employee.linkedin_url && (
+                                <a
+                                  href={employee.linkedin_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hover:opacity-70 transition-opacity"
+                                  title="LinkedIn"
+                                >
+                                  <Linkedin className="h-4 w-4 text-blue-700" />
+                                </a>
+                              )}
+                              {employee.facebook_url && (
+                                <a
+                                  href={employee.facebook_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hover:opacity-70 transition-opacity"
+                                  title="Facebook"
+                                >
+                                  <Facebook className="h-4 w-4 text-blue-600" />
+                                </a>
+                              )}
+                              {employee.instagram_username && (
+                                <a
+                                  href={`https://instagram.com/${employee.instagram_username.replace("@", "")}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hover:opacity-70 transition-opacity"
+                                  title="Instagram"
+                                >
+                                  <Instagram className="h-4 w-4 text-pink-600" />
+                                </a>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Badge variant={employee.active ? "default" : "secondary"}>
                               {employee.active ? "Activo" : "Inactivo"}
@@ -716,6 +813,10 @@ const Employees = () => {
                 <EmployeeRoleAssignment />
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="work">
+            <EmployeeWorkLog />
           </TabsContent>
 
           {showMyTime && (
