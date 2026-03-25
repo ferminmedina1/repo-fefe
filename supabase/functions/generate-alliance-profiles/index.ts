@@ -336,9 +336,7 @@ serve(async (req: Request) => {
     // Get API key from environment
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) {
-      console.error(
-        "[GENERATE_PROFILES] ANTHROPIC_API_KEY not configured in environment"
-      );
+      console.error("[GENERATE_PROFILES] ANTHROPIC_API_KEY not configured");
       return new Response(
         JSON.stringify({
           success: false,
@@ -351,6 +349,7 @@ serve(async (req: Request) => {
         }
       );
     }
+    console.log("[GENERATE_PROFILES] API Key length: " + apiKey.length);
 
     if (apiKey.length < 10) {
       console.error(
