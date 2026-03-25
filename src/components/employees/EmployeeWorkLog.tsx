@@ -126,16 +126,21 @@ export function EmployeeWorkLog() {
         .order("task_date", { ascending: true });
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map((item: any) => ({
+        task_date: item?.task_date,
+        status: item?.status
+      })) as Array<{ task_date: string; status: string }>;
     },
     enabled: !!currentCompany?.id,
   });
 
   // Calculate contribution data for heatmap
   const contributionData = useMemo(() => {
+    if (!Array.isArray(yearlyWorkLogs)) return [];
+    
     const dateMap = new Map<string, number>();
     yearlyWorkLogs.forEach((log: any) => {
-      if (log.task_date) {
+      if (log && log.task_date) {
         dateMap.set(log.task_date, (dateMap.get(log.task_date) || 0) + 1);
       }
     });
