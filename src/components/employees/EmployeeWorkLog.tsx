@@ -14,8 +14,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Briefcase, Plus, Filter } from "lucide-react";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 import { es } from "date-fns/locale";
+import { ContributionHeatmap } from "./ContributionHeatmap";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-500/10 text-yellow-700 border-yellow-500/20",
@@ -108,6 +109,38 @@ export function EmployeeWorkLog() {
     },
     enabled: !!currentCompany?.id,
   });
+
+  // Fetch work logs for last year (for contribution heatmap)
+  const { data: yearlyWorkLogs = [] } = useQuery({
+    queryKey: ["work-logs-yearly", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [];
+      const oneYearAgo = subDays(new Date(), 365);
+      const supabaseClient = supabase as any;
+      const { data, error } = await supabaseClient
+        .from("work_logs")
+        .select("task_date, status")
+        .eq("company_id", currentCompany.id)
+        .eq("status", "completed")
+        .gte("task_date", format(oneYearAgo, 'yyyy-MM-dd'))
+        .order("task_date", { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Calculate contribution data for heatmap
+  const contributionData = useMemo(() => {
+    const dateMap = new Map<string, number>();
+    yearlyWorkLogs.forEach((log: any) => {
+      if (log.task_date) {
+        dateMap.set(log.task_date, (dateMap.get(log.task_date) || 0) + 1);
+      }
+    });
+    return Array.from(dateMap.entries()).map(([date, count]) => ({ date, count }));
+  }, [yearlyWorkLogs]);
 
   // Filter logs by selected employees
   const filteredLogs = useMemo(() => {
@@ -219,6 +252,12 @@ export function EmployeeWorkLog() {
 
   return (
     <div className="space-y-6">
+      {/* Contribution Heatmap - Yearly Activity */}
+      <ContributionHeatmap 
+        data={contributionData} 
+        title="Actividad del Último Año - Tareas Completadas"
+      />
+
       {/* Employees Filter */}
       <Card>
         <CardHeader>
