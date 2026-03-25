@@ -1,9 +1,22 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-const claudeApiKey = Deno.env.get("ANTHROPIC_API_KEY") || "";
+// CORS Headers
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Content-Type": "application/json",
+};
+
+// Types
+interface GenerateProfilesRequest {
+  companyDescription: string;
+  productsSummary?: string;
+  targetIndustries?: string[];
+  targetRelationTypes?: string[];
+  searchKeywords?: string[];
+}
 
 interface AllianceProfile {
   business_name: string;
@@ -25,71 +38,144 @@ interface AllianceProfile {
   badge?: "hot" | "new" | "verified";
 }
 
-async function generateProfilesWithClaude(
-  companyDescription: string,
-  productsSummary: string,
-  targetIndustries: string[],
-  targetRelationTypes: string[],
-  searchKeywords: string[],
-  apiKey: string  // Accept API key as parameter
-): Promise<AllianceProfile[]> {
-  const prompt = `You are an expert business strategist. Based on the following company information and search criteria, generate 5-7 potential alliance or client profiles.
-
-COMPANY PROFILE:
-Description: ${companyDescription}
-Products/Services: ${productsSummary}
-Target Industries: ${targetIndustries.join(", ") || "Any"}
-Seeking: ${targetRelationTypes.join(", ") || "Co-distribution, technology integration, referrals"}
-Search Keywords: ${searchKeywords.join(", ") || "distributors, retailers, integrators"}
-
-Instructions:
-1. Search for real companies and professionals (use web search tools if available)
-2. For each profile, provide realistic information (name, industry, location, description)
-3. Calculate a compatibility_score (0-100) based on:
-   - Market overlap potential
-   - Synergies with products/services
-   - Geographic alignment
-   - Business model compatibility
-4. Generate "synergy_tags" with 2-4 relevant skill/characteristic keywords
-5. Provide "compatibility_breakdown" with metrics like:
-   - market_overlap (0-100)
-   - product_compatibility (0-100)
-   - geographic_fit (0-100)
-   - potential_revenue (0-100)
-
-Return ONLY a valid JSON array with this exact structure for each profile:
-{
-  "business_name": "Company Name",
-  "industry": "Industry Category",
-  "city": "City Name",
-  "province": "Province/State",
-  "country": "Country",
-  "website": "https://example.com",
-  "description": "Brief description of the company and why it's a good fit",
-  "contact_name": "John Doe",
-  "contact_email": "john@example.com",
-  "contact_phone": "+1234567890",
-  "profile_type": "alliance",
-  "relation_type": "co-distribucion",
-  "compatibility_score": 82,
-  "estimated_value": 50000,
-  "synergy_tags": ["retail", "distribution", "tech-savvy"],
-  "compatibility_breakdown": {
-    "market_overlap": 85,
-    "product_compatibility": 78,
-    "geographic_fit": 90,
-    "potential_revenue": 75
-  },
-  "badge": "hot"
+interface SuccessResponse {
+  success: true;
+  profiles_generated: number;
+  profiles: AllianceProfile[];
+  execution_time_ms: number;
 }
 
-Generate diverse profiles with real companies. Focus on ACTION - find actual businesses that match the criteria.`;
+interface ErrorResponse {
+  success: false;
+  error: string;
+  code?: string;
+}
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+// Validation
+function validateRequest(data: unknown): data is GenerateProfilesRequest {
+  if (!data || typeof data !== "object") return false;
+  const obj = data as Record<string, unknown>;
+  
+  if (typeof obj.companyDescription !== "string" || obj.companyDescription.trim().length === 0) {
+    return false;
+  }
+  
+  if (obj.productsSummary && typeof obj.productsSummary !== "string") return false;
+  if (obj.targetIndustries && !Array.isArray(obj.targetIndustries)) return false;
+  if (obj.targetRelationTypes && !Array.isArray(obj.targetRelationTypes)) return false;
+  if (obj.searchKeywords && !Array.isArray(obj.searchKeywords)) return false;
+  
+  return true;
+}
+
+// Prompt Builder
+function buildPrompt(req: GenerateProfilesRequest): string {
+  return `You are an expert business strategist specializing in B2B partnerships and market analysis.
+
+Based on the following company information, generate 5-7 detailed and realistic profiles of potential business partners or clients.
+
+COMPANY PROFILE:
+Description: ${req.companyDescription}
+Products/Services: ${req.productsSummary || "Not specified"}
+Target Industries: ${req.targetIndustries?.join(", ") || "Any"}
+Seeking Relationships: ${req.targetRelationTypes?.join(", ") || "Partnerships"}
+Search Keywords: ${req.searchKeywords?.join(", ") || "General"}
+
+EXPECTATIONS:
+- Generate realistic, diverse, and actionable business profiles
+- Each company should have genuine partnership/client potential
+- Include specific location (city, province, country)
+- Provide realistic contact information or indicate N/A
+- Estimate business value based on industry and size
+- Rate compatibility 0-100 based on alignment with requesting company
+- Use industry knowledge to suggest relationship types
+
+RETURN ONLY A VALID JSON ARRAY:
+[
+  {
+    "business_name": "Company Name",
+    "industry": "Primary Industry",
+    "city": "City",
+    "province": "Province/State",
+    "country": "Country",
+    "website": "domain.com or null",
+    "description": "Brief description and fit rationale",
+    "contact_name": "Contact or null",
+    "contact_email": "email@domain.com or null",
+    "contact_phone": "+1234567890 or null",
+    "profile_type": "alliance" or "client",
+    "relation_type": "Specific relationship type",
+    "compatibility_score": 85,
+    "estimated_value": 150000,
+    "synergy_tags": ["tag1", "tag2", "tag3"],
+    "compatibility_breakdown": {
+      "market_fit": 90,
+      "geographic_proximity": 70,
+      "technology_alignment": 85,
+      "size_fit": 80,
+      "growth_potential": 75
+    },
+    "badge": "hot" or "new" or "verified" or null
+  }
+]
+
+Focus on QUALITY over quantity. Generate diverse and realistic profiles.`;
+}
+
+// JSON Parser
+function parseJsonResponse(text: string): AllianceProfile[] {
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) {
+    throw new Error("Could not extract JSON array from Claude response");
+  }
+
+  const parsed = JSON.parse(jsonMatch[0]);
+  
+  if (!Array.isArray(parsed)) {
+    throw new Error("Claude response is not an array");
+  }
+
+  return parsed.map((profile: unknown) => {
+    const p = profile as Record<string, unknown>;
+    
+    if (!p.business_name || typeof p.business_name !== "string") {
+      throw new Error("Profile missing business_name");
+    }
+    
+    return {
+      business_name: p.business_name as string,
+      industry: (p.industry as string) || "Unknown",
+      city: (p.city as string) || "Unknown",
+      province: (p.province as string) || "Unknown",
+      country: (p.country as string) || "Unknown",
+      website: (p.website as string) || undefined,
+      description: (p.description as string) || "No description",
+      contact_name: (p.contact_name as string) || undefined,
+      contact_email: (p.contact_email as string) || undefined,
+      contact_phone: (p.contact_phone as string) || undefined,
+      profile_type: (p.profile_type as "alliance" | "client") || "alliance",
+      relation_type: (p.relation_type as string) || "Partnership",
+      compatibility_score: Number(p.compatibility_score) || 0,
+      estimated_value: Number(p.estimated_value) || 0,
+      synergy_tags: Array.isArray(p.synergy_tags) ? p.synergy_tags : [],
+      compatibility_breakdown: (p.compatibility_breakdown as Record<string, number>) || {},
+      badge: (p.badge as "hot" | "new" | "verified") || undefined,
+    } as AllianceProfile;
+  });
+}
+
+// Claude API Call
+async function generateProfilesWithClaude(
+  req: GenerateProfilesRequest,
+  apiKey: string
+): Promise<AllianceProfile[]> {
+  const prompt = buildPrompt(req);
+
+  const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,  // Use the passed API key
+      "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
@@ -104,24 +190,20 @@ Generate diverse profiles with real companies. Focus on ACTION - find actual bus
     }),
   });
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    console.error("Claude API error:", data);
-    throw new Error(`Claude API error: ${data.error?.message}`);
+  if (!claudeResponse.ok) {
+    const errorData = await claudeResponse.json();
+    console.error("[CLAUDE_ERROR]", errorData);
+    throw new Error(`Claude API error: ${errorData.error?.message || "Unknown error"}`);
   }
 
-  // Extract JSON from Claude's response
-  const content = data.content[0].text;
-  const jsonMatch = content.match(/\[[\s\S]*\]/);
+  const claudeData = await claudeResponse.json();
+  const responseText = claudeData.content[0]?.text;
 
-  if (!jsonMatch) {
-    console.error("Could not extract JSON from Claude response:", content);
-    throw new Error("Invalid JSON response from Claude");
+  if (!responseText) {
+    throw new Error("Empty response from Claude API");
   }
 
-  const profiles: AllianceProfile[] = JSON.parse(jsonMatch[0]);
-  return profiles;
+  return parseJsonResponse(responseText);
 }
 
 async function insertProfiles(
@@ -176,163 +258,161 @@ async function updateGenerationStatus(
   }
 }
 
-serve(async (req) => {
-  // CORS headers - IMPORTANTE: deben estar en TODAS las respuestas
+serve(async (req: Request) => {
+  const startTime = Date.now();
+
+  // Enhanced CORS headers for production
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    "Access-Control-Max-Age": "3600",
+    "Access-Control-Max-Age": "86400",
+    "Content-Type": "application/json",
   };
 
-  // Responder a preflight requests
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response(null, { 
+    console.log("[GENERATE_PROFILES] CORS preflight request");
+    return new Response(null, {
       status: 204,
-      headers: corsHeaders 
+      headers: corsHeaders,
     });
   }
 
-  // Solo aceptar POST
+  // Only allow POST
   if (req.method !== "POST") {
+    console.log(`[GENERATE_PROFILES] Invalid method: ${req.method}`);
     return new Response(
-      JSON.stringify({ error: "Method not allowed" }),
-      { 
+      JSON.stringify({
+        success: false,
+        error: "Only POST method is allowed",
+        code: "METHOD_NOT_ALLOWED",
+      } as ErrorResponse),
+      {
         status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
+        headers: corsHeaders,
       }
     );
   }
 
   try {
-    let body;
+    // Parse request body
+    let requestBody: unknown;
     try {
-      body = await req.json();
-    } catch (e) {
+      requestBody = await req.json();
+    } catch (_e) {
+      console.error("[GENERATE_PROFILES] Invalid JSON in request body");
       return new Response(
-        JSON.stringify({ error: "Invalid JSON in request body" }),
-        { 
+        JSON.stringify({
+          success: false,
+          error: "Invalid JSON in request body",
+          code: "INVALID_JSON",
+        } as ErrorResponse),
+        {
           status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+          headers: corsHeaders,
         }
       );
     }
 
-    const { company_id, anthropic_api_key } = body;
-
-    if (!company_id) {
+    // Validate request schema
+    if (!validateRequest(requestBody)) {
+      console.error("[GENERATE_PROFILES] Request validation failed", requestBody);
       return new Response(
-        JSON.stringify({ error: "company_id is required" }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        JSON.stringify({
+          success: false,
+          error: "Invalid request. Required: companyDescription (string). Optional: productsSummary, targetIndustries, targetRelationTypes, searchKeywords",
+          code: "VALIDATION_ERROR",
+        } as ErrorResponse),
+        {
+          status: 400,
+          headers: corsHeaders,
         }
       );
     }
 
-    // Usar la API key pasada desde el client o la del environment
-    const apiKey = anthropic_api_key || claudeApiKey;
-    
+    const request = requestBody as GenerateProfilesRequest;
+    console.log("[GENERATE_PROFILES] Request validated", {
+      companyDescription: request.companyDescription.substring(0, 50) + "...",
+      hasProducts: !!request.productsSummary,
+    });
+
+    // Get API key from environment
+    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) {
+      console.error(
+        "[GENERATE_PROFILES] ANTHROPIC_API_KEY not configured in environment"
+      );
       return new Response(
-        JSON.stringify({ error: "ANTHROPIC_API_KEY not configured" }),
-        { 
+        JSON.stringify({
+          success: false,
+          error: "Server configuration error: ANTHROPIC_API_KEY not set",
+          code: "INTERNAL_ERROR",
+        } as ErrorResponse),
+        {
           status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+          headers: corsHeaders,
         }
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    // Call Claude API
+    console.log("[GENERATE_PROFILES] Calling Claude API");
+    const profiles = await generateProfilesWithClaude(request, apiKey);
 
-    // Get company config
-    const { data: config, error: configError } = await supabase
-      .from("alliance_market_scoring_config")
-      .select(
-        "company_description, products_summary, market_positioning, target_industries, target_relation_types, ai_search_keywords"
-      )
-      .eq("company_id", company_id)
-      .single();
-
-    if (configError) {
-      console.error("Config error:", configError);
-      return new Response(
-        JSON.stringify({
-          error: "Could not fetch company config: " + (configError.message || "Unknown error"),
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
-      );
-    }
-
-    if (!config) {
-      return new Response(
-        JSON.stringify({
-          error: "Company configuration not found. Please set up Alliance Market config first.",
-        }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
-      );
-    }
-
-    // Validate required fields
-    if (!config.company_description) {
-      return new Response(
-        JSON.stringify({
-          error: "Company description is required. Please fill it in the Alliance Market configuration.",
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
-      );
-    }
-
-    // Update status to generating
-    await updateGenerationStatus(supabase, company_id, "generating");
-
-    // Generate profiles with Claude - USE THE PROVIDED API KEY
-    const profiles = await generateProfilesWithClaude(
-      config.company_description,
-      config.products_summary || "Not specified",
-      config.target_industries || [],
-      config.target_relation_types || [],
-      config.ai_search_keywords || [],
-      apiKey  // Pass the API key explicitly
+    const executionTime = Date.now() - startTime;
+    console.log(
+      `[GENERATE_PROFILES] Success: ${profiles.length} profiles generated in ${executionTime}ms`
     );
-
-    // Insert profiles
-    const inserted = await insertProfiles(supabase, company_id, profiles);
-
-    // Update status to completed
-    await updateGenerationStatus(supabase, company_id, "completed");
 
     return new Response(
       JSON.stringify({
         success: true,
         profiles_generated: profiles.length,
-        profiles: inserted,
-      }),
-      { 
+        profiles,
+        execution_time_ms: executionTime,
+      } as SuccessResponse),
+      {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        headers: corsHeaders,
       }
     );
   } catch (error) {
-    console.error("Error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const executionTime = Date.now() - startTime;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+
+    console.error(
+      `[GENERATE_PROFILES] Error after ${executionTime}ms: ${errorMsg}`
+    );
+    if (error instanceof Error) {
+      console.error("[GENERATE_PROFILES] Stack:", error.stack);
+    }
+
+    // Determine error code and status
+    let httpStatus = 500;
+    let errorCode = "INTERNAL_ERROR";
+
+    if (errorMsg.includes("Claude API error")) {
+      errorCode = "CLAUDE_API_ERROR";
+      httpStatus = 503;
+    } else if (errorMsg.includes("Could not extract JSON")) {
+      errorCode = "PARSE_ERROR";
+      httpStatus = 502;
+    } else if (errorMsg.includes("Profile missing")) {
+      errorCode = "VALIDATION_ERROR";
+      httpStatus = 502;
+    }
+
     return new Response(
       JSON.stringify({
-        error: errorMessage,
-        details: error instanceof Error ? error.stack : undefined,
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        success: false,
+        error: errorMsg,
+        code: errorCode,
+        execution_time_ms: executionTime,
+      } as ErrorResponse),
+      {
+        status: httpStatus,
+        headers: corsHeaders,
       }
     );
   }

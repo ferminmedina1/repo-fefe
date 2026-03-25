@@ -45,44 +45,39 @@ export async function generateAllianceProfilesWithClaude(
   }
 
   try {
-    // Use proxy server URL (configured via VITE_PROXY_URL environment variable)
-    // Falls back to localhost:3001 in development if not set
-    const proxyUrl = import.meta.env.VITE_PROXY_URL || 'http://localhost:3001';
-    const profilesUrl = `${proxyUrl}/api/generate-alliance-profiles`;
+    console.log('[ALLIANCE_AI] Invoking generate-alliance-profiles Edge Function');
     
-    console.log('Calling proxy server:', profilesUrl);
-    
-    const response = await fetch(profilesUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    // Call Supabase Edge Function
+    const { data, error } = await supabase.functions.invoke('generate-alliance-profiles', {
+      body: {
         companyDescription: config.company_description,
         productsSummary: config.products_summary || 'Not specified',
         targetIndustries: config.target_industries || [],
         targetRelationTypes: config.target_relation_types || [],
         searchKeywords: config.ai_search_keywords || [],
-      }),
+      },
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Server error');
+    if (error) {
+      console.error('[ALLIANCE_AI] Edge Function error:', error);
+      throw new Error(error.message || 'Edge Function error');
     }
 
-    const data = await response.json();
-    if (!data.profiles) {
-      throw new Error('No profiles returned');
+    if (!data?.success) {
+      console.error('[ALLIANCE_AI] Function returned unsuccessful response:', data);
+      throw new Error(data?.error || 'Profile generation failed');
     }
 
+    if (!Array.isArray(data.profiles) || data.profiles.length === 0) {
+      console.warn('[ALLIANCE_AI] No profiles returned from Edge Function');
+      throw new Error('No profiles were generated');
+    }
+
+    console.log(`[ALLIANCE_AI] Successfully generated ${data.profiles.length} profiles in ${data.execution_time_ms}ms`);
     return data.profiles;
   } catch (err) {
-    console.error('Profile generation error:', err);
+    console.error('[ALLIANCE_AI] Error:', err);
     const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-    
-    if (import.meta.env.DEV) {
-      throw new Error(`Error generating profiles: ${errorMsg}\n\nDevelopment: Make sure proxy server is running: npm run proxy`);
-    } else {
-      throw new Error(`Error generating profiles: ${errorMsg}`);
-    }
+    throw new Error(`Error generating alliance profiles: ${errorMsg}`);
   }
 }
