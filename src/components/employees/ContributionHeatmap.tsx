@@ -47,35 +47,13 @@ const professionalStyles = `
     z-index: 1;
   }
 `;
-    width: 2px;
-    height: 2px;
-    left: 50%;
-    top: 70%;
-    animation: floatingCrystals 16s ease-in-out infinite;
-    box-shadow: 0 0 8px rgba(14, 165, 233, 0.5);
-  }
-
-  .crystal-particle-4 {
-    width: 3px;
-    height: 3px;
-    left: 30%;
-    top: 80%;
-    animation: floatingCrystals 13s ease-in-out infinite reverse;
-    box-shadow: 0 0 10px rgba(236, 72, 153, 0.5);
-  }
-
-  .futuristic-overlay {
-    position: relative;
-    z-index: 2;
-  }
-`;
 
 // Inject styles into document
 if (typeof document !== 'undefined') {
   const style = document.createElement('style');
-  style.textContent = futuristicStyles;
-  if (!document.querySelector('style[data-futuristic]')) {
-    style.setAttribute('data-futuristic', 'true');
+  style.textContent = professionalStyles;
+  if (!document.querySelector('style[data-professional]')) {
+    style.setAttribute('data-professional', 'true');
     document.head.appendChild(style);
   }
 }
@@ -173,17 +151,11 @@ export function ContributionHeatmap({ data = [], title = 'Actividad Último Año
   }, [data, heatmapData.allDays]);
 
   return (
-    <Card className="futuristic-card">
-      {/* Crystal particles */}
-      <div className="crystal-particle crystal-particle-1" />
-      <div className="crystal-particle crystal-particle-2" />
-      <div className="crystal-particle crystal-particle-3" />
-      <div className="crystal-particle crystal-particle-4" />
-      
-      <CardHeader className="futuristic-overlay">
+    <Card className="professional-card">
+      <CardHeader className="professional-overlay">
         <CardTitle className="text-lg text-gray-900">{title}</CardTitle>
       </CardHeader>
-      <CardContent className="futuristic-overlay">
+      <CardContent className="professional-overlay">
         {!heatmapData.weeks || heatmapData.weeks.length === 0 ? (
           <div className="text-sm text-gray-500 py-8">
             No hay datos de actividad para mostrar
