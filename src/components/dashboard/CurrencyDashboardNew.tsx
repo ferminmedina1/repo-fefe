@@ -162,41 +162,41 @@ const CurrencyRateCard = ({
   };
 
   return (
-    <div className="group relative overflow-hidden rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/40 dark:to-gray-800/40 border border-gray-200/60 dark:border-gray-700/60 p-4 hover:shadow-md transition-all duration-300 hover:border-blue-300/60 dark:hover:border-blue-600/60">
+    <div className="group relative overflow-hidden rounded-md bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/40 dark:to-gray-800/40 border border-gray-200/60 dark:border-gray-700/60 p-3 hover:shadow-md transition-all duration-300 hover:border-blue-300/60 dark:hover:border-blue-600/60">
       <div className="absolute inset-0 bg-gradient-to-r from-blue-400/0 to-blue-400/0 group-hover:from-blue-400/5 group-hover:to-blue-400/10 transition-all" />
       
-      <div className="relative space-y-3">
+      <div className="relative space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl">{flags[rate.currency] || '💱'}</span>
+            <span className="text-lg">{flags[rate.currency] || '💱'}</span>
             <span className="font-semibold text-sm text-gray-900 dark:text-white">{rate.currency}</span>
           </div>
-          <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-blue-800/60">
-            {rate.currency !== 'ARS' ? 'Cotización' : 'Local'}
+          <Badge variant="outline" className="text-xs bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200/60 dark:border-blue-800/60 h-fit">
+            {rate.currency !== 'ARS' ? '$/USD' : 'Local'}
           </Badge>
         </div>
 
         <div className="space-y-1">
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            ARS {formatNumber(rate.rate)}
+          <div className="text-lg font-bold text-gray-900 dark:text-white">
+            ${formatNumber(rate.rate, 2)}
           </div>
           <p className="text-xs text-gray-600 dark:text-gray-400">
-            1 {rate.currency} = ARS {rate.rate.toFixed(2)}
+            1 {rate.currency}
           </p>
         </div>
 
         {previousRate && (
-          <div className={`flex items-center gap-2 text-sm font-medium ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+          <div className={`flex items-center gap-1 text-xs font-medium ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
             {isPositive ? (
-              <ArrowUpRight className="h-4 w-4" />
+              <ArrowUpRight className="h-3 w-3" />
             ) : (
-              <ArrowDownRight className="h-4 w-4" />
+              <ArrowDownRight className="h-3 w-3" />
             )}
             {Math.abs(variation).toFixed(2)}%
           </div>
         )}
 
-        <p className="text-xs text-gray-500 dark:text-gray-500 pt-2 border-t border-gray-200/50 dark:border-gray-700/50">
+        <p className="text-xs text-gray-500 dark:text-gray-500 pt-1 border-t border-gray-200/50 dark:border-gray-700/50">
           ↻ {format(new Date(rate.updated_at), 'HH:mm', { locale: es })}
         </p>
       </div>
@@ -236,46 +236,39 @@ const InventoryCard = ({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-gray-50 via-blue-50/50 to-gray-50 dark:from-gray-900/40 dark:via-indigo-950/20 dark:to-gray-900/40 border border-gray-200/60 dark:border-gray-700/60 p-5 hover:border-blue-300/60 dark:hover:border-blue-600/60 transition-all hover:shadow-md">
-      <div className={`absolute inset-0 opacity-20 ${marginBg}`} />
+    <div className="relative overflow-hidden rounded-md bg-gradient-to-br from-gray-50 via-blue-50/50 to-gray-50 dark:from-gray-900/40 dark:via-indigo-950/20 dark:to-gray-900/40 border border-gray-200/60 dark:border-gray-700/60 p-3 hover:border-blue-300/60 dark:hover:border-blue-600/60 transition-all hover:shadow-md">
+      <div className={`absolute inset-0 opacity-10 ${marginBg}`} />
       
-      <div className="relative space-y-4">
+      <div className="relative space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">{flags[item.currency] || '💱'}</span>
-            <span className="font-semibold text-gray-900 dark:text-white text-lg">{item.currency}</span>
+            <span className="text-lg">{flags[item.currency] || '💱'}</span>
+            <span className="font-semibold text-gray-900 dark:text-white text-sm">{item.currency}</span>
           </div>
-          <Badge variant="secondary" className="text-xs bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border-indigo-200/60 dark:border-indigo-800/60">
-            {item.productCount} {item.productCount === 1 ? 'producto' : 'productos'}
+          <Badge variant="secondary" className="text-xs bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border-indigo-200/60 dark:border-indigo-800/60 h-fit">
+            {item.productCount}
           </Badge>
         </div>
 
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Inventario</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+          <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">Valor</p>
+          <p className="text-sm font-bold text-gray-900 dark:text-white">
             {formatCurrency(item.totalValue, item.currency)}
           </p>
           {item.currency !== 'ARS' && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              ≈ {formatCurrency(item.valueInARS, 'ARS')}
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              ${formatNumber(item.valueInARS, 0)}
             </p>
           )}
         </div>
 
-        <div className={`rounded-lg border ${marginBg} p-3 space-y-2`}>
+        <div className={`rounded-md border ${marginBg} p-2 space-y-1`}>
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Margen</p>
-            <span className={`font-bold text-lg ${marginColor}`}>
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">Margen</p>
+            <span className={`font-bold text-sm ${marginColor}`}>
               {margin.toFixed(1)}%
             </span>
           </div>
-          <p className={`text-xs ${marginColor} font-medium`}>
-            {getMarginInsight(margin)}
-          </p>
-        </div>
-
-        <div className="pt-3 border-t border-gray-200/50 dark:border-gray-700/50">
-          <p className="text-xs text-gray-600 dark:text-gray-500">Costo Base: {formatCurrency(item.totalCost, item.currency)}</p>
         </div>
       </div>
     </div>
@@ -357,142 +350,46 @@ export const CurrencyDashboardNew: React.FC<CurrencyDashboardNewProps> = ({
   }
 
   return (
-    <div className="space-y-6">
-      {/* HERO KPI */}
-      <div>
-        <KPIHeroCard
-          value={kpis.totalInventoryARS}
-          label="Inventario Total (Consolidado)"
-          trend={kpis.tendencia}
-          currency="ARS"
-          insight={getInsights()}
-        />
+    <div className="space-y-3">
+      {/* Title */}
+      <div className="flex items-center gap-2 mb-2">
+        <DollarSign className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">Dashboard de Monedas</h2>
       </div>
 
-      {/* KPI Grid */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/40 dark:to-gray-800/40 border border-gray-200/60 dark:border-gray-700/60 p-5 space-y-3 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wider">Margen Global</p>
-            {kpis.globalMargin >= 20 && <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />}
+      <div className="grid gap-3 md:grid-cols-2">
+        {/* Exchange Rates - Left Column */}
+        {exchangeRates.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Cotizaciones Actuales</h3>
+            <div className="space-y-2">
+              {exchangeRates.map((rate) => (
+                <CurrencyRateCard
+                  key={rate.currency}
+                  rate={rate}
+                  previousRate={getPreviousRate(rate.currency)}
+                />
+              ))}
+            </div>
           </div>
-          <p className={`text-4xl font-bold ${getMarginColor(kpis.globalMargin)}`}>
-            {kpis.globalMargin.toFixed(1)}%
-          </p>
-          <p className="text-xs text-gray-600 dark:text-gray-400">Rentabilidad promedio</p>
-        </div>
+        )}
 
-        <div className="rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/40 dark:to-gray-800/40 border border-gray-200/60 dark:border-gray-700/60 p-5 space-y-3 hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Productos Activos</p>
-            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+        {/* Inventory by Currency - Right Column */}
+        {inventoryByCurrency.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Valorización de Inventario</h3>
+            <div className="space-y-2">
+              {inventoryByCurrency.map((item) => (
+                <InventoryCard
+                  key={item.currency}
+                  item={item}
+                  exchangeRate={exchangeRates.find(r => r.currency === item.currency)}
+                />
+              ))}
+            </div>
           </div>
-          <p className="text-4xl font-bold text-gray-900 dark:text-white">{kpis.totalProducts}</p>
-          <p className="text-xs text-gray-600 dark:text-gray-400">En {inventoryByCurrency.length} moneda{inventoryByCurrency.length > 1 ? 's' : ''}</p>
-        </div>
-
-        <div className="rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/40 dark:to-gray-800/40 border border-gray-200/60 dark:border-gray-700/60 p-5 space-y-3 hover:shadow-md transition-shadow">
-          <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Costo de Compra</p>
-          <p className="text-3xl font-bold text-gray-900 dark:text-white">{formatCurrency(kpis.totalCost, 'ARS')}</p>
-          <p className="text-xs text-gray-600 dark:text-gray-400">Inversión actual</p>
-        </div>
+        )}
       </div>
-
-      {/* Exchange Rates */}
-      {exchangeRates.length > 0 && (
-        <div>
-          <div className="mb-4 flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Cotizaciones Actuales</h3>
-          </div>
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {exchangeRates.map((rate) => (
-              <CurrencyRateCard
-                key={rate.currency}
-                rate={rate}
-                previousRate={getPreviousRate(rate.currency)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Historical Chart */}
-      {historicalRates.length > 3 && (
-        <div>
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Evolución de Cotizaciones (30 días)</h3>
-            <p className="text-xs text-gray-600 dark:text-gray-400">Tendencia de cambio en monedas principales</p>
-          </div>
-          <div className="rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900/40 dark:to-gray-800/40 border border-gray-200/60 dark:border-gray-700/60 p-5">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={historicalRates}>
-                <defs>
-                  <linearGradient id="colorUSD" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorEUR" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(156, 163, 175, 0.2)" />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="rgb(107, 114, 128)"
-                  style={{ fontSize: '12px' }}
-                />
-                <YAxis 
-                  stroke="rgb(107, 114, 128)"
-                  style={{ fontSize: '12px' }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(0, 0%, 100%)',
-                    border: '1px solid hsl(0, 0%, 90%)',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="USD"
-                  stroke="#22c55e"
-                  dot={false}
-                  strokeWidth={2}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="EUR"
-                  stroke="#3b82f6"
-                  dot={false}
-                  strokeWidth={2}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Inventory by Currency */}
-      {inventoryByCurrency.length > 0 && (
-        <div>
-          <div className="mb-4 flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Valorización por Moneda</h3>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {inventoryByCurrency.map((item) => (
-              <InventoryCard
-                key={item.currency}
-                item={item}
-                exchangeRate={exchangeRates.find(r => r.currency === item.currency)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

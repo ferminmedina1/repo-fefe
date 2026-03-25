@@ -1,11 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-// CORS Headers
-const corsHeaders = {
+// CORS Headers - Allow all headers needed by Supabase client
+const baseCorsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS, GET",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-client-info, apikey, user-agent, accept, accept-language, accept-encoding",
+  "Access-Control-Max-Age": "86400",
   "Content-Type": "application/json",
 };
 
@@ -261,19 +262,8 @@ async function updateGenerationStatus(
 serve(async (req: Request) => {
   const startTime = Date.now();
 
-  // Enhanced CORS headers for production
-  // Allow headers that Supabase client sends (x-client-info, user-agent, etc.)
-  // Get requested headers from preflight request for maximum compatibility
-  const requestHeaders = req.headers.get("access-control-request-headers") || 
-    "Content-Type, Authorization, x-client-info, apikey, user-agent";
-
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": requestHeaders,
-    "Access-Control-Max-Age": "86400",
-    "Content-Type": "application/json",
-  };
+  // Use the base CORS headers that allow Supabase client headers
+  const corsHeaders = baseCorsHeaders;
 
   // Handle CORS preflight
   if (req.method === "OPTIONS") {

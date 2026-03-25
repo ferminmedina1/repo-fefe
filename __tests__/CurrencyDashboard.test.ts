@@ -254,7 +254,8 @@ describe('CurrencyDashboard - Currency Formatting', () => {
 
   it('decimal places correctos', () => {
     const formatted = formatNumber(100.5, 2);
-    expect(formatted).toContain('.5');
+    // En es-AR, el separador decimal es coma (,)
+    expect(formatted).toBe('100,50');
   });
 });
 

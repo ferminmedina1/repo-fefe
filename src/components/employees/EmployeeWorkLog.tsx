@@ -260,7 +260,7 @@ export function EmployeeWorkLog() {
       {/* Contribution Heatmap - Yearly Activity */}
       <ContributionHeatmap 
         data={contributionData} 
-        title="Actividad del Último Año - Tareas Completadas"
+        title="Actividad del Último Año"
       />
 
       {/* Employees Filter */}
