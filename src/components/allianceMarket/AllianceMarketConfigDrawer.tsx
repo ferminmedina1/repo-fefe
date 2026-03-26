@@ -539,7 +539,7 @@ export function AllianceMarketConfigDrawer({
                   <Button
                     onClick={handleSave}
                     disabled={saving || generating || !formData.company_description}
-                    className="gap-2 flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium shadow-lg hover:shadow-blue-500/30 transition-all duration-300 disabled:opacity-50"
+                    className="gap-2 flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium shadow-lg transition-all duration-300 disabled:opacity-50"
                   >
                     {(saving || generating) && <Loader2 className="h-4 w-4 animate-spin" />}
                     ✨ Actualizar
