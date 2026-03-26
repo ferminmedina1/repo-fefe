@@ -333,8 +333,8 @@ export function AllianceMarketConfigDrawer({
         onClick={() => setIsOpen(!isOpen)}
         className="gap-2"
       >
-        <Settings className="h-4 w-4" />
-        Alliance Config
+        <span className="text-lg">▶</span>
+        Start
       </Button>
 
       {isOpen && (
