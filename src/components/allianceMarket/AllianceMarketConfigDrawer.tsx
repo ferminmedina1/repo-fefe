@@ -45,6 +45,11 @@ const RELATION_TYPES = {
   ],
 };
 
+// Helper para formatear relation types
+function formatRelationType(type: string): string {
+  return type.replace(/-/g, ' ');
+}
+
 const INDUSTRIES = [
   'Retail',
   'Distribución',
@@ -454,7 +459,7 @@ export function AllianceMarketConfigDrawer({
                                     )}
                                     onClick={() => toggleRelationType(val)}
                                   >
-                                    {val.replace(/-/g, ' ')}
+                                    {formatRelationType(val)}
                                   </Badge>
                                 ))}
                               </div>
