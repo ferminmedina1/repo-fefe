@@ -185,14 +185,23 @@ export function AllianceMarketConfigDrawer({
       if (onConfigUpdated) {
         onConfigUpdated({ ...config, ...formData } as AllianceMarketConfig);
       }
-
-      await handleGenerateProfiles();
     } catch (error) {
       console.error('Error guardando config:', error);
       toast.error('Error guardando configuración');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleClear = () => {
+    setFormData({
+      company_description: '',
+      products_summary: '',
+      market_positioning: '',
+      target_industries: [],
+      target_relation_types: [],
+      ai_search_keywords: [],
+    });
   };
 
   const handleGenerateProfiles = async () => {
@@ -493,18 +502,29 @@ export function AllianceMarketConfigDrawer({
               </div>
 
               {/* Clean White Footer */}
-              <div className="border-t border-slate-200 dark:border-slate-800 px-6 py-4 flex gap-3 bg-white dark:bg-slate-950 rounded-bl-2xl">
-                <Button variant="outline" onClick={() => setIsOpen(false)} disabled={saving || generating}>
-                  Cancelar
+              <div className="border-t border-slate-200 dark:border-slate-800 px-6 py-4 flex gap-2 bg-white dark:bg-slate-950 rounded-bl-2xl">
+                <Button
+                  variant="outline"
+                  onClick={handleClear}
+                  disabled={saving || generating}
+                  className="flex-1"
+                >
+                  Limpiar
                 </Button>
                 <Button
-                  onClick={handleSave}
+                  onClick={() => {
+                    handleSave();
+                    handleGenerateProfiles();
+                  }}
                   disabled={saving || generating || !formData.company_description || dailyAttempts >= 3}
-                  className="flex-1"
-                  title={dailyAttempts >= 3 ? 'Límite diario alcanzado' : ''}
+                  className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                  title={dailyAttempts >= 3 ? 'Has alcanzado el límite diario de 3 búsquedas' : ''}
                 >
-                  {(saving || generating) && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  {dailyAttempts >= 3 ? 'Límite alcanzado' : 'Actualizar'}
+                  {(saving || generating) && <Loader2 className="h-4 w-4 animate-spin" />}
+                  <span>Buscar</span>
+                  <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs font-bold">
+                    {3 - dailyAttempts}/3
+                  </Badge>
                 </Button>
               </div>
             </div>
