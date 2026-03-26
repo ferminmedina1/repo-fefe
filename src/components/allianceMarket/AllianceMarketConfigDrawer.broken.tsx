@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Settings } from 'lucide-react';
+import { Loader2, Settings, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { generateAllianceProfilesWithClaude } from '@/lib/allianceMarketAI';
@@ -74,6 +74,7 @@ export function AllianceMarketConfigDrawer({
   const [generating, setGenerating] = useState(false);
   const [config, setConfig] = useState<AllianceMarketConfig | null>(null);
   const [dailyAttempts, setDailyAttempts] = useState(0);
+  const [lastAttemptDate, setLastAttemptDate] = useState<string>('');
 
   const [formData, setFormData] = useState({
     company_description: '',
@@ -100,13 +101,17 @@ export function AllianceMarketConfigDrawer({
       const { attempts, date } = JSON.parse(stored);
       if (date === today) {
         setDailyAttempts(attempts);
+        setLastAttemptDate(date);
       } else {
+        // Reset for new day
         localStorage.setItem(key, JSON.stringify({ attempts: 0, date: today }));
         setDailyAttempts(0);
+        setLastAttemptDate(today);
       }
     } else {
       localStorage.setItem(key, JSON.stringify({ attempts: 0, date: today }));
       setDailyAttempts(0);
+      setLastAttemptDate(today);
     }
   };
 
@@ -159,7 +164,7 @@ export function AllianceMarketConfigDrawer({
       }
     } catch (error) {
       console.error('Error loading config:', error);
-      toast.error('Error cargando configuración');
+      toast.error('Error loading configuration');
     } finally {
       setLoading(false);
     }
@@ -170,7 +175,7 @@ export function AllianceMarketConfigDrawer({
       setSaving(true);
 
       if (!formData.company_description) {
-        toast.error('La descripción de la empresa es requerida');
+        toast.error('Company description is required');
         return;
       }
 
@@ -188,7 +193,7 @@ export function AllianceMarketConfigDrawer({
 
       await handleGenerateProfiles();
     } catch (error) {
-      console.error('Error guardando config:', error);
+      console.error('Error saving config:', error);
       toast.error('Error guardando configuración');
     } finally {
       setSaving(false);
@@ -211,6 +216,9 @@ export function AllianceMarketConfigDrawer({
     try {
       toast.loading('🔍 Buscando perfiles con Claude IA...');
       
+      console.log('Starting profile generation for company:', companyId);
+      console.log('API Key available:', !!import.meta.env.VITE_ANTHROPIC_API_KEY);
+
       const profiles = await generateAllianceProfilesWithClaude(
         companyId,
         formData.company_description,
@@ -220,10 +228,13 @@ export function AllianceMarketConfigDrawer({
         formData.ai_search_keywords
       );
 
+      console.log('Profiles generated:', profiles.length);
+
       if (!profiles || profiles.length === 0) {
         throw new Error('No se encontraron perfiles');
       }
 
+      // Increment attempts on successful generation
       incrementDailyAttempts();
 
       const now = new Date();
@@ -256,7 +267,7 @@ export function AllianceMarketConfigDrawer({
 
       toast.dismiss();
       toast.success(
-        `✨ ¡Encontrados ${profiles.length} perfiles!`
+        `✨ ¡Encontrados ${profiles.length} perfiles! Acciones previas se mantienen.`
       );
 
       if (onGenerateProfiles) {
@@ -272,7 +283,9 @@ export function AllianceMarketConfigDrawer({
       if (error instanceof Error) {
         errorMsg = error.message;
         if (errorMsg.includes('API')) {
-          errorMsg = 'Error en Claude API - verifica tu ANTHROPIC_API_KEY';
+          errorMsg = 'Error en Claude API - verifica tu clave ANTHROPIC_API_KEY';
+        } else if (errorMsg.includes('JSON')) {
+          errorMsg = 'Error procesando respuesta de Claude - intenta de nuevo';
         }
       }
 
@@ -314,6 +327,14 @@ export function AllianceMarketConfigDrawer({
       ...prev,
       ai_search_keywords: prev.ai_search_keywords.filter((k) => k !== keyword),
     }));
+  };
+
+  const gradientStyle = {
+    background: 'linear-gradient(90deg, rgb(37, 99, 235) 0%, rgb(147, 51, 234) 100%)',
+  };
+
+  const contentGradientStyle = {
+    background: 'linear-gradient(180deg, transparent 0%, transparent 50%, rgb(219, 234, 254) 100%)',
   };
 
   return (
@@ -367,7 +388,7 @@ export function AllianceMarketConfigDrawer({
                         Descripción de tu Empresa *
                       </label>
                       <Textarea
-                        placeholder="Describe tu empresa: qué haces, misión, visión, especialidades..."
+                        placeholder="Describe tu empresa: qué haces, misión, visión, especialidades, propuesta única..."
                         value={formData.company_description}
                         onChange={(e) =>
                           setFormData((prev) => ({
@@ -375,8 +396,11 @@ export function AllianceMarketConfigDrawer({
                             company_description: e.target.value,
                           }))
                         }
-                        className="min-h-24 border-slate-200 dark:border-slate-700 rounded-lg"
+                        className="min-h-24 border-slate-200 dark:border-slate-700 rounded-lg transition-all"
                       />
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Claude IA usará esto para encontrar aliados compatibles
+                      </p>
                     </div>
 
                     <div className="space-y-3">
@@ -385,7 +409,7 @@ export function AllianceMarketConfigDrawer({
                         Resumen de Productos/Servicios
                       </label>
                       <Textarea
-                        placeholder="Productos principales, categorías, rango de precios..."
+                        placeholder="Productos principales, categorías, rango de precios, digital/físico, mercado objetivo..."
                         value={formData.products_summary}
                         onChange={(e) =>
                           setFormData((prev) => ({
@@ -393,7 +417,7 @@ export function AllianceMarketConfigDrawer({
                             products_summary: e.target.value,
                           }))
                         }
-                        className="min-h-20 border-slate-200 dark:border-slate-700 rounded-lg"
+                        className="min-h-20 border-slate-200 dark:border-slate-700 rounded-lg transition-all"
                       />
                     </div>
 
@@ -411,18 +435,26 @@ export function AllianceMarketConfigDrawer({
                             market_positioning: e.target.value,
                           }))
                         }
-                        className="border-slate-200 dark:border-slate-700"
+                        className="border-slate-200 dark:border-slate-700 transition-all"
                       />
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-sm font-bold text-slate-900 dark:text-white">Industrias Objetivo</label>
+                      <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                        Industrias Objetivo
+                      </label>
                       <div className="flex flex-wrap gap-2">
                         {INDUSTRIES.map((industry) => (
                           <Badge
                             key={industry}
                             variant={formData.target_industries.includes(industry) ? 'default' : 'outline'}
-                            className="cursor-pointer"
+                            className={clsx(
+                              'cursor-pointer transition-all duration-200',
+                              formData.target_industries.includes(industry)
+                                ? 'bg-emerald-600 text-white shadow-lg'
+                                : 'hover:border-emerald-400 hover:text-emerald-600'
+                            )}
                             onClick={() => toggleIndustry(industry)}
                           >
                             {industry}
@@ -432,11 +464,14 @@ export function AllianceMarketConfigDrawer({
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-sm font-bold text-slate-900 dark:text-white">Tipos de Relación</label>
-                      <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
+                        Tipos de Relación Buscada
+                      </label>
+                      <div className="space-y-3">
                         {Object.entries(RELATION_TYPES).map(([type, values]) => (
                           <div key={type}>
-                            <p className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-1 uppercase">
+                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">
                               {type === 'alliance' ? 'Alianzas' : 'Clientes'}
                             </p>
                             <div className="flex flex-wrap gap-2">
@@ -444,7 +479,12 @@ export function AllianceMarketConfigDrawer({
                                 <Badge
                                   key={val}
                                   variant={formData.target_relation_types.includes(val) ? 'default' : 'outline'}
-                                  className="cursor-pointer text-xs"
+                                  className={clsx(
+                                    'cursor-pointer text-xs transition-all duration-200',
+                                    formData.target_relation_types.includes(val)
+                                      ? 'bg-purple-600 text-white shadow-lg'
+                                      : 'hover:border-purple-400 hover:text-purple-600'
+                                  )}
                                   onClick={() => toggleRelationType(val)}
                                 >
                                   {formatRelationType(val)}
@@ -457,33 +497,49 @@ export function AllianceMarketConfigDrawer({
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-sm font-bold text-slate-900 dark:text-white">Palabras Clave</label>
+                      <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-pink-600"></span>
+                        Palabras Clave para búsqueda IA
+                      </label>
                       <div className="flex gap-2 mb-3">
                         <Input
-                          placeholder="Ej: distribuidores, retailers..."
+                          placeholder="Ej: distribuidores, retailers, integradores..."
                           onKeyPress={(e) => {
                             if (e.key === 'Enter') {
                               addKeyword((e.target as HTMLInputElement).value);
                               (e.target as HTMLInputElement).value = '';
                             }
                           }}
-                          className="border-slate-200 dark:border-slate-700"
+                          className="border-slate-200 dark:border-slate-700 transition-all"
                         />
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {formData.ai_search_keywords.map((keyword) => (
-                          <Badge key={keyword} variant="secondary" className="cursor-pointer" onClick={() => removeKeyword(keyword)}>
+                          <Badge
+                            key={keyword}
+                            variant="secondary"
+                            className="cursor-pointer bg-pink-100 dark:bg-pink-900 text-pink-700 dark:text-pink-300 hover:bg-pink-200 dark:hover:bg-pink-800 transition-all"
+                            onClick={() => removeKeyword(keyword)}
+                          >
                             {keyword} X
                           </Badge>
                         ))}
                       </div>
+                      {formData.ai_search_keywords.length === 0 && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                          Presiona Enter para agregar palabras clave...
+                        </p>
+                      )}
                     </div>
 
                     {config?.last_ai_generation_at && (
                       <Card className="bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                         <CardContent className="pt-4">
                           <p className="text-sm font-medium text-slate-900 dark:text-white">
-                            Última: {new Date(config.last_ai_generation_at).toLocaleDateString()}
+                            Última generación: {new Date(config.last_ai_generation_at).toLocaleDateString()}
+                          </p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                            Status: {config.ai_generation_status}
                           </p>
                         </CardContent>
                       </Card>
@@ -494,17 +550,206 @@ export function AllianceMarketConfigDrawer({
 
               {/* Clean White Footer */}
               <div className="border-t border-slate-200 dark:border-slate-800 px-6 py-4 flex gap-3 bg-white dark:bg-slate-950 rounded-bl-2xl">
-                <Button variant="outline" onClick={() => setIsOpen(false)} disabled={saving || generating}>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsOpen(false)}
+                  disabled={saving || generating}
+                  className="border-slate-200 dark:border-slate-700"
+                >
                   Cancelar
                 </Button>
                 <Button
                   onClick={handleSave}
                   disabled={saving || generating || !formData.company_description || dailyAttempts >= 3}
-                  className="flex-1"
-                  title={dailyAttempts >= 3 ? 'Límite diario alcanzado' : ''}
+                  className="gap-2 flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md transition-all disabled:opacity-50"
+                  title={dailyAttempts >= 3 ? 'Has alcanzado el límite diario de 3 búsquedas' : ''}
                 >
-                  {(saving || generating) && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {(saving || generating) && <Loader2 className="h-4 w-4 animate-spin" />}
                   {dailyAttempts >= 3 ? 'Límite alcanzado' : 'Actualizar'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+                        value={formData.company_description}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            company_description: e.target.value,
+                          }))
+                        }
+                        className="min-h-24 border-slate-200 dark:border-slate-700 rounded-lg transition-all"
+                      />
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Claude IA usará esto para encontrar aliados compatibles
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                        Resumen de Productos/Servicios
+                      </label>
+                      <Textarea
+                        placeholder="Productos principales, categorías, rango de precios, digital/físico, mercado objetivo..."
+                        value={formData.products_summary}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            products_summary: e.target.value,
+                          }))
+                        }
+                        className="min-h-20 border-slate-200 dark:border-slate-700 rounded-lg transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-600"></span>
+                        Posicionamiento en Mercado
+                      </label>
+                      <Input
+                        placeholder="Ej: Premium, Accesible, Escalable, B2B, B2C..."
+                        value={formData.market_positioning}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            market_positioning: e.target.value,
+                          }))
+                        }
+                        className="border-slate-200 dark:border-slate-700 transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                        Industrias Objetivo
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {INDUSTRIES.map((industry) => (
+                          <Badge
+                            key={industry}
+                            variant={formData.target_industries.includes(industry) ? 'default' : 'outline'}
+                            className={clsx(
+                              'cursor-pointer transition-all duration-200',
+                              formData.target_industries.includes(industry)
+                                ? 'bg-emerald-600 text-white shadow-lg'
+                                : 'hover:border-emerald-400 hover:text-emerald-600'
+                            )}
+                            onClick={() => toggleIndustry(industry)}
+                          >
+                            {industry}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-600"></span>
+                        Tipos de Relación Buscada
+                      </label>
+                      <div className="space-y-3">
+                        {Object.entries(RELATION_TYPES).map(([type, values]) => (
+                          <div key={type}>
+                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">
+                              {type === 'alliance' ? 'Alianzas' : 'Clientes'}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {values.map((val) => (
+                                <Badge
+                                  key={val}
+                                  variant={formData.target_relation_types.includes(val) ? 'default' : 'outline'}
+                                  className={clsx(
+                                    'cursor-pointer text-xs transition-all duration-200',
+                                    formData.target_relation_types.includes(val)
+                                      ? 'bg-purple-600 text-white shadow-lg'
+                                      : 'hover:border-purple-400 hover:text-purple-600'
+                                  )}
+                                  onClick={() => toggleRelationType(val)}
+                                >
+                                  {formatRelationType(val)}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <label className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-pink-600"></span>
+                        Palabras Clave para búsqueda IA
+                      </label>
+                      <div className="flex gap-2 mb-3">
+                        <Input
+                          placeholder="Ej: distribuidores, retailers, integradores..."
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              addKeyword((e.target as HTMLInputElement).value);
+                              (e.target as HTMLInputElement).value = '';
+                            }
+                          }}
+                          className="border-slate-200 dark:border-slate-700 transition-all"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {formData.ai_search_keywords.map((keyword) => (
+                          <Badge
+                            key={keyword}
+                            variant="secondary"
+                            className="cursor-pointer bg-pink-100 dark:bg-pink-900 text-pink-700 dark:text-pink-300 hover:bg-pink-200 dark:hover:bg-pink-800 transition-all"
+                            onClick={() => removeKeyword(keyword)}
+                          >
+                            {keyword} X
+                          </Badge>
+                        ))}
+                      </div>
+                      {formData.ai_search_keywords.length === 0 && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                          Presiona Enter para agregar palabras clave...
+                        </p>
+                      )}
+                    </div>
+
+                    {config?.last_ai_generation_at && (
+                      <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-900">
+                        <CardContent className="pt-4">
+                          <p className="text-sm font-medium text-slate-900 dark:text-white">
+                            Última generación: {new Date(config.last_ai_generation_at).toLocaleDateString()}
+                          </p>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                            Status: {config.ai_generation_status}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="border-t px-6 py-4 flex gap-3 bg-slate-50 dark:bg-slate-900 rounded-bl-2xl">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsOpen(false)}
+                  disabled={saving || generating}
+                  className="border-slate-200 dark:border-slate-700"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={saving || generating || !formData.company_description}
+                  className="gap-2 flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium shadow-lg transition-all disabled:opacity-50"
+                >
+                  {(saving || generating) && <Loader2 className="h-4 w-4 animate-spin" />}
+                  Actualizar
                 </Button>
               </div>
             </div>
