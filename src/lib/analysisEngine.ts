@@ -267,7 +267,7 @@ export async function analyzeProducts(companyId: string, months: number = 12): P
       sale_items (
         quantity,
         unit_price,
-        sale (
+        sales (
           total,
           created_at,
           customer_id
@@ -309,12 +309,12 @@ export async function analyzeProducts(companyId: string, months: number = 12): P
     .map((p: any) => {
       const saleItems = p.sale_items || [];
       const filteredSales = saleItems.filter((si: any) => 
-        si.sale && new Date(si.sale.created_at) >= startDate
+        si.sales && new Date(si.sales.created_at) >= startDate
       );
       
       const unitsSold = filteredSales.reduce((sum: number, si: any) => sum + si.quantity, 0);
       const revenue = filteredSales.reduce((sum: number, si: any) => sum + (si.quantity * si.unit_price), 0);
-      const uniqueCustomers = new Set(filteredSales.map((si: any) => si.sale?.customer_id).filter(Boolean)).size;
+      const uniqueCustomers = new Set(filteredSales.map((si: any) => si.sales?.customer_id).filter(Boolean)).size;
       
       return {
         productId: p.id,
