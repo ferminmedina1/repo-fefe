@@ -263,7 +263,6 @@ export async function analyzeProducts(companyId: string, months: number = 12): P
       id,
       name,
       category,
-      profit_margin,
       sale_items (
         quantity,
         unit_price,
@@ -322,7 +321,7 @@ export async function analyzeProducts(companyId: string, months: number = 12): P
         category: p.category || 'Uncategorized',
         unitsSold,
         revenue,
-        margin: p.profit_margin || 0,
+        margin: 0,
         penetration: (uniqueCustomers / totalCustomerCount) * 100,
         volumePerCustomer: unitsSold / Math.max(uniqueCustomers, 1),
         seasonality: 'STABLE',

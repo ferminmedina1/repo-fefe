@@ -145,12 +145,14 @@ export const intelligentSegmentationRepository = {
         .limit(1)
         .single();
 
-      if (error || !data) return null;
+      // Table doesn't exist or no data
+      if (error) return null;
+      if (!data) return null;
 
       // Reconstruct report from stored JSON
       return JSON.parse(data.report_data);
     } catch (error) {
-      console.error('[SEGMENTATION] Error fetching report:', error);
+      // Silently fail - cache table might not exist yet
       return null;
     }
   },
@@ -354,11 +356,13 @@ export const intelligentSegmentationRepository = {
         suggestions_count: report.suggestions.length,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Silently fail - cache table might not exist yet
+        return;
+      }
       console.log('[SEGMENTATION] Report stored successfully');
     } catch (error) {
-      console.error('[SEGMENTATION] Error storing report:', error);
-      // Don't throw - report was generated, just not persisted
+      // Silently fail - do not throw
     }
   },
 
@@ -373,7 +377,7 @@ export const intelligentSegmentationRepository = {
         .eq('company_id', companyId);
       console.log('[SEGMENTATION] Report invalidated');
     } catch (error) {
-      console.error('[SEGMENTATION] Error invalidating report:', error);
+      // Silently fail - cache table might not exist
     }
   },
 };

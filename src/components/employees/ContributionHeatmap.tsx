@@ -159,7 +159,7 @@ export function ContributionHeatmap({ data = [], title = 'Actividad Último Año
     return monthLabels;
   }, [heatmapData.weeks]);
 
-  const dayLabels = ['', 'Lun', '', 'Mié', '', 'Vie', ''];
+  const dayLabels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   const getMaxCount = useMemo(() => {
     return Math.max(...heatmapData.allDays.map(date => {
       const dateStr = format(date, 'yyyy-MM-dd');
