@@ -256,13 +256,15 @@ export async function analyzeCustomers(companyId: string, months: number = 12): 
 export async function analyzeProducts(companyId: string, months: number = 12): Promise<ProductAnalysis> {
   const startDate = subMonths(new Date(), months);
 
-  // Get products and sales data
+  // Get products with cost/price for margin calculation
   const { data: productData, error: productError } = await supabase
     .from('products')
     .select(`
       id,
       name,
       category,
+      price,
+      cost,
       sale_items (
         quantity,
         unit_price,
@@ -291,6 +293,7 @@ export async function analyzeProducts(companyId: string, months: number = 12): P
         missingComplementary: [],
         lowMarginCategory: [],
       },
+      alerts: [],
     };
   }
 
@@ -315,13 +318,18 @@ export async function analyzeProducts(companyId: string, months: number = 12): P
       const revenue = filteredSales.reduce((sum: number, si: any) => sum + (si.quantity * si.unit_price), 0);
       const uniqueCustomers = new Set(filteredSales.map((si: any) => si.sales?.customer_id).filter(Boolean)).size;
       
+      // Calculate margin: (price - cost) / price * 100
+      const price = parseFloat(p.price) || 0;
+      const cost = parseFloat(p.cost) || 0;
+      const margin = price > 0 ? ((price - cost) / price) * 100 : 0;
+      
       return {
         productId: p.id,
         name: p.name,
         category: p.category || 'Uncategorized',
         unitsSold,
         revenue,
-        margin: 0,
+        margin: Math.max(0, margin),
         penetration: (uniqueCustomers / totalCustomerCount) * 100,
         volumePerCustomer: unitsSold / Math.max(uniqueCustomers, 1),
         seasonality: 'STABLE',
@@ -337,11 +345,12 @@ export async function analyzeProducts(companyId: string, months: number = 12): P
   const activeProducts = productMetrics.length;
   const topProducts = productMetrics.slice(0, 10);
   const lowPenetrationProducts = productMetrics.filter((p) => p.penetration < 20);
+  const totalProducts = productData.length;
 
   // Validate data quality
   const productAlerts: DataAlert[] = [];
 
-  if (productData.length === 0) {
+  if (totalProducts === 0) {
     productAlerts.push(
       generateAlert(
         'prod-001',
@@ -383,13 +392,13 @@ export async function analyzeProducts(companyId: string, months: number = 12): P
     );
   }
 
-  if (avgMargin < 10) {
+  if (avgMargin < 10 && avgMargin > 0) {
     productAlerts.push(
       generateAlert(
         'prod-004',
         'WARNING',
         'DATA_RELIABILITY',
-        `Average margin very low (${avgMargin}%)`,
+        `Average margin very low (${avgMargin.toFixed(1)}%)`,
         'Business profitability may be unsustainable',
         'Review pricing strategy and negotiate supplier costs',
         'avgMargin'
@@ -397,7 +406,7 @@ export async function analyzeProducts(companyId: string, months: number = 12): P
     );
   }
 
-  if (lowPenetrationProducts.length > totalProducts * 0.5) {
+  if (lowPenetrationProducts.length > (totalProducts * 0.5)) {
     productAlerts.push(
       generateAlert(
         'prod-005',
@@ -412,9 +421,9 @@ export async function analyzeProducts(companyId: string, months: number = 12): P
   }
 
   return {
-    totalProducts: productData.length,
+    totalProducts,
     activeProducts,
-    avgMargin: Math.round(avgMargin),
+    avgMargin: Math.round(avgMargin * 100) / 100,
     totalRevenue,
     topProducts,
     productAffinity: [],

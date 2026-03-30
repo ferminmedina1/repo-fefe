@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { subDays, startOfYear, eachDayOfInterval, format, getMonth } from 'date-fns';
+import { subDays, eachDayOfInterval, format, getMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 // Professional Minimal Styles
@@ -73,7 +73,6 @@ export function ContributionHeatmap({ data = [], title = 'Actividad Último Año
     if (!Array.isArray(data)) return { weeks: [], allDays: [] };
     
     const oneYearAgo = subDays(new Date(), 365);
-    const yearStart = startOfYear(oneYearAgo);
     
     // Crear mapa de fechas con conteos
     const dateMap = new Map<string, number>();
@@ -83,35 +82,26 @@ export function ContributionHeatmap({ data = [], title = 'Actividad Último Año
       }
     });
 
-    // Generar todos los días del intervalo
+    // Generar todos los días del intervalo (últimos 365 días)
     const allDays = eachDayOfInterval({
-      start: yearStart,
+      start: oneYearAgo,
       end: new Date()
     });
 
-    // Agrupar por semana y día (asegurando 7 días por semana)
+    // Agrupar por semana (Sunday-Saturday)
     const weeks: { dayOfWeek: number; date: Date; count: number }[][] = [];
     let currentWeek: { dayOfWeek: number; date: Date; count: number }[] = [];
-    let firstWeekStarted = false;
 
     allDays.forEach((date, index) => {
       const dateStr = format(date, 'yyyy-MM-dd');
-      const dayOfWeek = date.getDay(); // 0-6 (Sun-Sat)
+      const dayOfWeek = date.getDay(); // 0=Sun, 1=Mon, 6=Sat
       const count = dateMap.get(dateStr) || 0;
-
-      // Si es la primera iteración y no es domingo, rellenar días anteriores
-      if (index === 0 && dayOfWeek !== 0) {
-        for (let i = dayOfWeek - 1; i >= 0; i--) {
-          const prevDate = subDays(date, i + 1);
-          currentWeek.unshift({ dayOfWeek: prevDate.getDay(), date: prevDate, count: 0 });
-        }
-      }
 
       currentWeek.push({ dayOfWeek, date, count });
 
-      // Si llegamos a sábado (6) o es el último día, terminar la semana
+      // Si es sábado (6) o es el último día, terminar la semana
       if (dayOfWeek === 6 || index === allDays.length - 1) {
-        // Rellenar con días vacíos si la última semana no termina en sábado
+        // Si es el último día y no es sábado, llenar hasta sábado
         if (index === allDays.length - 1 && dayOfWeek !== 6) {
           for (let i = dayOfWeek + 1; i < 7; i++) {
             const nextDate = new Date(date);
