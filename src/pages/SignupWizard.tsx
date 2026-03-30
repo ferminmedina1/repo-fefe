@@ -2,9 +2,8 @@ import { useSignupWizard } from "@/hooks/useSignupWizard";
 import { SignupStepper } from "@/components/signup/SignupStepper";
 import { Step1Account } from "@/components/signup/Step1Account";
 import { Step2Plan } from "@/components/signup/Step2Plan";
-import { Step4Modules } from "@/components/signup/Step4Modules";
-import { Step4Payment } from "@/components/signup/Step4Payment";
-import { Step5Confirmation } from "@/components/signup/Step5Confirmation";
+import { Step3Payment } from "@/components/signup/Step3Payment";
+import { Step4Confirmation } from "@/components/signup/Step4Confirmation";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -23,7 +22,6 @@ export default function SignupWizard() {
   const stepLabels = [
     "Cuenta",
     "Plan",
-    "Módulos",
     "Pago",
     "Confirmación",
   ];
@@ -44,8 +42,6 @@ export default function SignupWizard() {
           full_name: formData.full_name,
           company_name: formData.company_name,
           plan_id: formData.plan_id,
-          modules: formData.modules,
-          provider: providerSelected,
           payment_provider: providerSelected,
           payment_method_ref: paymentMethodRef,
           billing_country: formData.billing_country,
@@ -133,7 +129,7 @@ export default function SignupWizard() {
     }
   };
 
-  return /*(
+  return (
     
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-3 py-4 md:p-8 relative overflow-hidden">
      
@@ -236,7 +232,7 @@ export default function SignupWizard() {
             />
           )}
           {currentStep === 2 && (
-            <Step4Modules
+            <Step3Payment
               formData={formData}
               updateFormData={updateFormData}
               nextStep={nextStep}
@@ -244,15 +240,7 @@ export default function SignupWizard() {
             />
           )}
           {currentStep === 3 && (
-            <Step4Payment
-              formData={formData}
-              updateFormData={updateFormData}
-              nextStep={nextStep}
-              prevStep={prevStep}
-            />
-          )}
-          {currentStep === 4 && (
-            <Step5Confirmation
+            <Step4Confirmation
               formData={formData}
               prevStep={prevStep}
               onCreateIntent={handleCreateIntent}
@@ -269,5 +257,5 @@ export default function SignupWizard() {
         </p>
       </div>
     </div>
-  );*/
+  );
 }

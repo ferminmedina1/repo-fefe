@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { AlertCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Format currency to 2 decimal places
 const formatCurrency = (value: number) => value.toFixed(2);
@@ -28,6 +29,7 @@ export function Step4Confirmation({
   onCreateIntent,
 }: Step4ConfirmationProps) {
   const [isCreating, setIsCreating] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const { data: plan, isLoading: isPlanLoading } = useQuery({
     queryKey: ["plan", formData.plan_id],
@@ -124,9 +126,9 @@ export function Step4Confirmation({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Precio base:</span>
-                    <span className="font-medium">${formatCurrency(baseCost)} USD/mes</span>
+                    <span className="font-medium">${formatCurrency(Number(plan?.price || 0))} USD/mes</span>
                   </div>
-                </>total
+                </>
               )}
             </CardContent>
           </Card>
@@ -181,20 +183,40 @@ export function Step4Confirmation({
         </div>
       </div>
 
-      <div className="flex justify-between gap-4">
-        <Button onClick={prevStep} variant="outline" size="lg" disabled={isCreating}>
-          Atrás
-        </Button>
-        <Button onClick={handleConfirm} size="lg" disabled={isCreating}>
-          {isCreating ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Confirmando...
-            </>
-          ) : (
-            "Confirmar y continuar"
-          )}
-        </Button>
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+          <Checkbox
+            id="terms"
+            checked={acceptedTerms}
+            onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
+            className="mt-1"
+          />
+          <Label htmlFor="terms" className="cursor-pointer text-sm leading-relaxed">
+            Acepto los{" "}
+            <a
+              href="#terms-and-conditions"
+              className="text-primary hover:underline font-semibold"
+            >
+              Términos y Condiciones
+            </a>
+          </Label>
+        </div>
+
+        <div className="flex justify-between gap-4">
+          <Button onClick={prevStep} variant="outline" size="lg" disabled={isCreating}>
+            Atrás
+          </Button>
+          <Button onClick={handleConfirm} size="lg" disabled={isCreating || !acceptedTerms}>
+            {isCreating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Confirmando...
+              </>
+            ) : (
+              "Confirmar y continuar"
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

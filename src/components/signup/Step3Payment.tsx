@@ -13,7 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StripeCardFields } from "./StripeCardFields";
 import { MercadoPagoCardFields } from "./MercadoPagoCardFields";
 
-interface Step4PaymentProps {
+interface Step3PaymentProps {
   formData: SignupFormData;
   updateFormData: (data: Partial<SignupFormData>) => void;
   nextStep: () => void;
@@ -34,7 +34,7 @@ const COUNTRIES = [
   { code: "OTHER", name: "Otro" },
 ];
 
-export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: Step4PaymentProps) {
+export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: Step3PaymentProps) {
   const [billingCountry, setBillingCountry] = useState<string>(formData.billing_country || "AR");
   const [stripePromise] = useState(() => {
     const key = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
@@ -47,6 +47,7 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
 
   const handlePaymentSuccess = async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => {
     try {
+      setLoading(true);
       const { data, error } = await supabase.functions.invoke("signup-save-payment-method", {
         body: {
           email: formData.email,
@@ -76,6 +77,7 @@ export function Step4Payment({ formData, updateFormData, nextStep, prevStep }: S
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Error al guardar el método de pago");
+      setLoading(false);
     }
   };
 

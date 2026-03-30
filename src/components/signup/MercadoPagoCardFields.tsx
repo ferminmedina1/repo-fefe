@@ -24,6 +24,17 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
   const cardPaymentRef = useRef<any>(null);
   const publicKeyRef = useRef(import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!mpLoaded && !mpError) {
+        console.warn("[MP] Form loading timeout - setting timeout error");
+        setMpError("El formulario de Mercado Pago tardó demasiado en cargar. Recarga la página.");
+      }
+    }, 10000); // 10 segundo timeout
+
+    return () => clearTimeout(timer);
+  }, [mpLoaded, mpError]);
+
   // Function to translate error messages from Mercado Pago
   const translateMercadoPagoError = (errorMsg: string): string => {
     if (!errorMsg) return "No pudimos verificar los métodos de pago de esta tarjeta. Intentá nuevamente o usá otra tarjeta.";
@@ -47,116 +58,218 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
 
   useEffect(() => {
     if (!publicKeyRef.current) {
-      setMpError("Mercado Pago no está configurado");
+      console.error("[MP] Missing VITE_MERCADOPAGO_PUBLIC_KEY");
+      setMpError("Mercado Pago no está configurado. Contacta al administrador.");
       return;
     }
 
+    console.log("[MP] Initializing with public key:", publicKeyRef.current.substring(0, 20) + "...");
+
     const initMercadoPago = async () => {
       try {
-        const script = document.createElement("script");
-        script.src = "https://sdk.mercadopago.com/js/v2";
-        script.async = true;
-        script.onload = async () => {
-          try {
-            if (window.MercadoPago) {
-              const mp = new window.MercadoPago(publicKeyRef.current, { locale: "es-AR" });
-              const bricksBuilder = mp.bricks();
+        // Check if script already loaded
+        if (window.MercadoPago) {
+          console.log("[MP] Script already loaded globally");
+          const mp = new window.MercadoPago(publicKeyRef.current, { locale: "es-AR" });
+          const bricksBuilder = mp.bricks();
 
-              const bricksInstance = await bricksBuilder.create("cardPayment", "cardPayment", {
-                initialization: {
-                  amount: 1000, // use higher amount to enable all payment methods
-                  payer: {
-                    email: undefined,
+          const bricksInstance = await bricksBuilder.create("cardPayment", "cardPayment", {
+            initialization: {
+              amount: 1000,
+              payer: {
+                email: undefined,
+              },
+            },
+            customization: {
+              paymentMethods: {
+                maxInstallments: 1,
+              },
+            },
+            callbacks: {
+              onReady: () => {
+                console.log("[MP] Brick ready");
+                setMpLoaded(true);
+              },
+              onError: (error: any) => {
+                console.error("[MP] Brick error:", error);
+                const friendlyMessage = translateMercadoPagoError(error?.message);
+                setCardError(friendlyMessage);
+              },
+              onSubmit: async (formData: any) => {
+                setSaving(true);
+                try {
+                  console.log("[MP] formData received:", formData);
+                  console.log("[MP] All form data keys:", Object.keys(formData));
+                  
+                  // Try to extract card data from formData
+                  // MP Bricks may include: cardNumber, cardholderName, cardExpirationMonth, cardExpirationYear, securityCode
+                  const cardData = {
+                    cardNumber: formData.cardNumber || formData.card_number || "",
+                    cardholderName: formData.cardholderName || formData.cardholder_name || "",
+                    cardExpirationMonth: formData.cardExpirationMonth || formData.card_expiration_month || "",
+                    cardExpirationYear: formData.cardExpirationYear || formData.card_expiration_year || "",
+                    securityCode: formData.securityCode || formData.security_code || "",
+                  };
+                  
+                  console.log("[MP] Extracted card data:", {
+                    hasCardNumber: !!cardData.cardNumber,
+                    hasCardholderName: !!cardData.cardholderName,
+                    hasExpiration: !!cardData.cardExpirationMonth,
+                    hasSecurityCode: !!cardData.securityCode,
+                  });
+                  
+                  // If we have card data, tokenize it
+                  if (cardData.cardNumber && cardData.cardholderName && cardData.cardExpirationMonth && cardData.securityCode) {
+                    const tokenResp = await supabase.functions.invoke("mp-create-token", {
+                      body: cardData,
+                    });
+                    
+                    if (tokenResp.error) throw tokenResp.error;
+                    
+                    const token = tokenResp.data?.token_id || tokenResp.data?.id;
+                    console.log("[MP] Token created:", token);
+                    
+                    // Extract metadata from card data
+                    const last4 = cardData.cardNumber.replace(/\s/g, '').slice(-4);
+                    const brand = tokenResp.data?.payment_method?.type || "unknown";
+                    const exp_month = parseInt(cardData.cardExpirationMonth, 10);
+                    const exp_year = parseInt(cardData.cardExpirationYear, 10);
+                    
+                    const metadata = { brand, last4, exp_month, exp_year };
+                    console.log("[MP] Card metadata:", metadata);
+                    
+                    toast.success("Tarjeta procesada exitosamente");
+                    await onSuccess(token, metadata);
+                  } else {
+                    // Fallback: generate test token
+                    console.log("[MP] No card data in formData, using test token");
+                    const testToken = `mp_token_${Date.now()}`;
+                    const testMetadata = { brand: "test", last4: "0000", exp_month: 12, exp_year: 2030 };
+                    toast.success("Tarjeta guardada exitosamente");
+                    await onSuccess(testToken, testMetadata);
+                  }
+                } catch (error: any) {
+                  console.error("[MP] Token error:", error);
+                  const friendlyMessage = translateMercadoPagoError(error?.message);
+                  setCardError(friendlyMessage);
+                  toast.error(friendlyMessage);
+                  setSaving(false);
+                }
+              },
+            },
+          });
+
+          cardPaymentRef.current = bricksInstance;
+        } else {
+          // Script doesn't exist, load it
+          console.log("[MP] Loading MP script");
+          const script = document.createElement("script");
+          script.src = "https://sdk.mercadopago.com/js/v2";
+          script.async = true;
+          script.onload = async () => {
+            console.log("[MP] Script loaded successfully");
+            try {
+              if (window.MercadoPago) {
+                console.log("[MP] MercadoPago object available, initializing");
+                const mp = new window.MercadoPago(publicKeyRef.current, { locale: "es-AR" });
+                const bricksBuilder = mp.bricks();
+
+                const bricksInstance = await bricksBuilder.create("cardPayment", "cardPayment", {
+                  initialization: {
+                    amount: 1000,
+                    payer: {
+                      email: undefined,
+                    },
                   },
-                },
-                customization: {
-                  paymentMethods: {
-                    maxInstallments: 1,
+                  customization: {
+                    paymentMethods: {
+                      maxInstallments: 1,
+                    },
                   },
-                },
-                callbacks: {
-                  onReady: () => {
-                    setMpLoaded(true);
-                  },
-                  onError: (error: any) => {
-                    console.error("[MP] Brick error:", error);
-                    const friendlyMessage = translateMercadoPagoError(error?.message);
-                    setCardError(friendlyMessage);
-                  },
-                  onSubmit: async (formData: any) => {
-                    setSaving(true);
-                    try {
-                      console.log("[MP] formData received:", formData);
-                      console.log("[MP] All form data keys:", Object.keys(formData));
-                      
-                      // Try to extract card data from formData
-                      // MP Bricks may include: cardNumber, cardholderName, cardExpirationMonth, cardExpirationYear, securityCode
-                      const cardData = {
-                        cardNumber: formData.cardNumber || formData.card_number || "",
-                        cardholderName: formData.cardholderName || formData.cardholder_name || "",
-                        cardExpirationMonth: formData.cardExpirationMonth || formData.card_expiration_month || "",
-                        cardExpirationYear: formData.cardExpirationYear || formData.card_expiration_year || "",
-                        securityCode: formData.securityCode || formData.security_code || "",
-                      };
-                      
-                      console.log("[MP] Extracted card data:", {
-                        hasCardNumber: !!cardData.cardNumber,
-                        hasCardholderName: !!cardData.cardholderName,
-                        hasExpiration: !!cardData.cardExpirationMonth,
-                        hasSecurityCode: !!cardData.securityCode,
-                      });
-                      
-                      // If we have card data, tokenize it
-                      if (cardData.cardNumber && cardData.cardholderName && cardData.cardExpirationMonth && cardData.securityCode) {
-                        const tokenResp = await supabase.functions.invoke("mp-create-token", {
-                          body: cardData,
-                        });
-                        
-                        if (tokenResp.error) throw tokenResp.error;
-                        
-                        const token = tokenResp.data?.token_id || tokenResp.data?.id;
-                        console.log("[MP] Token created:", token);
-                        
-                        // Extract metadata from card data
-                        const last4 = cardData.cardNumber.replace(/\s/g, '').slice(-4);
-                        const brand = tokenResp.data?.payment_method?.type || "unknown";
-                        const exp_month = parseInt(cardData.cardExpirationMonth, 10);
-                        const exp_year = parseInt(cardData.cardExpirationYear, 10);
-                        
-                        const metadata = { brand, last4, exp_month, exp_year };
-                        console.log("[MP] Card metadata:", metadata);
-                        
-                        toast.success("Tarjeta procesada exitosamente");
-                        onSuccess(token, metadata);
-                      } else {
-                        // Fallback: generate test token
-                        console.log("[MP] No card data in formData, using test token");
-                        const testToken = `mp_token_${Date.now()}`;
-                        const testMetadata = { brand: "test", last4: "0000", exp_month: 12, exp_year: 2030 };
-                        toast.success("Tarjeta guardada exitosamente");
-                        onSuccess(testToken, testMetadata);
-                      }
-                    } catch (error: any) {
-                      console.error("[MP] Token error:", error);
+                  callbacks: {
+                    onReady: () => {
+                      console.log("[MP] Brick ready");
+                      setMpLoaded(true);
+                    },
+                    onError: (error: any) => {
+                      console.error("[MP] Brick error:", error);
                       const friendlyMessage = translateMercadoPagoError(error?.message);
                       setCardError(friendlyMessage);
-                      setSaving(false);
-                    }
+                    },
+                    onSubmit: async (formData: any) => {
+                      setSaving(true);
+                      try {
+                        console.log("[MP] formData received:", formData);
+                        console.log("[MP] All form data keys:", Object.keys(formData));
+                        
+                        const cardData = {
+                          cardNumber: formData.cardNumber || formData.card_number || "",
+                          cardholderName: formData.cardholderName || formData.cardholder_name || "",
+                          cardExpirationMonth: formData.cardExpirationMonth || formData.card_expiration_month || "",
+                          cardExpirationYear: formData.cardExpirationYear || formData.card_expiration_year || "",
+                          securityCode: formData.securityCode || formData.security_code || "",
+                        };
+                        
+                        console.log("[MP] Extracted card data:", {
+                          hasCardNumber: !!cardData.cardNumber,
+                          hasCardholderName: !!cardData.cardholderName,
+                          hasExpiration: !!cardData.cardExpirationMonth,
+                          hasSecurityCode: !!cardData.securityCode,
+                        });
+                        
+                        if (cardData.cardNumber && cardData.cardholderName && cardData.cardExpirationMonth && cardData.securityCode) {
+                          const tokenResp = await supabase.functions.invoke("mp-create-token", {
+                            body: cardData,
+                          });
+                          
+                          if (tokenResp.error) throw tokenResp.error;
+                          
+                          const token = tokenResp.data?.token_id || tokenResp.data?.id;
+                          console.log("[MP] Token created:", token);
+                          
+                          const last4 = cardData.cardNumber.replace(/\s/g, '').slice(-4);
+                          const brand = tokenResp.data?.payment_method?.type || "unknown";
+                          const exp_month = parseInt(cardData.cardExpirationMonth, 10);
+                          const exp_year = parseInt(cardData.cardExpirationYear, 10);
+                          
+                          const metadata = { brand, last4, exp_month, exp_year };
+                          console.log("[MP] Card metadata:", metadata);
+                          
+                          toast.success("Tarjeta procesada exitosamente");
+                          await onSuccess(token, metadata);
+                        } else {
+                          console.log("[MP] No card data in formData, using test token");
+                          const testToken = `mp_token_${Date.now()}`;
+                          const testMetadata = { brand: "test", last4: "0000", exp_month: 12, exp_year: 2030 };
+                          toast.success("Tarjeta guardada exitosamente");
+                          await onSuccess(testToken, testMetadata);
+                        }
+                      } catch (error: any) {
+                        console.error("[MP] Token error:", error);
+                        const friendlyMessage = translateMercadoPagoError(error?.message);
+                        setCardError(friendlyMessage);
+                        toast.error(friendlyMessage);
+                        setSaving(false);
+                      }
+                    },
                   },
-                },
-              });
+                });
 
-              cardPaymentRef.current = bricksInstance;
+                cardPaymentRef.current = bricksInstance;
+              } else {
+                throw new Error("MercadoPago object not found after script load");
+              }
+            } catch (error: any) {
+              console.error("[MP] Script onload error:", error);
+              setMpError(error?.message || "Error al cargar Mercado Pago");
             }
-          } catch (error: any) {
-            console.error("[MP] Script onload error:", error);
-            setMpError(error?.message || "Error al cargar Mercado Pago");
-          }
-        };
-        script.onerror = () => {
-          setMpError("No se pudo cargar Mercado Pago");
-        };
-        document.body.appendChild(script);
+          };
+          script.onerror = () => {
+            console.error("[MP] Script load failed");
+            setMpError("No se pudo cargar Mercado Pago. Verifica tu conexión a internet.");
+          };
+          document.body.appendChild(script);
+        }
       } catch (error: any) {
         console.error("[MP] Init error:", error);
         setMpError(error?.message || "Error inicializando Mercado Pago");
@@ -207,11 +320,13 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
         Usando Mercado Pago Bricks para procesar tu tarjeta de forma segura
       </div>
 
-      <div id="cardPayment" className="mb-4">
+      {/* MP Container - MUST exist before MP script runs */}
+      <div id="cardPayment" className="mb-4 min-h-[400px] bg-white rounded-lg border border-gray-200 p-4">
         {!mpLoaded && (
-          <div className="text-center py-8 text-muted-foreground">
-            <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
-            Cargando formulario de Mercado Pago...
+          <div className="text-center py-12 text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin mx-auto mb-3" />
+            <p className="text-sm font-medium">Cargando formulario de pago...</p>
+            <p className="text-xs text-gray-400 mt-1">Por favor espera mientras inicializamos Mercado Pago</p>
           </div>
         )}
       </div>

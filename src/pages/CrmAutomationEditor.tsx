@@ -63,10 +63,61 @@ type WorkflowRow = Database["public"]["Tables"] extends Record<
       is_active: boolean;
     };
 
-type TriggerType = "opportunity_updated" | "pipeline_stage_changed";
+type TriggerType =
+  | "opportunity_created"
+  | "opportunity_updated"
+  | "opportunity_deleted"
+  | "opportunity_stage_changed"
+  | "opportunity_owner_changed"
+  | "opportunity_value_changed"
+  | "opportunity_probability_changed"
+  | "opportunity_custom_field_changed"
+  | "pipeline_stage_changed"
+  | "activity_created"
+  | "activity_completed"
+  | "message_status_changed"
+  | "schedule_cron"
+  | "schedule_interval"
+  | "schedule_daily"
+  | "schedule_weekly"
+  | "schedule_monthly"
+  | "opportunity_stagnant"
+  | "sla_breached"
+  | "activity_overdue"
+  | "manual_trigger"
+  | "webhook_received"
+  | "api_invoked";
 type StepType = "condition" | "action" | "response" | "wait";
 type BranchKey = "trueBranch" | "falseBranch";
 type EditorTab = "builder" | "settings" | "history" | "logs";
+type TriggerEvaluationMode = "any" | "all";
+type TriggerGroupLogic = "all" | "any";
+type TriggerConditionOperator =
+  | "eq"
+  | "neq"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "contains"
+  | "not_contains"
+  | "starts_with"
+  | "ends_with"
+  | "in"
+  | "not_in"
+  | "is_null"
+  | "is_not_null"
+  | "is_empty"
+  | "is_not_empty"
+  | "before"
+  | "after"
+  | "between"
+  | "within_next"
+  | "within_last"
+  | "changed"
+  | "changed_from"
+  | "changed_to"
+  | "changed_by";
 type ExecutionStatusFilter =
   | "all"
   | "queued"
@@ -86,10 +137,35 @@ type TriggerFilter = {
   stageName?: string;
 };
 
+type TriggerSchedule = {
+  timezone: string;
+  cron?: string;
+  intervalMinutes?: number;
+  runAt?: string;
+  daysOfWeek?: string;
+  dayOfMonth?: number;
+};
+
+type TriggerCondition = {
+  id: string;
+  field: string;
+  op: TriggerConditionOperator;
+  value?: string;
+};
+
+type TriggerFilterGroup = {
+  id: string;
+  logic: TriggerGroupLogic;
+  conditions: TriggerCondition[];
+};
+
 type WorkflowTrigger = {
   id: string;
   type: TriggerType;
+  enabled: boolean;
   filter: TriggerFilter;
+  filterGroupId?: string;
+  schedule?: TriggerSchedule;
 };
 
 type WorkflowStep = {
@@ -121,10 +197,302 @@ type PipelineRow = {
   stages: unknown;
 };
 
+type OpportunityCustomFieldDefinitionOptionRow = {
+  id: string;
+  field_key: string;
+  label: string;
+  field_type: string;
+  options: string[] | null;
+  is_active: boolean;
+  sort_order: number;
+};
+
+type ConditionInputKind = "text" | "number" | "date" | "boolean" | "pipeline" | "stage" | "select";
+
+type TriggerConditionFieldOption = {
+  value: string;
+  label: string;
+  allowedOperators: TriggerConditionOperator[];
+  inputKind: ConditionInputKind;
+  selectOptions?: { value: string; label: string }[];
+};
+
 const triggerOptions: { value: TriggerType; label: string }[] = [
+  { value: "opportunity_created", label: "Opportunity created" },
   { value: "opportunity_updated", label: "Opportunity updated" },
+  { value: "opportunity_deleted", label: "Opportunity deleted" },
+  { value: "opportunity_stage_changed", label: "Opportunity stage changed" },
+  { value: "opportunity_owner_changed", label: "Opportunity owner changed" },
+  { value: "opportunity_value_changed", label: "Opportunity value changed" },
+  { value: "opportunity_probability_changed", label: "Opportunity probability changed" },
+  { value: "opportunity_custom_field_changed", label: "Opportunity custom field changed" },
   { value: "pipeline_stage_changed", label: "Pipeline stage changed" },
+  { value: "activity_created", label: "Activity created" },
+  { value: "activity_completed", label: "Activity completed" },
+  { value: "message_status_changed", label: "Message status changed" },
+  { value: "schedule_cron", label: "Schedule (cron)" },
+  { value: "schedule_interval", label: "Schedule (interval)" },
+  { value: "schedule_daily", label: "Schedule (daily)" },
+  { value: "schedule_weekly", label: "Schedule (weekly)" },
+  { value: "schedule_monthly", label: "Schedule (monthly)" },
+  { value: "opportunity_stagnant", label: "Opportunity stagnant" },
+  { value: "sla_breached", label: "SLA breached" },
+  { value: "activity_overdue", label: "Activity overdue" },
+  { value: "manual_trigger", label: "Manual trigger" },
+  { value: "webhook_received", label: "Webhook received" },
+  { value: "api_invoked", label: "API invoked" },
 ];
+
+const triggerTypesWithStageFilter = new Set<TriggerType>([
+  "opportunity_updated",
+  "pipeline_stage_changed",
+  "opportunity_stage_changed",
+]);
+
+const scheduleTriggerTypes = new Set<TriggerType>([
+  "schedule_cron",
+  "schedule_interval",
+  "schedule_daily",
+  "schedule_weekly",
+  "schedule_monthly",
+]);
+
+const textConditionOperators: TriggerConditionOperator[] = [
+  "eq",
+  "neq",
+  "contains",
+  "not_contains",
+  "starts_with",
+  "ends_with",
+  "in",
+  "not_in",
+  "is_empty",
+  "is_not_empty",
+  "is_null",
+  "is_not_null",
+  "changed",
+  "changed_from",
+  "changed_to",
+  "changed_by",
+];
+
+const numberConditionOperators: TriggerConditionOperator[] = [
+  "eq",
+  "neq",
+  "gt",
+  "gte",
+  "lt",
+  "lte",
+  "between",
+  "in",
+  "not_in",
+  "is_null",
+  "is_not_null",
+  "changed",
+  "changed_from",
+  "changed_to",
+  "changed_by",
+];
+
+const dateConditionOperators: TriggerConditionOperator[] = [
+  "eq",
+  "neq",
+  "before",
+  "after",
+  "between",
+  "within_next",
+  "within_last",
+  "is_null",
+  "is_not_null",
+  "is_empty",
+  "is_not_empty",
+  "changed",
+  "changed_from",
+  "changed_to",
+  "changed_by",
+];
+
+const booleanConditionOperators: TriggerConditionOperator[] = [
+  "eq",
+  "neq",
+  "is_null",
+  "is_not_null",
+  "changed",
+  "changed_from",
+  "changed_to",
+  "changed_by",
+];
+
+const noValueTriggerConditionOperators = new Set<TriggerConditionOperator>([
+  "is_null",
+  "is_not_null",
+  "is_empty",
+  "is_not_empty",
+  "changed",
+]);
+
+const baseTriggerConditionFieldOptions: TriggerConditionFieldOption[] = [
+  {
+    value: "pipeline_id",
+    label: "Pipeline",
+    allowedOperators: ["eq", "neq"],
+    inputKind: "pipeline",
+  },
+  {
+    value: "stage",
+    label: "Stage",
+    allowedOperators: ["eq", "neq", "changed"],
+    inputKind: "stage",
+  },
+  {
+    value: "owner_id",
+    label: "Owner",
+    allowedOperators: ["eq", "neq", "in", "not_in", "is_null", "is_not_null"],
+    inputKind: "text",
+  },
+  {
+    value: "value",
+    label: "Value",
+    allowedOperators: numberConditionOperators,
+    inputKind: "number",
+  },
+  {
+    value: "probability",
+    label: "Probability",
+    allowedOperators: numberConditionOperators,
+    inputKind: "number",
+  },
+  {
+    value: "estimated_close_date",
+    label: "Estimated close date",
+    allowedOperators: dateConditionOperators,
+    inputKind: "date",
+  },
+  {
+    value: "custom_fields.priority",
+    label: "Custom field: priority",
+    allowedOperators: textConditionOperators,
+    inputKind: "text",
+  },
+  {
+    value: "activity.type",
+    label: "Activity type",
+    allowedOperators: textConditionOperators,
+    inputKind: "text",
+  },
+  {
+    value: "message.status",
+    label: "Message status",
+    allowedOperators: textConditionOperators,
+    inputKind: "text",
+  },
+];
+
+const triggerConditionOperatorOptions: { value: TriggerConditionOperator; label: string }[] = [
+  { value: "eq", label: "IS" },
+  { value: "neq", label: "IS NOT" },
+  { value: "gt", label: ">" },
+  { value: "gte", label: ">=" },
+  { value: "lt", label: "<" },
+  { value: "lte", label: "<=" },
+  { value: "contains", label: "Contains" },
+  { value: "not_contains", label: "Not contains" },
+  { value: "starts_with", label: "Starts with" },
+  { value: "ends_with", label: "Ends with" },
+  { value: "in", label: "In" },
+  { value: "not_in", label: "Not in" },
+  { value: "is_null", label: "Is null" },
+  { value: "is_not_null", label: "Is not null" },
+  { value: "is_empty", label: "Is empty" },
+  { value: "is_not_empty", label: "Is not empty" },
+  { value: "before", label: "Before" },
+  { value: "after", label: "After" },
+  { value: "between", label: "Between" },
+  { value: "within_next", label: "Within next" },
+  { value: "within_last", label: "Within last" },
+  { value: "changed", label: "Changed" },
+  { value: "changed_from", label: "Changed from" },
+  { value: "changed_to", label: "Changed to" },
+  { value: "changed_by", label: "Changed by" },
+];
+
+const triggerConditionOperatorLabelMap = new Map<TriggerConditionOperator, string>(
+  triggerConditionOperatorOptions.map((operator) => [operator.value, operator.label])
+);
+
+const defaultTriggerConditionFieldOption: TriggerConditionFieldOption = {
+  value: "pipeline_id",
+  label: "Pipeline",
+  allowedOperators: ["eq", "neq"],
+  inputKind: "pipeline",
+};
+
+const operatorRequiresValue = (operator: TriggerConditionOperator) =>
+  !noValueTriggerConditionOperators.has(operator);
+
+const getOperatorLabelForField = (field: string, operator: TriggerConditionOperator) => {
+  if (field === "stage" && operator === "changed") return "Stage changed";
+  return triggerConditionOperatorLabelMap.get(operator) || operator;
+};
+
+const buildCustomFieldConditionOption = (
+  field: OpportunityCustomFieldDefinitionOptionRow
+): TriggerConditionFieldOption => {
+  const normalizedType = (field.field_type || "text").toLowerCase();
+  const parsedOptions = Array.isArray(field.options)
+    ? field.options
+        .filter((option): option is string => typeof option === "string" && option.trim().length > 0)
+        .map((option) => ({ value: option, label: option }))
+    : [];
+
+  if (["number", "currency", "amount", "decimal", "integer"].includes(normalizedType)) {
+    return {
+      value: `custom_fields.${field.field_key}`,
+      label: `Custom field: ${field.label || field.field_key}`,
+      allowedOperators: numberConditionOperators,
+      inputKind: "number",
+    };
+  }
+
+  if (["date", "datetime", "timestamp"].includes(normalizedType)) {
+    return {
+      value: `custom_fields.${field.field_key}`,
+      label: `Custom field: ${field.label || field.field_key}`,
+      allowedOperators: dateConditionOperators,
+      inputKind: "date",
+    };
+  }
+
+  if (["boolean", "checkbox", "toggle"].includes(normalizedType)) {
+    return {
+      value: `custom_fields.${field.field_key}`,
+      label: `Custom field: ${field.label || field.field_key}`,
+      allowedOperators: booleanConditionOperators,
+      inputKind: "boolean",
+      selectOptions: [
+        { value: "true", label: "True" },
+        { value: "false", label: "False" },
+      ],
+    };
+  }
+
+  if (["select", "enum", "dropdown", "radio"].includes(normalizedType) && parsedOptions.length > 0) {
+    return {
+      value: `custom_fields.${field.field_key}`,
+      label: `Custom field: ${field.label || field.field_key}`,
+      allowedOperators: ["eq", "neq", "is_empty", "is_not_empty"],
+      inputKind: "select",
+      selectOptions: parsedOptions,
+    };
+  }
+
+  return {
+    value: `custom_fields.${field.field_key}`,
+    label: `Custom field: ${field.label || field.field_key}`,
+    allowedOperators: textConditionOperators,
+    inputKind: "text",
+  };
+};
 
 const stepTypeOptions: { value: StepType; label: string }[] = [
   { value: "condition", label: "Condición" },
@@ -242,6 +610,47 @@ const parseWorkflowSettings = (config: unknown): WorkflowSettings => {
   };
 };
 
+const makeTriggerId = () => globalThis.crypto?.randomUUID?.() ?? `trigger-${Date.now()}`;
+const makeConditionId = () => globalThis.crypto?.randomUUID?.() ?? `condition-${Date.now()}`;
+const makeFilterGroupId = () => globalThis.crypto?.randomUUID?.() ?? `filter-group-${Date.now()}`;
+
+const isScheduleTriggerType = (type: TriggerType) => scheduleTriggerTypes.has(type);
+
+const getDefaultSchedule = (type: TriggerType): TriggerSchedule | undefined => {
+  if (!isScheduleTriggerType(type)) return undefined;
+  const base: TriggerSchedule = {
+    timezone: "America/Argentina/Buenos_Aires",
+    runAt: "09:00",
+  };
+
+  if (type === "schedule_cron") return { ...base, cron: "0 0 9 * * 1-5" };
+  if (type === "schedule_interval") return { ...base, intervalMinutes: 60 };
+  if (type === "schedule_weekly") return { ...base, daysOfWeek: "1,2,3,4,5" };
+  if (type === "schedule_monthly") return { ...base, dayOfMonth: 1 };
+  return base;
+};
+
+const makeDefaultTriggerCondition = (): TriggerCondition => ({
+  id: makeConditionId(),
+  field: "pipeline_id",
+  op: "eq",
+  value: "",
+});
+
+const makeDefaultFilterGroup = (): TriggerFilterGroup => ({
+  id: makeFilterGroupId(),
+  logic: "all",
+  conditions: [makeDefaultTriggerCondition()],
+});
+
+const makeDefaultTrigger = (filterGroupId?: string): WorkflowTrigger => ({
+  id: makeTriggerId(),
+  type: "opportunity_updated",
+  enabled: true,
+  filter: {},
+  filterGroupId,
+});
+
 const parseTriggerFilter = (config: unknown): TriggerFilter => {
   if (!config || typeof config !== "object") return {};
   const triggerFilter = (config as { triggerFilter?: unknown }).triggerFilter;
@@ -252,6 +661,89 @@ const parseTriggerFilter = (config: unknown): TriggerFilter => {
   return {
     pipelineId: typeof parsed.pipelineId === "string" && parsed.pipelineId.length > 0 ? parsed.pipelineId : undefined,
     stageName: typeof parsed.stageName === "string" && parsed.stageName.length > 0 ? parsed.stageName : undefined,
+  };
+};
+
+const parseTriggerCondition = (raw: unknown, index: number): TriggerCondition => {
+  const parsed = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const rawOp = typeof parsed.op === "string" ? parsed.op : "eq";
+
+  const supportedOps = new Set(triggerConditionOperatorOptions.map((item) => item.value));
+  const op = supportedOps.has(rawOp as TriggerConditionOperator)
+    ? (rawOp as TriggerConditionOperator)
+    : "eq";
+
+  return {
+    id:
+      typeof parsed.id === "string" && parsed.id.length > 0
+        ? parsed.id
+        : `condition-${index + 1}`,
+    field:
+      typeof parsed.field === "string" && parsed.field.length > 0
+        ? parsed.field
+        : "pipeline_id",
+    op,
+    value: typeof parsed.value === "string" ? parsed.value : "",
+  };
+};
+
+const parseFilterGroups = (config: unknown): TriggerFilterGroup[] => {
+  if (!config || typeof config !== "object") return [makeDefaultFilterGroup()];
+  const maybeGroups = (config as { filterGroups?: unknown }).filterGroups;
+  if (!Array.isArray(maybeGroups) || maybeGroups.length === 0) {
+    return [makeDefaultFilterGroup()];
+  }
+
+  const parsed = maybeGroups.map((rawGroup, groupIndex) => {
+    const group = rawGroup && typeof rawGroup === "object" ? (rawGroup as Record<string, unknown>) : {};
+    const logic = group.logic === "any" ? "any" : "all";
+    const rawConditions = Array.isArray(group.conditions) ? group.conditions : [];
+
+    return {
+      id:
+        typeof group.id === "string" && group.id.length > 0
+          ? group.id
+          : `filter-group-${groupIndex + 1}`,
+      logic,
+      conditions: rawConditions.length
+        ? rawConditions.map((condition, conditionIndex) => parseTriggerCondition(condition, conditionIndex))
+        : [makeDefaultTriggerCondition()],
+    } as TriggerFilterGroup;
+  });
+
+  return parsed.length ? parsed : [makeDefaultFilterGroup()];
+};
+
+const parseTriggerEvaluationMode = (config: unknown): TriggerEvaluationMode => {
+  if (!config || typeof config !== "object") return "any";
+  const evaluation = (config as { evaluation?: unknown }).evaluation;
+  if (!evaluation || typeof evaluation !== "object") return "any";
+  const mode = (evaluation as { mode?: unknown }).mode;
+  return mode === "all" ? "all" : "any";
+};
+
+const parseTriggerSchedule = (raw: unknown, type: TriggerType): TriggerSchedule | undefined => {
+  if (!isScheduleTriggerType(type)) return undefined;
+
+  const defaults = getDefaultSchedule(type);
+  const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+
+  return {
+    timezone:
+      typeof source.timezone === "string" && source.timezone.length > 0
+        ? source.timezone
+        : defaults?.timezone || "America/Argentina/Buenos_Aires",
+    cron: typeof source.cron === "string" ? source.cron : defaults?.cron,
+    intervalMinutes:
+      Number.isFinite(Number(source.intervalMinutes)) && Number(source.intervalMinutes) > 0
+        ? Number(source.intervalMinutes)
+        : defaults?.intervalMinutes,
+    runAt: typeof source.runAt === "string" ? source.runAt : defaults?.runAt,
+    daysOfWeek: typeof source.daysOfWeek === "string" ? source.daysOfWeek : defaults?.daysOfWeek,
+    dayOfMonth:
+      Number.isFinite(Number(source.dayOfMonth)) && Number(source.dayOfMonth) > 0
+        ? Number(source.dayOfMonth)
+        : defaults?.dayOfMonth,
   };
 };
 
@@ -269,13 +761,18 @@ const parseWorkflowTriggers = (
           const item = raw as {
             id?: unknown;
             type?: unknown;
+            enabled?: unknown;
+            filterGroupId?: unknown;
+            schedule?: unknown;
             filter?: unknown;
             pipelineId?: unknown;
             stageName?: unknown;
           };
 
-          const type: TriggerType =
-            item.type === "pipeline_stage_changed" ? "pipeline_stage_changed" : "opportunity_updated";
+          const supportedTypes = new Set(triggerOptions.map((option) => option.value));
+          const type = supportedTypes.has(item.type as TriggerType)
+            ? (item.type as TriggerType)
+            : fallbackTriggerType;
 
           const legacyFilter: TriggerFilter = {
             pipelineId: typeof item.pipelineId === "string" && item.pipelineId.length > 0 ? item.pipelineId : undefined,
@@ -304,10 +801,16 @@ const parseWorkflowTriggers = (
                 ? item.id
                 : `trigger-${index + 1}`,
             type,
+            enabled: item.enabled !== false,
             filter: {
               pipelineId: nestedFilter.pipelineId || legacyFilter.pipelineId,
               stageName: nestedFilter.stageName || legacyFilter.stageName,
             },
+            filterGroupId:
+              typeof item.filterGroupId === "string" && item.filterGroupId.length > 0
+                ? item.filterGroupId
+                : undefined,
+            schedule: parseTriggerSchedule(item.schedule, type),
           } as WorkflowTrigger;
         })
         .filter(Boolean) as WorkflowTrigger[];
@@ -318,9 +821,11 @@ const parseWorkflowTriggers = (
 
   return [
     {
-      id: globalThis.crypto?.randomUUID?.() ?? "trigger-1",
+      id: makeTriggerId(),
       type: fallbackTriggerType,
+      enabled: true,
       filter: parseTriggerFilter(config),
+      schedule: parseTriggerSchedule(undefined, fallbackTriggerType),
     },
   ];
 };
@@ -564,7 +1069,7 @@ export default function CrmAutomationEditor() {
     queryFn: async () => {
       if (!currentCompany?.id || !workflowId) return null;
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("crm_automation_workflows")
         .select("id, company_id, name, description, status, trigger_type, trigger_config, updated_at, is_active")
         .eq("company_id", currentCompany.id)
@@ -601,7 +1106,7 @@ export default function CrmAutomationEditor() {
     queryFn: async () => {
       if (!currentCompany?.id || !workflowId) return [] as ExecutionRow[];
 
-      let query = (supabase as any)
+      let query = supabase
         .from("crm_automation_executions")
         .select("id, status, source_event_type, retry_count, last_error, created_at, started_at, finished_at")
         .eq("company_id", currentCompany.id)
@@ -620,16 +1125,65 @@ export default function CrmAutomationEditor() {
     enabled: !!currentCompany?.id && !!workflowId && (activeTab === "history" || activeTab === "logs"),
   });
 
+  const { data: opportunityCustomFieldDefinitions = [] } = useQuery({
+    queryKey: ["crm-automation-opportunity-custom-fields", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return [] as OpportunityCustomFieldDefinitionOptionRow[];
+
+      const { data, error } = await supabase
+        .from("crm_opportunity_custom_field_definitions")
+        .select("id, field_key, label, field_type, options, is_active, sort_order")
+        .eq("company_id", currentCompany.id)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      return (data ?? []) as OpportunityCustomFieldDefinitionOptionRow[];
+    },
+    enabled: !!currentCompany?.id,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const triggerConditionFieldOptions = useMemo(() => {
+    const dynamicCustomFieldOptions = opportunityCustomFieldDefinitions
+      .filter((field) => field.field_key)
+      .map((field) => buildCustomFieldConditionOption(field));
+
+    const deduped = new Map<string, TriggerConditionFieldOption>();
+    [...baseTriggerConditionFieldOptions, ...dynamicCustomFieldOptions].forEach((option) => {
+      if (!deduped.has(option.value)) {
+        deduped.set(option.value, option);
+      }
+    });
+
+    return Array.from(deduped.values());
+  }, [opportunityCustomFieldDefinitions]);
+
+  const triggerConditionFieldOptionMap = useMemo(
+    () => new Map(triggerConditionFieldOptions.map((option) => [option.value, option])),
+    [triggerConditionFieldOptions]
+  );
+
+  const availableStageOptions = useMemo(() => {
+    const deduped = new Set<string>();
+
+    pipelines.forEach((pipeline) => {
+      getStageNames(pipeline.stages).forEach((stageName) => {
+        if (stageName) deduped.add(stageName);
+      });
+    });
+
+    return Array.from(deduped).sort((a, b) => a.localeCompare(b));
+  }, [pipelines]);
+
   const [hasLoadedInitialState, setHasLoadedInitialState] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [triggers, setTriggers] = useState<WorkflowTrigger[]>([
-    {
-      id: globalThis.crypto?.randomUUID?.() ?? "trigger-1",
-      type: "opportunity_updated",
-      filter: {},
-    },
-  ]);
+  const [triggerEvaluationMode, setTriggerEvaluationMode] = useState<TriggerEvaluationMode>("any");
+  const [filterGroups, setFilterGroups] = useState<TriggerFilterGroup[]>([makeDefaultFilterGroup()]);
+  const [triggers, setTriggers] = useState<WorkflowTrigger[]>([makeDefaultTrigger()]);
   const [steps, setSteps] = useState<WorkflowStep[]>([]);
   const [workflowSettings, setWorkflowSettings] = useState<WorkflowSettings>(defaultWorkflowSettings);
   const [isPublished, setIsPublished] = useState(false);
@@ -643,8 +1197,21 @@ export default function CrmAutomationEditor() {
     setName(workflow.name || "Workflow sin título");
     setDescription(workflow.description || "");
     const fallbackType: TriggerType =
-      workflow.trigger_type === "pipeline_stage_changed" ? "pipeline_stage_changed" : "opportunity_updated";
-    setTriggers(parseWorkflowTriggers(workflow.trigger_config, fallbackType));
+      triggerOptions.some((option) => option.value === workflow.trigger_type)
+        ? (workflow.trigger_type as TriggerType)
+        : "opportunity_updated";
+    const parsedFilterGroups = parseFilterGroups(workflow.trigger_config);
+    setFilterGroups(parsedFilterGroups);
+    setTriggerEvaluationMode(parseTriggerEvaluationMode(workflow.trigger_config));
+
+    const parsedTriggers = parseWorkflowTriggers(workflow.trigger_config, fallbackType).map((trigger) => ({
+      ...trigger,
+      filterGroupId:
+        trigger.filterGroupId && parsedFilterGroups.some((group) => group.id === trigger.filterGroupId)
+          ? trigger.filterGroupId
+          : parsedFilterGroups[0]?.id,
+    }));
+    setTriggers(parsedTriggers);
 
     setWorkflowSettings(parseWorkflowSettings(workflow.trigger_config));
 
@@ -655,6 +1222,38 @@ export default function CrmAutomationEditor() {
     setHasLoadedInitialState(true);
   }, [workflow, hasLoadedInitialState]);
 
+  useEffect(() => {
+    setFilterGroups((prev) => {
+      let hasChanges = false;
+
+      const next = prev.map((group) => ({
+        ...group,
+        conditions: group.conditions.map((condition) => {
+          const fieldOption =
+            triggerConditionFieldOptionMap.get(condition.field) || defaultTriggerConditionFieldOption;
+          const fallbackOperator = fieldOption.allowedOperators[0] || "eq";
+          const nextOperator = fieldOption.allowedOperators.includes(condition.op)
+            ? condition.op
+            : fallbackOperator;
+          const nextValue = operatorRequiresValue(nextOperator) ? condition.value : "";
+
+          if (nextOperator !== condition.op || nextValue !== condition.value) {
+            hasChanges = true;
+            return {
+              ...condition,
+              op: nextOperator,
+              value: nextValue,
+            };
+          }
+
+          return condition;
+        }),
+      }));
+
+      return hasChanges ? next : prev;
+    });
+  }, [triggerConditionFieldOptionMap]);
+
   const selectedStep = useMemo(() => findStepById(steps, selectedStepId), [steps, selectedStepId]);
   const primaryTrigger = triggers[0];
   const primaryTriggerPipeline = useMemo(
@@ -664,6 +1263,7 @@ export default function CrmAutomationEditor() {
   const triggerSummary = useMemo(() => {
     if (!primaryTrigger) return "Sin trigger configurado";
 
+    const enabledCount = triggers.filter((trigger) => trigger.enabled).length;
     const pipelineLabel = primaryTriggerPipeline?.name;
     const stageLabel = primaryTrigger.filter.stageName;
     const base = triggerOptions.find((option) => option.value === primaryTrigger.type)?.label || primaryTrigger.type;
@@ -676,12 +1276,24 @@ export default function CrmAutomationEditor() {
           ? `${base} · Etapa: ${stageLabel}`
           : `${base} · Sin filtros`;
 
-    return triggers.length > 1 ? `${filtered} (+${triggers.length - 1} trigger/s)` : filtered;
-  }, [primaryTrigger, primaryTriggerPipeline?.name, triggers.length]);
+    const triggerCountLabel =
+      triggers.length > 1 ? `${filtered} (+${triggers.length - 1} trigger/s)` : filtered;
+    return `${triggerCountLabel} · ${enabledCount} activo/s · modo ${triggerEvaluationMode.toUpperCase()}`;
+  }, [primaryTrigger, primaryTriggerPipeline?.name, triggerEvaluationMode, triggers]);
 
   useEffect(() => {
     setTriggers((prev) =>
       prev.map((trigger) => {
+        if (!triggerTypesWithStageFilter.has(trigger.type)) {
+          return {
+            ...trigger,
+            filter: {
+              pipelineId: undefined,
+              stageName: undefined,
+            },
+          };
+        }
+
         const pipeline = pipelines.find((item) => item.id === trigger.filter.pipelineId);
         const validStages = getStageNames(pipeline?.stages);
 
@@ -709,15 +1321,31 @@ export default function CrmAutomationEditor() {
       const nextStatus = statusOverride ?? (isPublished ? "published" : "draft");
 
       if (nextStatus === "published") {
+        const enabledTriggers = triggers.filter((trigger) => trigger.enabled);
         const validationErrors = [
-          ...(triggers.length === 0 ? ["Debe existir al menos un trigger"] : []),
+          ...(enabledTriggers.length === 0 ? ["Debe existir al menos un trigger habilitado"] : []),
           ...(steps.length === 0 ? ["Debe existir al menos un bloque en el workflow"] : []),
-          ...triggers
+          ...enabledTriggers
             .map((trigger, index) =>
-              trigger.filter.stageName && !trigger.filter.pipelineId
+              triggerTypesWithStageFilter.has(trigger.type) && trigger.filter.stageName && !trigger.filter.pipelineId
                 ? `Trigger #${index + 1}: si filtrás por etapa, también debés seleccionar pipeline`
                 : ""
             )
+            .filter(Boolean),
+          ...enabledTriggers
+            .map((trigger, index) => {
+              if (!isScheduleTriggerType(trigger.type)) return "";
+              if (!trigger.schedule?.timezone?.trim()) {
+                return `Trigger #${index + 1}: timezone obligatorio`;
+              }
+              if (trigger.type === "schedule_cron" && !trigger.schedule?.cron?.trim()) {
+                return `Trigger #${index + 1}: cron obligatorio`;
+              }
+              if (trigger.type === "schedule_interval" && (!trigger.schedule?.intervalMinutes || trigger.schedule.intervalMinutes <= 0)) {
+                return `Trigger #${index + 1}: intervalMinutes debe ser mayor a 0`;
+              }
+              return "";
+            })
             .filter(Boolean),
           ...collectValidationErrors(steps),
         ];
@@ -736,6 +1364,9 @@ export default function CrmAutomationEditor() {
         is_active: nextStatus !== "archived",
         trigger_type: primaryTriggerType,
         trigger_config: {
+          evaluation: {
+            mode: triggerEvaluationMode,
+          },
           triggerFilter: {
             pipelineId: triggers[0]?.filter.pipelineId || null,
             stageName: triggers[0]?.filter.stageName || null,
@@ -743,10 +1374,32 @@ export default function CrmAutomationEditor() {
           triggers: triggers.map((trigger) => ({
             id: trigger.id,
             type: trigger.type,
+            enabled: trigger.enabled,
+            filterGroupId: trigger.filterGroupId || null,
             filter: {
               pipelineId: trigger.filter.pipelineId || null,
               stageName: trigger.filter.stageName || null,
             },
+            schedule: isScheduleTriggerType(trigger.type)
+              ? {
+                  timezone: trigger.schedule?.timezone || "America/Argentina/Buenos_Aires",
+                  cron: trigger.schedule?.cron || null,
+                  intervalMinutes: trigger.schedule?.intervalMinutes || null,
+                  runAt: trigger.schedule?.runAt || null,
+                  daysOfWeek: trigger.schedule?.daysOfWeek || null,
+                  dayOfMonth: trigger.schedule?.dayOfMonth || null,
+                }
+              : null,
+          })),
+          filterGroups: filterGroups.map((group) => ({
+            id: group.id,
+            logic: group.logic,
+            conditions: group.conditions.map((condition) => ({
+              id: condition.id,
+              field: condition.field,
+              op: condition.op,
+              value: condition.value || "",
+            })),
           })),
           settings: {
             maxRetries: workflowSettings.maxRetries,
@@ -757,7 +1410,7 @@ export default function CrmAutomationEditor() {
         updated_by: userId,
       };
 
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from("crm_automation_workflows")
         .update(payload)
         .eq("company_id", currentCompany.id)
@@ -820,6 +1473,76 @@ export default function CrmAutomationEditor() {
       }
       return next;
     });
+  };
+
+  const addFilterGroup = () => {
+    const group = makeDefaultFilterGroup();
+    setFilterGroups((prev) => [...prev, group]);
+    setTriggers((prev) =>
+      prev.map((trigger) =>
+        trigger.filterGroupId
+          ? trigger
+          : { ...trigger, filterGroupId: group.id }
+      )
+    );
+  };
+
+  const removeFilterGroup = (groupId: string) => {
+    setFilterGroups((prev) => {
+      const next = prev.filter((group) => group.id !== groupId);
+      return next.length ? next : [makeDefaultFilterGroup()];
+    });
+
+    setTriggers((prev) => {
+      const fallbackGroupId = filterGroups.find((group) => group.id !== groupId)?.id;
+      return prev.map((trigger) =>
+        trigger.filterGroupId === groupId
+          ? { ...trigger, filterGroupId: fallbackGroupId }
+          : trigger
+      );
+    });
+  };
+
+  const addConditionToGroup = (groupId: string) => {
+    setFilterGroups((prev) =>
+      prev.map((group) =>
+        group.id === groupId
+          ? { ...group, conditions: [...group.conditions, makeDefaultTriggerCondition()] }
+          : group
+      )
+    );
+  };
+
+  const updateConditionInGroup = (
+    groupId: string,
+    conditionId: string,
+    patch: Partial<TriggerCondition>
+  ) => {
+    setFilterGroups((prev) =>
+      prev.map((group) =>
+        group.id === groupId
+          ? {
+              ...group,
+              conditions: group.conditions.map((condition) =>
+                condition.id === conditionId ? { ...condition, ...patch } : condition
+              ),
+            }
+          : group
+      )
+    );
+  };
+
+  const removeConditionFromGroup = (groupId: string, conditionId: string) => {
+    setFilterGroups((prev) =>
+      prev.map((group) => {
+        if (group.id !== groupId) return group;
+        const nextConditions = group.conditions.filter((condition) => condition.id !== conditionId);
+        return {
+          ...group,
+          conditions: nextConditions.length ? nextConditions : [makeDefaultTriggerCondition()],
+        };
+      })
+    );
   };
 
   if (!currentCompany) return null;
@@ -1032,12 +1755,13 @@ export default function CrmAutomationEditor() {
         )}
 
         <Dialog open={isTriggerDialogOpen} onOpenChange={setIsTriggerDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
+          <DialogContent className="flex max-h-[90vh] w-[96vw] flex-col overflow-hidden p-0 sm:max-w-4xl">
+            <DialogHeader className="px-6 pt-6 pb-2">
               <DialogTitle>Configuración de trigger</DialogTitle>
               <DialogDescription>Editá descripción y agregá uno o más triggers.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-1">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-1">
+              <div className="space-y-4 pb-4">
               <div className="space-y-2">
                 <Label>Descripción</Label>
                 <Textarea
@@ -1057,11 +1781,7 @@ export default function CrmAutomationEditor() {
                     onClick={() =>
                       setTriggers((prev) => [
                         ...prev,
-                        {
-                          id: globalThis.crypto?.randomUUID?.() ?? `trigger-${Date.now()}`,
-                          type: "opportunity_updated",
-                          filter: {},
-                        },
+                        makeDefaultTrigger(filterGroups[0]?.id),
                       ])
                     }
                   >
@@ -1073,35 +1793,60 @@ export default function CrmAutomationEditor() {
                 {triggers.map((trigger, index) => {
                   const triggerPipeline = pipelines.find((pipeline) => pipeline.id === trigger.filter.pipelineId);
                   const triggerStages = getStageNames(triggerPipeline?.stages);
+                  const isScheduleTrigger = isScheduleTriggerType(trigger.type);
+                  const selectedFilterGroup = filterGroups.find((group) => group.id === trigger.filterGroupId);
 
                   return (
                     <div key={trigger.id} className="space-y-3 rounded-md border p-3">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium">Trigger #{index + 1}</p>
-                        {triggers.length > 1 ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setTriggers((prev) => prev.filter((item) => item.id !== trigger.id))}
-                          >
-                            Eliminar
-                          </Button>
-                        ) : null}
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>Habilitado</span>
+                            <Switch
+                              checked={trigger.enabled}
+                              onCheckedChange={(checked) =>
+                                setTriggers((prev) =>
+                                  prev.map((item) =>
+                                    item.id === trigger.id ? { ...item, enabled: checked } : item
+                                  )
+                                )
+                              }
+                            />
+                          </div>
+                          {triggers.length > 1 ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setTriggers((prev) => prev.filter((item) => item.id !== trigger.id))}
+                            >
+                              Eliminar
+                            </Button>
+                          ) : null}
+                        </div>
                       </div>
 
                       <div className="space-y-2">
                         <Label>Tipo</Label>
                         <Select
                           value={trigger.type}
-                          onValueChange={(value) =>
+                          onValueChange={(value) => {
+                            const nextType = value as TriggerType;
                             setTriggers((prev) =>
                               prev.map((item) =>
                                 item.id === trigger.id
-                                  ? { ...item, type: value as TriggerType }
+                                  ? {
+                                      ...item,
+                                      type: nextType,
+                                      schedule: parseTriggerSchedule(item.schedule, nextType),
+                                      filter: triggerTypesWithStageFilter.has(nextType)
+                                        ? item.filter
+                                        : { pipelineId: undefined, stageName: undefined },
+                                    }
                                   : item
                               )
                             )
-                          }
+                          }}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Seleccionar trigger" />
@@ -1115,6 +1860,206 @@ export default function CrmAutomationEditor() {
                           </SelectContent>
                         </Select>
                       </div>
+
+                      <div className="space-y-2">
+                        <Label>Grupo de filtros lógicos</Label>
+                        <Select
+                          value={selectedFilterGroup?.id || "__none__"}
+                          onValueChange={(value) =>
+                            setTriggers((prev) =>
+                              prev.map((item) =>
+                                item.id === trigger.id
+                                  ? {
+                                      ...item,
+                                      filterGroupId: value === "__none__" ? undefined : value,
+                                    }
+                                  : item
+                              )
+                            )
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sin grupo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Sin grupo</SelectItem>
+                            {filterGroups.map((group, groupIndex) => (
+                              <SelectItem key={group.id} value={group.id}>
+                                Grupo #{groupIndex + 1} ({group.logic.toUpperCase()})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {isScheduleTrigger ? (
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-2 sm:col-span-2">
+                            <Label>Timezone</Label>
+                            <Input
+                              value={trigger.schedule?.timezone || ""}
+                              onChange={(event) =>
+                                setTriggers((prev) =>
+                                  prev.map((item) =>
+                                    item.id === trigger.id
+                                      ? {
+                                          ...item,
+                                          schedule: {
+                                            ...(parseTriggerSchedule(item.schedule, item.type) || {
+                                              timezone: "America/Argentina/Buenos_Aires",
+                                            }),
+                                            timezone: event.target.value,
+                                          },
+                                        }
+                                      : item
+                                  )
+                                )
+                              }
+                              placeholder="America/Argentina/Buenos_Aires"
+                            />
+                          </div>
+
+                          {trigger.type === "schedule_cron" ? (
+                            <div className="space-y-2 sm:col-span-2">
+                              <Label>CRON (con segundos)</Label>
+                              <Input
+                                value={trigger.schedule?.cron || ""}
+                                onChange={(event) =>
+                                  setTriggers((prev) =>
+                                    prev.map((item) =>
+                                      item.id === trigger.id
+                                        ? {
+                                            ...item,
+                                            schedule: {
+                                              ...(parseTriggerSchedule(item.schedule, item.type) || {
+                                                timezone: "America/Argentina/Buenos_Aires",
+                                              }),
+                                              cron: event.target.value,
+                                            },
+                                          }
+                                        : item
+                                    )
+                                  )
+                                }
+                                placeholder="0 0 9 * * 1-5"
+                              />
+                            </div>
+                          ) : null}
+
+                          {trigger.type === "schedule_interval" ? (
+                            <div className="space-y-2 sm:col-span-2">
+                              <Label>Intervalo (minutos)</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={trigger.schedule?.intervalMinutes || ""}
+                                onChange={(event) =>
+                                  setTriggers((prev) =>
+                                    prev.map((item) =>
+                                      item.id === trigger.id
+                                        ? {
+                                            ...item,
+                                            schedule: {
+                                              ...(parseTriggerSchedule(item.schedule, item.type) || {
+                                                timezone: "America/Argentina/Buenos_Aires",
+                                              }),
+                                              intervalMinutes: Math.max(1, Number(event.target.value || 1)),
+                                            },
+                                          }
+                                        : item
+                                    )
+                                  )
+                                }
+                              />
+                            </div>
+                          ) : null}
+
+                          {(trigger.type === "schedule_daily" ||
+                            trigger.type === "schedule_weekly" ||
+                            trigger.type === "schedule_monthly") ? (
+                            <div className="space-y-2">
+                              <Label>Hora</Label>
+                              <Input
+                                type="time"
+                                value={trigger.schedule?.runAt || "09:00"}
+                                onChange={(event) =>
+                                  setTriggers((prev) =>
+                                    prev.map((item) =>
+                                      item.id === trigger.id
+                                        ? {
+                                            ...item,
+                                            schedule: {
+                                              ...(parseTriggerSchedule(item.schedule, item.type) || {
+                                                timezone: "America/Argentina/Buenos_Aires",
+                                              }),
+                                              runAt: event.target.value,
+                                            },
+                                          }
+                                        : item
+                                    )
+                                  )
+                                }
+                              />
+                            </div>
+                          ) : null}
+
+                          {trigger.type === "schedule_weekly" ? (
+                            <div className="space-y-2">
+                              <Label>Días semana (0-6 CSV)</Label>
+                              <Input
+                                value={trigger.schedule?.daysOfWeek || "1,2,3,4,5"}
+                                onChange={(event) =>
+                                  setTriggers((prev) =>
+                                    prev.map((item) =>
+                                      item.id === trigger.id
+                                        ? {
+                                            ...item,
+                                            schedule: {
+                                              ...(parseTriggerSchedule(item.schedule, item.type) || {
+                                                timezone: "America/Argentina/Buenos_Aires",
+                                              }),
+                                              daysOfWeek: event.target.value,
+                                            },
+                                          }
+                                        : item
+                                    )
+                                  )
+                                }
+                                placeholder="1,2,3,4,5"
+                              />
+                            </div>
+                          ) : null}
+
+                          {trigger.type === "schedule_monthly" ? (
+                            <div className="space-y-2">
+                              <Label>Día del mes</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={31}
+                                value={trigger.schedule?.dayOfMonth || 1}
+                                onChange={(event) =>
+                                  setTriggers((prev) =>
+                                    prev.map((item) =>
+                                      item.id === trigger.id
+                                        ? {
+                                            ...item,
+                                            schedule: {
+                                              ...(parseTriggerSchedule(item.schedule, item.type) || {
+                                                timezone: "America/Argentina/Buenos_Aires",
+                                              }),
+                                              dayOfMonth: Math.min(31, Math.max(1, Number(event.target.value || 1))),
+                                            },
+                                          }
+                                        : item
+                                    )
+                                  )
+                                }
+                              />
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
 
                       <div className="space-y-2">
                         <Label>Filtrar por pipeline (opcional)</Label>
@@ -1170,7 +2115,7 @@ export default function CrmAutomationEditor() {
                               )
                             )
                           }
-                          disabled={!trigger.filter.pipelineId}
+                          disabled={!trigger.filter.pipelineId || !triggerTypesWithStageFilter.has(trigger.type)}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Todas las etapas" />
@@ -1185,12 +2130,253 @@ export default function CrmAutomationEditor() {
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {!triggerTypesWithStageFilter.has(trigger.type) ? (
+                        <p className="text-xs text-muted-foreground">
+                          Este tipo de trigger no usa filtro de etapa/pipeline como criterio principal.
+                        </p>
+                      ) : null}
                     </div>
                   );
                 })}
               </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Evaluación de triggers</Label>
+                  <Select
+                    value={triggerEvaluationMode}
+                    onValueChange={(value) => setTriggerEvaluationMode(value as TriggerEvaluationMode)}
+                  >
+                    <SelectTrigger className="w-[220px]">
+                      <SelectValue placeholder="Modo de evaluación" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">ANY: si cumple cualquier trigger</SelectItem>
+                      <SelectItem value="all">ALL: deben cumplirse todos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label>Grupos de filtros lógicos</Label>
+                  <Button variant="outline" size="sm" onClick={addFilterGroup}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Agregar grupo
+                  </Button>
+                </div>
+
+                {filterGroups.map((group, groupIndex) => (
+                  <div key={group.id} className="space-y-3 rounded-md border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium">Grupo #{groupIndex + 1}</p>
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={group.logic}
+                          onValueChange={(value) =>
+                            setFilterGroups((prev) =>
+                              prev.map((item) =>
+                                item.id === group.id ? { ...item, logic: value as TriggerGroupLogic } : item
+                              )
+                            )
+                          }
+                        >
+                          <SelectTrigger className="w-[160px]">
+                            <SelectValue placeholder="Lógica" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">ALL (AND)</SelectItem>
+                            <SelectItem value="any">ANY (OR)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {filterGroups.length > 1 ? (
+                          <Button variant="ghost" size="sm" onClick={() => removeFilterGroup(group.id)}>
+                            Eliminar
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {group.conditions.map((condition) => {
+                        const fieldOption =
+                          triggerConditionFieldOptionMap.get(condition.field) || defaultTriggerConditionFieldOption;
+                        const allowedOperators = fieldOption.allowedOperators;
+                        const requiresValue = operatorRequiresValue(condition.op);
+                        const safeSelectValue = condition.value && condition.value.length > 0 ? condition.value : "__none__";
+
+                        return (
+                          <div key={condition.id} className="grid gap-2 sm:grid-cols-[1.2fr_1fr_1fr_auto]">
+                            <Select
+                              value={condition.field}
+                              onValueChange={(value) => {
+                                const nextField =
+                                  triggerConditionFieldOptionMap.get(value) || defaultTriggerConditionFieldOption;
+                                const fallbackOperator = nextField.allowedOperators[0] || "eq";
+                                const nextOperator = nextField.allowedOperators.includes(condition.op)
+                                  ? condition.op
+                                  : fallbackOperator;
+
+                                updateConditionInGroup(group.id, condition.id, {
+                                  field: value,
+                                  op: nextOperator,
+                                  value: operatorRequiresValue(nextOperator) ? condition.value : "",
+                                });
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Campo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {triggerConditionFieldOptions.map((field) => (
+                                  <SelectItem key={field.value} value={field.value}>
+                                    {field.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <Select
+                              value={condition.op}
+                              onValueChange={(value) =>
+                                updateConditionInGroup(group.id, condition.id, {
+                                  op: value as TriggerConditionOperator,
+                                  value: operatorRequiresValue(value as TriggerConditionOperator)
+                                    ? condition.value
+                                    : "",
+                                })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Operador" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {allowedOperators.map((operator) => (
+                                  <SelectItem key={operator} value={operator}>
+                                    {getOperatorLabelForField(condition.field, operator)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            {requiresValue ? (
+                              fieldOption.inputKind === "pipeline" ? (
+                                <Select
+                                  value={safeSelectValue}
+                                  onValueChange={(value) =>
+                                    updateConditionInGroup(group.id, condition.id, {
+                                      value: value === "__none__" ? "" : value,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar pipeline" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">Seleccionar pipeline</SelectItem>
+                                    {pipelines.map((pipeline) => (
+                                      <SelectItem key={pipeline.id} value={pipeline.id}>
+                                        {pipeline.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : fieldOption.inputKind === "stage" ? (
+                                <Select
+                                  value={safeSelectValue}
+                                  onValueChange={(value) =>
+                                    updateConditionInGroup(group.id, condition.id, {
+                                      value: value === "__none__" ? "" : value,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar etapa" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">Seleccionar etapa</SelectItem>
+                                    {availableStageOptions.map((stageName) => (
+                                      <SelectItem key={stageName} value={stageName}>
+                                        {stageName}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : fieldOption.inputKind === "boolean" ? (
+                                <Select
+                                  value={safeSelectValue}
+                                  onValueChange={(value) =>
+                                    updateConditionInGroup(group.id, condition.id, {
+                                      value: value === "__none__" ? "" : value,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar valor" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">Seleccionar valor</SelectItem>
+                                    <SelectItem value="true">True</SelectItem>
+                                    <SelectItem value="false">False</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              ) : fieldOption.inputKind === "select" && fieldOption.selectOptions?.length ? (
+                                <Select
+                                  value={safeSelectValue}
+                                  onValueChange={(value) =>
+                                    updateConditionInGroup(group.id, condition.id, {
+                                      value: value === "__none__" ? "" : value,
+                                    })
+                                  }
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar valor" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">Seleccionar valor</SelectItem>
+                                    {fieldOption.selectOptions.map((option) => (
+                                      <SelectItem key={option.value} value={option.value}>
+                                        {option.label}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Input
+                                  type={fieldOption.inputKind === "number" ? "number" : fieldOption.inputKind === "date" ? "date" : "text"}
+                                  value={condition.value || ""}
+                                  onChange={(event) =>
+                                    updateConditionInGroup(group.id, condition.id, { value: event.target.value })
+                                  }
+                                  placeholder={fieldOption.inputKind === "date" ? "Seleccionar fecha" : "Valor"}
+                                />
+                              )
+                            ) : (
+                              <Input value="N/A" disabled />
+                            )}
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeConditionFromGroup(group.id, condition.id)}
+                            >
+                              Eliminar
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <Button variant="outline" size="sm" onClick={() => addConditionToGroup(group.id)}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Agregar condición
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t bg-background px-6 py-4">
               <Button variant="outline" onClick={() => setIsTriggerDialogOpen(false)}>
                 Cerrar
               </Button>
@@ -1199,15 +2385,16 @@ export default function CrmAutomationEditor() {
         </Dialog>
 
         <Dialog open={!!editingStepId} onOpenChange={(open) => !open && setEditingStepId(null)}>
-          <DialogContent>
-            <DialogHeader>
+          <DialogContent className="flex max-h-[90vh] w-[96vw] flex-col overflow-hidden p-0 sm:max-w-2xl">
+            <DialogHeader className="px-6 pt-6 pb-2">
               <DialogTitle>Configurar bloque</DialogTitle>
               <DialogDescription>
                 Seleccioná variables y reglas para operar dentro del bloque.
               </DialogDescription>
             </DialogHeader>
             {selectedStep ? (
-              <div className="space-y-4 py-1">
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-1">
+                <div className="space-y-4 pb-4">
                 <div className="space-y-2">
                   <Label>Tipo</Label>
                   <Select
@@ -1303,9 +2490,10 @@ export default function CrmAutomationEditor() {
                     rows={3}
                   />
                 </div>
+                </div>
               </div>
             ) : null}
-            <DialogFooter>
+            <DialogFooter className="border-t bg-background px-6 py-4">
               <Button variant="outline" onClick={() => setEditingStepId(null)}>
                 Cerrar
               </Button>

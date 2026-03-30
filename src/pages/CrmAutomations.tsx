@@ -69,7 +69,7 @@ export default function CrmAutomations() {
         updated_by: userId,
       };
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("crm_automation_workflows")
         .insert([payload])
         .select("id")
@@ -100,7 +100,7 @@ export default function CrmAutomations() {
     queryFn: async () => {
       if (!currentCompany?.id) return [] as WorkflowRow[];
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("crm_automation_workflows")
         .select("id, company_id, name, description, status, created_at, updated_at")
         .eq("company_id", currentCompany.id)
