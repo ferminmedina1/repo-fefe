@@ -1,7 +1,7 @@
 /**
- * ALLIANCE MARKET V2 - Intelligent Segmentation
- * Replaces AI-generated fake profiles with real data analysis and segmentation
- * Shows actionable business opportunities based on your actual data
+ * ALLIANCE MARKET V2 - Segmentación Inteligente
+ * Reemplaza perfiles ficticios con análisis de datos reales y segmentación
+ * Muestra oportunidades de negocio accionables basadas en tus datos reales
  */
 
 import { useState } from 'react';
@@ -54,16 +54,16 @@ export default function AllianceMarket() {
   // ── Regenerate Report Mutation ──
   const regenerateMutation = useMutation({
     mutationFn: async () => {
-      if (!companyId) throw new Error('No company selected');
+      if (!companyId) throw new Error('No hay empresa seleccionada');
       await intelligentSegmentationRepository.invalidateReport(companyId);
       return intelligentSegmentationRepository.generateSegmentationReport(companyId, 12);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alliance-segmentation-report', companyId] });
-      toast.success('Segmentation analysis updated');
+      toast.success('Análisis de segmentación actualizado');
     },
     onError: (error: any) => {
-      toast.error('Error regenerating analysis: ' + error.message);
+      toast.error('Error al regenerar análisis: ' + error.message);
     },
   });
 
@@ -72,7 +72,7 @@ export default function AllianceMarket() {
       <Layout>
         <div className="text-center py-12">
           <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600">No company selected</p>
+          <p className="text-gray-600">No hay empresa seleccionada</p>
         </div>
       </Layout>
     );
@@ -84,9 +84,9 @@ export default function AllianceMarket() {
         {/* HEADER */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Alliance Market</h1>
+            <h1 className="text-3xl font-bold">Mercado de Alianzas</h1>
             <p className="text-gray-600 mt-1">
-              Intelligent segmentation analysis based on your real business data
+              Análisis de segmentación inteligente basado en tus datos comerciales reales
             </p>
           </div>
           <Button
@@ -96,7 +96,7 @@ export default function AllianceMarket() {
             className="gap-2"
           >
             <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
-            Refresh Analysis
+            Actualizar Análisis
           </Button>
         </div>
 
@@ -119,14 +119,14 @@ export default function AllianceMarket() {
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
                     <AlertCircle className="h-5 w-5" />
-                    Data Quality Alerts ({report.allAlerts.length})
+                    Alertas de Calidad de Datos ({report.allAlerts.length})
                   </CardTitle>
                   <CardDescription>
                     {report.allAlerts.filter((a) => a.severity === 'CRITICAL').length > 0
-                      ? '⚠️ Critical issues found - some metrics may be unreliable'
+                      ? '⚠️ Problemas críticos encontrados - algunas métricas pueden no ser confiables'
                       : report.allAlerts.filter((a) => a.severity === 'WARNING').length > 0
-                      ? '⚠️ Warnings detected - review before relying on recommendations'
-                      : 'ℹ️ Info alerts - good to know'}
+                      ? '⚠️ Advertencias detectadas - revisa antes de confiar en las recomendaciones'
+                      : 'ℹ️ Alertas informativas - bueno saberlo'}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -164,14 +164,14 @@ export default function AllianceMarket() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BarChart3 className="h-5 w-5" />
-                  Executive Summary
+                  Resumen Ejecutivo
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Health Score */}
                   <div className="border rounded-lg p-4">
-                    <div className="text-sm text-gray-600 mb-2">Overall Health</div>
+                    <div className="text-sm text-gray-600 mb-2">Salud General</div>
                     <div className="text-2xl font-bold">
                       {report.executiveSummary.healthScore.toFixed(0)}/100
                     </div>
@@ -182,41 +182,41 @@ export default function AllianceMarket() {
 
                   {/* Confidence Level */}
                   <div className="border rounded-lg p-4">
-                    <div className="text-sm text-gray-600 mb-2">Analysis Confidence</div>
+                    <div className="text-sm text-gray-600 mb-2">Confianza del Análisis</div>
                     <div className="text-2xl font-bold">
                       {report.executiveSummary.confidenceLevel.toFixed(0)}%
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
                       {report.executiveSummary.confidenceLevel >= 80
-                        ? 'High confidence'
+                        ? 'Confianza alta' 
                         : report.executiveSummary.confidenceLevel >= 60
-                        ? 'Good confidence'
+                        ? 'Buena confianza'
                         : report.executiveSummary.confidenceLevel >= 40
-                        ? 'Moderate confidence'
-                        : 'Low confidence'}
+                        ? 'Confianza moderada'
+                        : 'Baja confianza'}
                     </div>
                   </div>
 
                   {/* Opportunities */}
                   <div className="border rounded-lg p-4">
-                    <div className="text-sm text-gray-600 mb-2">Opportunities Found</div>
+                    <div className="text-sm text-gray-600 mb-2">Oportunidades Encontradas</div>
                     <div className="text-2xl font-bold">{report.gaps.length}</div>
-                    <div className="text-xs text-gray-500 mt-1">gaps identified</div>
+                    <div className="text-xs text-gray-500 mt-1">brechas identificadas</div>
                   </div>
 
                   {/* Total Opportunity */}
                   <div className="border rounded-lg p-4">
-                    <div className="text-sm text-gray-600 mb-2">Est. Total Opportunity</div>
+                    <div className="text-sm text-gray-600 mb-2">Oportunidad Total Est.</div>
                     <div className="text-2xl font-bold">
                       ${(report.executiveSummary.estimatedTotalOpportunity / 1000000).toFixed(1)}M
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">revenue potential</div>
+                    <div className="text-xs text-gray-500 mt-1">potencial de ingresos</div>
                   </div>
                 </div>
 
                 {/* Key Insights */}
                 <div className="space-y-2 pt-4 border-t">
-                  <h3 className="font-semibold text-sm">Key Insights</h3>
+                  <h3 className="font-semibold text-sm">Perspectivas Clave</h3>
                   <ul className="space-y-2">
                     {report.executiveSummary.keyInsights.map((insight, idx) => (
                       <li key={idx} className="text-sm text-gray-700 flex gap-2">
@@ -234,15 +234,15 @@ export default function AllianceMarket() {
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="gaps" className="flex items-center gap-2">
                   <AlertCircle className="h-4 w-4" />
-                  Opportunities ({report.gaps.length})
+                  Oportunidades ({report.gaps.length})
                 </TabsTrigger>
                 <TabsTrigger value="suggestions" className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
-                  Suggestions ({report.suggestions.length})
+                  Sugerencias ({report.suggestions.length})
                 </TabsTrigger>
                 <TabsTrigger value="analysis" className="flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
-                  Analysis Details
+                  Detalles del Análisis
                 </TabsTrigger>
               </TabsList>
 
@@ -251,7 +251,7 @@ export default function AllianceMarket() {
                 {report.gaps.length === 0 ? (
                   <Card>
                     <CardContent className="py-8 text-center text-gray-600">
-                      No gaps identified - your business is well optimized!
+                      No se identificaron brechas - ¡Tu negocio está bien optimizado!
                     </CardContent>
                   </Card>
                 ) : (
@@ -285,28 +285,28 @@ export default function AllianceMarket() {
                       <CardContent className="space-y-3">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                           <div>
-                            <div className="text-gray-600">Revenue Impact</div>
+                            <div className="text-gray-600">Impacto de Ingresos</div>
                             <div className="font-semibold">
                               ${(gap.estimatedImpact.revenue / 1000).toFixed(0)}k
                             </div>
                           </div>
                           <div>
-                            <div className="text-gray-600">Margin +</div>
+                            <div className="text-gray-600">Margen +</div>
                             <div className="font-semibold">{gap.estimatedImpact.margin}%</div>
                           </div>
                           <div>
-                            <div className="text-gray-600">Type</div>
+                            <div className="text-gray-600">Tipo</div>
                             <div className="font-semibold">{gap.type}</div>
                           </div>
                           <div>
-                            <div className="text-gray-600">Risk</div>
+                            <div className="text-gray-600">Riesgo</div>
                             <div className={`font-semibold ${gap.riskLevel === 'LOW' ? 'text-green-600' : gap.riskLevel === 'MEDIUM' ? 'text-yellow-600' : 'text-red-600'}`}>
                               {gap.riskLevel}
                             </div>
                           </div>
                         </div>
                         <div className="pt-2 border-t">
-                          <div className="text-sm font-semibold text-gray-700 mb-2">Required Alliance Type</div>
+                          <div className="text-sm font-semibold text-gray-700 mb-2">Tipo de Alianza Requerida</div>
                           <Badge variant="outline">{gap.requiredAllianceType}</Badge>
                         </div>
                       </CardContent>
@@ -320,7 +320,7 @@ export default function AllianceMarket() {
                 {report.suggestions.length === 0 ? (
                   <Card>
                     <CardContent className="py-8 text-center text-gray-600">
-                      No suggestions at this time
+                      No hay sugerencias en este momento
                     </CardContent>
                   </Card>
                 ) : (
@@ -348,35 +348,35 @@ export default function AllianceMarket() {
                                 : 'secondary'
                             }
                           >
-                            {suggestion.priority} PRIORITY
+                            PRIORIDAD {suggestion.priority === 'HIGH' ? 'ALTA' : suggestion.priority === 'MEDIUM' ? 'MEDIA' : 'BAJA'}
                           </Badge>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                           <div>
-                            <div className="text-gray-600">Revenue +</div>
+                            <div className="text-gray-600">Ingresos +</div>
                             <div className="font-semibold">
                               ${(suggestion.expectedImpact.revenueIncrease / 1000).toFixed(0)}k
                             </div>
                           </div>
                           <div>
-                            <div className="text-gray-600">Margin +</div>
+                            <div className="text-gray-600">Margen +</div>
                             <div className="font-semibold">{suggestion.expectedImpact.marginIncrease}%</div>
                           </div>
                           <div>
-                            <div className="text-gray-600">Timeline</div>
-                            <div className="font-semibold">{suggestion.implementationPath.timelineMonths} months</div>
+                            <div className="text-gray-600">Cronograma</div>
+                            <div className="font-semibold">{suggestion.implementationPath.timelineMonths} meses</div>
                           </div>
                           <div>
-                            <div className="text-gray-600">Risk Level</div>
+                            <div className="text-gray-600">Nivel de Riesgo</div>
                             <div className={`font-semibold ${suggestion.riskLevel === 'LOW' ? 'text-green-600' : suggestion.riskLevel === 'MEDIUM' ? 'text-yellow-600' : 'text-red-600'}`}>
                               {suggestion.riskLevel}
                             </div>
                           </div>
                         </div>
                         <div className="pt-2 border-t">
-                          <div className="text-sm font-semibold text-gray-700 mb-2">Type of Partner Needed</div>
+                          <div className="text-sm font-semibold text-gray-700 mb-2">Tipo de Socio Necesario</div>
                           <Badge variant="outline">{suggestion.type}</Badge>
                         </div>
                       </CardContent>
@@ -391,27 +391,27 @@ export default function AllianceMarket() {
                   {/* Customer Analysis */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg">Customer Analysis</CardTitle>
+                      <CardTitle className="text-lg">Análisis de Clientes</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-gray-600">Total Customers</span>
+                        <span className="text-gray-600">Clientes Totales</span>
                         <span className="font-semibold">{report.customerAnalysis.totalCustomers}</span>
                       </div>
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-gray-600">Active Customers</span>
+                        <span className="text-gray-600">Clientes Activos</span>
                         <span className="font-semibold">{report.customerAnalysis.activeCustomers}</span>
                       </div>
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-gray-600">Avg Ticket</span>
+                        <span className="text-gray-600">Ticket Promedio</span>
                         <span className="font-semibold">${report.customerAnalysis.avgTicket.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-gray-600">Retention Rate</span>
+                        <span className="text-gray-600">Tasa de Retención</span>
                         <span className="font-semibold">{report.customerAnalysis.retentionRate.toFixed(1)}%</span>
                       </div>
                       <div className="flex justify-between py-2">
-                        <span className="text-gray-600">Concentration Ratio</span>
+                        <span className="text-gray-600">Razón de Concentración</span>
                         <span className="font-semibold">{report.customerAnalysis.concentrationRatio.toFixed(0)}%</span>
                       </div>
                     </CardContent>
@@ -420,27 +420,27 @@ export default function AllianceMarket() {
                   {/* Product Analysis */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg">Product Analysis</CardTitle>
+                      <CardTitle className="text-lg">Análisis de Productos</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3 text-sm">
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-gray-600">Total Products</span>
+                        <span className="text-gray-600">Productos Totales</span>
                         <span className="font-semibold">{report.productAnalysis.totalProducts}</span>
                       </div>
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-gray-600">Active Products</span>
+                        <span className="text-gray-600">Productos Activos</span>
                         <span className="font-semibold">{report.productAnalysis.activeProducts}</span>
                       </div>
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-gray-600">Avg Margin</span>
+                        <span className="text-gray-600">Margen Promedio</span>
                         <span className="font-semibold">{report.productAnalysis.avgMargin}%</span>
                       </div>
                       <div className="flex justify-between py-2 border-b">
-                        <span className="text-gray-600">Total Revenue</span>
+                        <span className="text-gray-600">Ingresos Totales</span>
                         <span className="font-semibold">${(report.productAnalysis.totalRevenue / 1000000).toFixed(2)}M</span>
                       </div>
                       <div className="flex justify-between py-2">
-                        <span className="text-gray-600">Low Penetration Items</span>
+                        <span className="text-gray-600">Artículos de Baja Penetración</span>
                         <span className="font-semibold">{report.productAnalysis.lowPenetrationProducts.length}</span>
                       </div>
                     </CardContent>
@@ -449,7 +449,7 @@ export default function AllianceMarket() {
                   {/* Top Industries */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg">Top Industries</CardTitle>
+                      <CardTitle className="text-lg">Industrias Principales</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       {report.segmentAnalysis.segments.slice(0, 5).map((seg, idx) => (
@@ -464,7 +464,7 @@ export default function AllianceMarket() {
                   {/* Geographic Coverage */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg">Geographic Coverage</CardTitle>
+                      <CardTitle className="text-lg">Cobertura Geográfica</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       {report.geographicAnalysis.covered.slice(0, 5).map((geo, idx) => (
@@ -475,7 +475,7 @@ export default function AllianceMarket() {
                       ))}
                       {report.geographicAnalysis.uncovered.length > 0 && (
                         <div className="pt-2 text-xs text-orange-600">
-                          +{report.geographicAnalysis.uncovered.length} uncovered regions
+                          +{report.geographicAnalysis.uncovered.length} regiones sin cobertura
                         </div>
                       )}
                     </CardContent>
@@ -490,10 +490,10 @@ export default function AllianceMarket() {
                 <div className="flex items-start gap-3">
                   <Eye className="h-5 w-5 text-blue-600 mt-1 flex-shrink-0" />
                   <div className="text-sm">
-                    <div className="font-semibold text-blue-900">Next Steps</div>
+                    <div className="font-semibold text-blue-900">Próximos Pasos</div>
                     <p className="text-blue-800 mt-1">
-                      Review the suggestions above and identify which alliances align with your strategic priorities. 
-                      Use the action items provided to guide vendor outreach and partnership negotiations.
+                      Revisa las sugerencias anteriores e identifica qué alianzas se alinean con tus prioridades estratégicas. 
+                      Usa los elementos de acción proporcionados para guiar la comunicación con proveedores y negociaciones de asociaciones.
                     </p>
                   </div>
                 </div>
