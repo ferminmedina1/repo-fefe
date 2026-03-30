@@ -11,7 +11,6 @@ import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
 import { usePermissions } from "@/hooks/usePermissions";
 import { TutorialRunner } from "./components/learning/TutorialRunner";
-import { TutorialHelpButton } from "./components/learning/TutorialHelpButton";
 import { TutorialProvider } from "@/contexts/TutorialContext";
 
 // Lazy load all page components
@@ -423,7 +422,6 @@ const App = () => (
           </Routes>
           {/* Tutorial System - Global Execution */}
           <TutorialRunner />
-          <TutorialHelpButton />
             </Suspense>
           </CompanyProvider>
         </TutorialProvider>

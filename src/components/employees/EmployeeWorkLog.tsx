@@ -119,7 +119,7 @@ export function EmployeeWorkLog() {
       const supabaseClient = supabase as any;
       const { data, error } = await supabaseClient
         .from("work_logs")
-        .select("task_date, status")
+        .select("task_date, status, employee_id")
         .eq("company_id", currentCompany.id)
         .eq("status", "completed")
         .gte("task_date", format(oneYearAgo, 'yyyy-MM-dd'))
@@ -128,10 +128,12 @@ export function EmployeeWorkLog() {
       if (error) throw error;
       return (data || []).map((item: any) => ({
         task_date: item?.task_date,
-        status: item?.status
-      })) as Array<{ task_date: string; status: string }>;
+        status: item?.status,
+        employee_id: item?.employee_id
+      })) as Array<{ task_date: string; status: string; employee_id: string }>;
     },
     enabled: !!currentCompany?.id,
+    refetchInterval: 5000, // Actualizar cada 5 segundos para cambios en tiempo real
   });
 
   // Calculate contribution data for heatmap - filtered by selected employees
@@ -198,6 +200,7 @@ export function EmployeeWorkLog() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work-logs", currentCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["work-logs-yearly", currentCompany?.id] });
       toast.success("Tarea registrada correctamente");
       setDialogOpen(false);
       setFormData({
@@ -231,6 +234,7 @@ export function EmployeeWorkLog() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["work-logs", currentCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["work-logs-yearly", currentCompany?.id] });
       toast.success("Estado actualizado");
     },
     onError: (error: any) => {

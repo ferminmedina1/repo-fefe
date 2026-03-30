@@ -1,362 +1,507 @@
-// src/pages/AllianceMarket.tsx
+/**
+ * ALLIANCE MARKET V2 - Intelligent Segmentation
+ * Replaces AI-generated fake profiles with real data analysis and segmentation
+ * Shows actionable business opportunities based on your actual data
+ */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AlertCircle, BarChart3, TrendingUp, Zap, RefreshCw, Download, Eye } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  Network,
-  Users,
-  TrendingUp,
-  Sparkles,
-  Search,
-  SlidersHorizontal,
-  RefreshCw,
-} from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
-import { supabase } from '@/integrations/supabase/client';
-import { allianceMarketRepository } from '@/data/allianceMarket/allianceMarketRepository';
-import { AllianceMarketCard } from '@/components/allianceMarket/AllianceMarketCard';
-import { AllianceMarketDrawer } from '@/components/allianceMarket/AllianceMarketDrawer';
-import { AllianceMarketConfigDrawer } from '@/components/allianceMarket/AllianceMarketConfigDrawer';
+import { intelligentSegmentationRepository } from '@/data/allianceMarket/intelligentSegmentationRepository';
 import type {
-  AllianceMarketProfileDTO,
-  ProfileType,
-  ProfileStatus,
-} from '@/domain/allianceMarket/dtos/allianceMarket';
-
-type SortOption = 'compatibility_score' | 'estimated_value' | 'created_at';
-
-const SORT_LABELS: Record<SortOption, string> = {
-  compatibility_score: 'Mayor compatibilidad',
-  estimated_value: 'Mayor valor estimado',
-  created_at: 'Más recientes',
-};
+  SegmentationReport,
+  AllianceSuggestion,
+  OpportunityGap,
+} from '@/domain/allianceMarket/intelligentSegmentation';
 
 export default function AllianceMarket() {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
-
-  const [activeTab, setActiveTab] = useState<ProfileType>('alliance');
-  const [search, setSearch] = useState('');
-  const [industryFilter, setIndustryFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<ProfileStatus | 'all'>('all');
-  const [sortBy, setSortBy] = useState<SortOption>('compatibility_score');
-  const [selectedProfile, setSelectedProfile] = useState<AllianceMarketProfileDTO | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
   const companyId = currentCompany?.id ?? '';
 
-  // ── KPIs ──
-  const { data: kpis, isLoading: kpisLoading } = useQuery({
-    queryKey: ['alliance-market-kpis', companyId],
-    queryFn: () => allianceMarketRepository.getKPIs(companyId),
-    enabled: !!companyId,
-    staleTime: 1000 * 60 * 2,
-  });
+  const [selectedSuggestion, setSelectedSuggestion] = useState<AllianceSuggestion | null>(null);
+  const [selectedGap, setSelectedGap] = useState<OpportunityGap | null>(null);
 
-  // ── Lista de perfiles ──
-  const { data: listResult, isLoading: listLoading } = useQuery({
-    queryKey: ['alliance-market-profiles', companyId, activeTab, search, industryFilter, statusFilter, sortBy],
-    queryFn: () =>
-      allianceMarketRepository.list({
-        companyId,
-        profileType: activeTab,
-        search: search || undefined,
-        industry: industryFilter !== 'all' ? industryFilter : undefined,
-        status: statusFilter !== 'all' ? statusFilter : undefined,
-        sortBy,
-        sortDir: 'desc',
-        pageSize: 50,
-      }),
-    enabled: !!companyId,
-    staleTime: 1000 * 30,
-  });
-
-  // ── Industrias para filtro ──
-  const { data: industries = [] } = useQuery({
-    queryKey: ['alliance-market-industries', companyId],
-    queryFn: () => allianceMarketRepository.getIndustries(companyId),
-    enabled: !!companyId,
-    staleTime: 1000 * 60 * 10,
-  });
-
-  // ── Actualizar perfiles - Elimina anteriores y recarga ──
-  const handleRefreshProfiles = async () => {
-    if (!companyId) return;
-    
-    setRefreshing(true);
-    try {
-      // Obtener todos los perfiles "sugeridos" generados por IA
-      const { data: oldProfiles } = await supabase
-        .from('alliance_market_profiles')
-        .select('id')
-        .eq('company_id', companyId)
-        .eq('status', 'suggested')
-        .eq('is_ai_generated', true);
-
-      // Eliminar perfiles anteriores
-      if (oldProfiles && oldProfiles.length > 0) {
-        await supabase
-          .from('alliance_market_profiles')
-          .delete()
-          .in('id', oldProfiles.map(p => p.id));
-        
-        toast.info(`Eliminados ${oldProfiles.length} perfiles anteriores`);
-      }
-
-      // Recargar datos
-      queryClient.invalidateQueries({ queryKey: ['alliance-market-profiles', companyId] });
-      queryClient.invalidateQueries({ queryKey: ['alliance-market-kpis', companyId] });
-      queryClient.invalidateQueries({ queryKey: ['alliance-market-industries', companyId] });
+  // ── Generate/Get Segmentation Report ──
+  const { data: report, isLoading: reportLoading, refetch: refetchReport } = useQuery({
+    queryKey: ['alliance-segmentation-report', companyId],
+    queryFn: async () => {
+      if (!companyId) return null;
       
-      toast.success('Perfiles actualizados y limpios');
-    } catch (error) {
-      console.error('Error refreshing profiles:', error);
-      toast.error('Error actualizando perfiles');
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  // ── Mutation: registrar conexión ──
-  const connectMutation = useMutation({
-    mutationFn: ({
-      profileId,
-      action,
-    }: {
-      profileId: string;
-      action: 'contacted' | 'saved' | 'discarded' | 'connected';
-    }) =>
-      allianceMarketRepository.registerConnection(companyId, profileId, action),
-    onSuccess: (_, { action }) => {
-      queryClient.invalidateQueries({ queryKey: ['alliance-market-profiles', companyId] });
-      queryClient.invalidateQueries({ queryKey: ['alliance-market-kpis', companyId] });
-      const msgs: Record<string, string> = {
-        contacted: 'Contacto registrado',
-        saved: 'Guardado en favoritos',
-        discarded: 'Perfil descartado',
-        connected: 'Conexión iniciada',
-      };
-      toast.success(msgs[action] ?? 'Acción registrada');
+      // First try to get cached report
+      let cachedReport = await intelligentSegmentationRepository.getSegmentationReport(companyId);
+      
+      // If no cache or older than 24 hours, regenerate
+      if (!cachedReport || 
+          (new Date().getTime() - new Date(cachedReport.generatedAt).getTime()) > 24 * 60 * 60 * 1000) {
+        cachedReport = await intelligentSegmentationRepository.generateSegmentationReport(companyId, 12);
+      }
+      
+      return cachedReport;
     },
-    onError: () => toast.error('Error al registrar la acción'),
+    enabled: !!companyId,
+    staleTime: 1000 * 60 * 60, // 1 hour
   });
 
-  const profiles = listResult?.data ?? [];
-
-  const handleOpenProfile = useCallback((profile: AllianceMarketProfileDTO) => {
-    setSelectedProfile(profile);
-    setDrawerOpen(true);
-    allianceMarketRepository
-      .registerConnection(companyId, profile.id, 'viewed')
-      .catch(() => {});
-  }, [companyId]);
-
-  const handleConnect = useCallback(
-    (profileId: string) => {
-      connectMutation.mutate({ profileId, action: 'contacted' });
+  // ── Regenerate Report Mutation ──
+  const regenerateMutation = useMutation({
+    mutationFn: async () => {
+      if (!companyId) throw new Error('No company selected');
+      await intelligentSegmentationRepository.invalidateReport(companyId);
+      return intelligentSegmentationRepository.generateSegmentationReport(companyId, 12);
     },
-    [connectMutation]
-  );
-
-  const handleDiscard = useCallback(
-    (profileId: string) => {
-      connectMutation.mutate({ profileId, action: 'discarded' });
-      if (selectedProfile?.id === profileId) setDrawerOpen(false);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alliance-segmentation-report', companyId] });
+      toast.success('Segmentation analysis updated');
     },
-    [connectMutation, selectedProfile]
-  );
+    onError: (error: any) => {
+      toast.error('Error regenerating analysis: ' + error.message);
+    },
+  });
 
-  const kpiCards = useMemo(
-    () => [
-      {
-        label: 'Alianzas sugeridas',
-        value: kpisLoading ? '—' : (kpis?.totalAlliances ?? 0).toString(),
-        sub: 'Perfiles activos',
-        icon: Network,
-        color: 'text-emerald-600',
-      },
-      {
-        label: 'Clientes potenciales',
-        value: kpisLoading ? '—' : (kpis?.totalClients ?? 0).toString(),
-        sub: 'Leads identificados',
-        icon: Users,
-        color: 'text-blue-600',
-      },
-      {
-        label: 'Valor estimado total',
-        value: kpisLoading
-          ? '—'
-          : `$${((kpis?.totalEstimatedValue ?? 0) / 1000).toFixed(0)}K USD`,
-        sub: 'Potencial combinado',
-        icon: TrendingUp,
-        color: 'text-amber-600',
-      },
-      {
-        label: 'Compatibilidad promedio',
-        value: kpisLoading ? '—' : `${kpis?.avgCompatibility ?? 0}%`,
-        sub: 'Score IA',
-        icon: Sparkles,
-        color: 'text-purple-600',
-      },
-    ],
-    [kpis, kpisLoading]
-  );
+  if (!companyId) {
+    return (
+      <Layout>
+        <div className="text-center py-12">
+          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">No company selected</p>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <div className="flex flex-col gap-6 p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+      <div className="space-y-6 p-6">
+        {/* HEADER */}
+        <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-semibold flex items-center gap-2">
-              <Network className="w-6 h-6 text-emerald-600" />
-              Alliance Market
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Alianzas estratégicas y clientes potenciales identificados por IA
+            <h1 className="text-3xl font-bold">Alliance Market</h1>
+            <p className="text-gray-600 mt-1">
+              Intelligent segmentation analysis based on your real business data
             </p>
           </div>
-          <div className="flex gap-2">
-            <AllianceMarketConfigDrawer
-              companyId={companyId}
-              onGenerateProfiles={() => {
-                queryClient.invalidateQueries({ queryKey: ['alliance-market-profiles', companyId] });
-                queryClient.invalidateQueries({ queryKey: ['alliance-market-kpis', companyId] });
-              }}
-            />
-          </div>
+          <Button
+            onClick={() => regenerateMutation.mutate()}
+            disabled={regenerateMutation.isPending}
+            variant="outline"
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
+            Refresh Analysis
+          </Button>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {kpiCards.map((kpi) => (
-            <div
-              key={kpi.label}
-              className="bg-card border border-border rounded-xl p-4"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <kpi.icon className={`w-4 h-4 ${kpi.color}`} />
-                <span className="text-xs text-muted-foreground">{kpi.label}</span>
-              </div>
-              <div className="text-2xl font-semibold">{kpi.value}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{kpi.sub}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Tabs + Filtros */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ProfileType)}>
-            <TabsList>
-              <TabsTrigger value="alliance">Alianzas estratégicas</TabsTrigger>
-              <TabsTrigger value="client">Clientes potenciales</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <div className="flex flex-1 flex-wrap gap-2 sm:ml-auto">
-            {/* Search */}
-            <div className="relative flex-1 min-w-[180px]">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Buscar empresa o industria..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 h-9 text-sm"
-              />
-            </div>
-
-            {/* Industria */}
-            <Select value={industryFilter} onValueChange={setIndustryFilter}>
-              <SelectTrigger className="w-[150px] h-9 text-sm">
-                <SlidersHorizontal className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-                <SelectValue placeholder="Industria" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las industrias</SelectItem>
-                {industries.map((ind) => (
-                  <SelectItem key={ind} value={ind}>
-                    {ind}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Sort */}
-            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-              <SelectTrigger className="w-[190px] h-9 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.entries(SORT_LABELS) as [SortOption, string][]).map(([val, label]) => (
-                  <SelectItem key={val} value={val}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Grid de cards */}
-        {listLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-64 rounded-xl" />
-            ))}
-          </div>
-        ) : profiles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            <Network className="w-12 h-12 mb-4 opacity-20" />
-            <p className="text-sm font-medium">No se encontraron perfiles</p>
-            <p className="text-xs mt-1">Probá cambiando los filtros o actualizando el market</p>
+        {reportLoading || !report ? (
+          <div className="space-y-4">
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-64 w-full" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {profiles.map((profile) => (
-              <AllianceMarketCard
-                key={profile.id}
-                profile={profile}
-                onOpen={handleOpenProfile}
-                onConnect={handleConnect}
-                onDiscard={handleDiscard}
-                isConnecting={connectMutation.isPending}
-              />
-            ))}
-          </div>
-        )}
+          <>
+            {/* VALIDATION ALERTS BANNER */}
+            {report.allAlerts && report.allAlerts.length > 0 && (
+              <Card className={`border-l-4 ${
+                report.allAlerts.some((a) => a.severity === 'CRITICAL')
+                  ? 'border-l-red-500 bg-red-50'
+                  : report.allAlerts.some((a) => a.severity === 'WARNING')
+                  ? 'border-l-yellow-500 bg-yellow-50'
+                  : 'border-l-blue-500 bg-blue-50'
+              }`}>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5" />
+                    Data Quality Alerts ({report.allAlerts.length})
+                  </CardTitle>
+                  <CardDescription>
+                    {report.allAlerts.filter((a) => a.severity === 'CRITICAL').length > 0
+                      ? '⚠️ Critical issues found - some metrics may be unreliable'
+                      : report.allAlerts.filter((a) => a.severity === 'WARNING').length > 0
+                      ? '⚠️ Warnings detected - review before relying on recommendations'
+                      : 'ℹ️ Info alerts - good to know'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {report.allAlerts.map((alert, idx) => (
+                      <div key={alert.id || idx} className="flex gap-3 pb-3 border-b last:border-b-0 last:pb-0">
+                        <div className="flex-shrink-0 pt-0.5">
+                          <div className={`w-2 h-2 rounded-full ${
+                            alert.severity === 'CRITICAL' ? 'bg-red-600' : 
+                            alert.severity === 'WARNING' ? 'bg-yellow-600' : 
+                            'bg-blue-600'
+                          }`} />
+                        </div>
+                        <div className="flex-grow">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{alert.message}</p>
+                              <p className="text-xs text-gray-600 mt-1">{alert.impact}</p>
+                              <p className="text-xs text-gray-500 mt-1 italic">💡 {alert.recommendation}</p>
+                            </div>
+                            <Badge variant="outline" className="whitespace-nowrap">
+                              {alert.category.replace(/_/g, ' ')}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-        {/* Count */}
-        {!listLoading && profiles.length > 0 && (
-          <p className="text-xs text-muted-foreground text-center pb-2">
-            Mostrando {profiles.length} de {listResult?.count ?? profiles.length} perfiles
-          </p>
+            {/* EXECUTIVE SUMMARY */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Executive Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Health Score */}
+                  <div className="border rounded-lg p-4">
+                    <div className="text-sm text-gray-600 mb-2">Overall Health</div>
+                    <div className="text-2xl font-bold">
+                      {report.executiveSummary.healthScore.toFixed(0)}/100
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {report.executiveSummary.overallHealth}
+                    </div>
+                  </div>
+
+                  {/* Confidence Level */}
+                  <div className="border rounded-lg p-4">
+                    <div className="text-sm text-gray-600 mb-2">Analysis Confidence</div>
+                    <div className="text-2xl font-bold">
+                      {report.executiveSummary.confidenceLevel.toFixed(0)}%
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {report.executiveSummary.confidenceLevel >= 80
+                        ? 'High confidence'
+                        : report.executiveSummary.confidenceLevel >= 60
+                        ? 'Good confidence'
+                        : report.executiveSummary.confidenceLevel >= 40
+                        ? 'Moderate confidence'
+                        : 'Low confidence'}
+                    </div>
+                  </div>
+
+                  {/* Opportunities */}
+                  <div className="border rounded-lg p-4">
+                    <div className="text-sm text-gray-600 mb-2">Opportunities Found</div>
+                    <div className="text-2xl font-bold">{report.gaps.length}</div>
+                    <div className="text-xs text-gray-500 mt-1">gaps identified</div>
+                  </div>
+
+                  {/* Total Opportunity */}
+                  <div className="border rounded-lg p-4">
+                    <div className="text-sm text-gray-600 mb-2">Est. Total Opportunity</div>
+                    <div className="text-2xl font-bold">
+                      ${(report.executiveSummary.estimatedTotalOpportunity / 1000000).toFixed(1)}M
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">revenue potential</div>
+                  </div>
+                </div>
+
+                {/* Key Insights */}
+                <div className="space-y-2 pt-4 border-t">
+                  <h3 className="font-semibold text-sm">Key Insights</h3>
+                  <ul className="space-y-2">
+                    {report.executiveSummary.keyInsights.map((insight, idx) => (
+                      <li key={idx} className="text-sm text-gray-700 flex gap-2">
+                        <span className="text-blue-600">•</span>
+                        <span>{insight}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* TABS */}
+            <Tabs defaultValue="gaps" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="gaps" className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Opportunities ({report.gaps.length})
+                </TabsTrigger>
+                <TabsTrigger value="suggestions" className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Suggestions ({report.suggestions.length})
+                </TabsTrigger>
+                <TabsTrigger value="analysis" className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Analysis Details
+                </TabsTrigger>
+              </TabsList>
+
+              {/* GAPS TAB */}
+              <TabsContent value="gaps" className="space-y-4">
+                {report.gaps.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-8 text-center text-gray-600">
+                      No gaps identified - your business is well optimized!
+                    </CardContent>
+                  </Card>
+                ) : (
+                  report.gaps.map((gap) => (
+                    <Card
+                      key={gap.id}
+                      className="cursor-pointer hover:border-blue-500 transition-colors"
+                      onClick={() => setSelectedGap(gap)}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="text-lg">{gap.title}</CardTitle>
+                            <CardDescription className="mt-1">{gap.description}</CardDescription>
+                          </div>
+                          <div className="text-right">
+                            <Badge
+                              className={`${
+                                gap.impactLevel > 70
+                                  ? 'bg-red-100 text-red-800'
+                                  : gap.impactLevel > 50
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}
+                            >
+                              Impact: {gap.impactLevel}
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                          <div>
+                            <div className="text-gray-600">Revenue Impact</div>
+                            <div className="font-semibold">
+                              ${(gap.estimatedImpact.revenue / 1000).toFixed(0)}k
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-gray-600">Margin +</div>
+                            <div className="font-semibold">{gap.estimatedImpact.margin}%</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-600">Type</div>
+                            <div className="font-semibold">{gap.type}</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-600">Risk</div>
+                            <div className={`font-semibold ${gap.riskLevel === 'LOW' ? 'text-green-600' : gap.riskLevel === 'MEDIUM' ? 'text-yellow-600' : 'text-red-600'}`}>
+                              {gap.riskLevel}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t">
+                          <div className="text-sm font-semibold text-gray-700 mb-2">Required Alliance Type</div>
+                          <Badge variant="outline">{gap.requiredAllianceType}</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </TabsContent>
+
+              {/* SUGGESTIONS TAB */}
+              <TabsContent value="suggestions" className="space-y-4">
+                {report.suggestions.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-8 text-center text-gray-600">
+                      No suggestions at this time
+                    </CardContent>
+                  </Card>
+                ) : (
+                  report.suggestions.map((suggestion) => (
+                    <Card
+                      key={suggestion.id}
+                      className="cursor-pointer hover:border-green-500 transition-colors"
+                      onClick={() => setSelectedSuggestion(suggestion)}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="text-lg flex items-center gap-2">
+                              <Zap className="h-5 w-5 text-green-600" />
+                              {suggestion.title}
+                            </CardTitle>
+                            <CardDescription className="mt-1">{suggestion.description}</CardDescription>
+                          </div>
+                          <Badge
+                            variant={
+                              suggestion.priority === 'HIGH'
+                                ? 'destructive'
+                                : suggestion.priority === 'MEDIUM'
+                                ? 'default'
+                                : 'secondary'
+                            }
+                          >
+                            {suggestion.priority} PRIORITY
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                          <div>
+                            <div className="text-gray-600">Revenue +</div>
+                            <div className="font-semibold">
+                              ${(suggestion.expectedImpact.revenueIncrease / 1000).toFixed(0)}k
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-gray-600">Margin +</div>
+                            <div className="font-semibold">{suggestion.expectedImpact.marginIncrease}%</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-600">Timeline</div>
+                            <div className="font-semibold">{suggestion.implementationPath.timelineMonths} months</div>
+                          </div>
+                          <div>
+                            <div className="text-gray-600">Risk Level</div>
+                            <div className={`font-semibold ${suggestion.riskLevel === 'LOW' ? 'text-green-600' : suggestion.riskLevel === 'MEDIUM' ? 'text-yellow-600' : 'text-red-600'}`}>
+                              {suggestion.riskLevel}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t">
+                          <div className="text-sm font-semibold text-gray-700 mb-2">Type of Partner Needed</div>
+                          <Badge variant="outline">{suggestion.type}</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </TabsContent>
+
+              {/* ANALYSIS DETAILS TAB */}
+              <TabsContent value="analysis" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Customer Analysis */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Customer Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-gray-600">Total Customers</span>
+                        <span className="font-semibold">{report.customerAnalysis.totalCustomers}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-gray-600">Active Customers</span>
+                        <span className="font-semibold">{report.customerAnalysis.activeCustomers}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-gray-600">Avg Ticket</span>
+                        <span className="font-semibold">${report.customerAnalysis.avgTicket.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-gray-600">Retention Rate</span>
+                        <span className="font-semibold">{report.customerAnalysis.retentionRate.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between py-2">
+                        <span className="text-gray-600">Concentration Ratio</span>
+                        <span className="font-semibold">{report.customerAnalysis.concentrationRatio.toFixed(0)}%</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Product Analysis */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Product Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-gray-600">Total Products</span>
+                        <span className="font-semibold">{report.productAnalysis.totalProducts}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-gray-600">Active Products</span>
+                        <span className="font-semibold">{report.productAnalysis.activeProducts}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-gray-600">Avg Margin</span>
+                        <span className="font-semibold">{report.productAnalysis.avgMargin}%</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b">
+                        <span className="text-gray-600">Total Revenue</span>
+                        <span className="font-semibold">${(report.productAnalysis.totalRevenue / 1000000).toFixed(2)}M</span>
+                      </div>
+                      <div className="flex justify-between py-2">
+                        <span className="text-gray-600">Low Penetration Items</span>
+                        <span className="font-semibold">{report.productAnalysis.lowPenetrationProducts.length}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Top Industries */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Top Industries</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      {report.segmentAnalysis.segments.slice(0, 5).map((seg, idx) => (
+                        <div key={idx} className="flex justify-between py-1 border-b last:border-0">
+                          <span className="text-gray-600">{seg.industry}</span>
+                          <span className="font-semibold">{seg.percentOfTotal.toFixed(1)}%</span>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+
+                  {/* Geographic Coverage */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Geographic Coverage</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      {report.geographicAnalysis.covered.slice(0, 5).map((geo, idx) => (
+                        <div key={idx} className="flex justify-between py-1 border-b last:border-0">
+                          <span className="text-gray-600">{geo.region}</span>
+                          <span className="font-semibold">{geo.penetration.toFixed(1)}%</span>
+                        </div>
+                      ))}
+                      {report.geographicAnalysis.uncovered.length > 0 && (
+                        <div className="pt-2 text-xs text-orange-600">
+                          +{report.geographicAnalysis.uncovered.length} uncovered regions
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            {/* FOOTER */}
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="py-4">
+                <div className="flex items-start gap-3">
+                  <Eye className="h-5 w-5 text-blue-600 mt-1 flex-shrink-0" />
+                  <div className="text-sm">
+                    <div className="font-semibold text-blue-900">Next Steps</div>
+                    <p className="text-blue-800 mt-1">
+                      Review the suggestions above and identify which alliances align with your strategic priorities. 
+                      Use the action items provided to guide vendor outreach and partnership negotiations.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
-
-      {/* Drawer de detalle */}
-      <AllianceMarketDrawer
-        profile={selectedProfile}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onConnect={handleConnect}
-        onDiscard={handleDiscard}
-        isConnecting={connectMutation.isPending}
-      />
     </Layout>
   );
 }

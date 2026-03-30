@@ -89,19 +89,36 @@ export function ContributionHeatmap({ data = [], title = 'Actividad Último Año
       end: new Date()
     });
 
-    // Agrupar por semana y día
+    // Agrupar por semana y día (asegurando 7 días por semana)
     const weeks: { dayOfWeek: number; date: Date; count: number }[][] = [];
     let currentWeek: { dayOfWeek: number; date: Date; count: number }[] = [];
+    let firstWeekStarted = false;
 
-    allDays.forEach(date => {
+    allDays.forEach((date, index) => {
       const dateStr = format(date, 'yyyy-MM-dd');
       const dayOfWeek = date.getDay(); // 0-6 (Sun-Sat)
       const count = dateMap.get(dateStr) || 0;
 
+      // Si es la primera iteración y no es domingo, rellenar días anteriores
+      if (index === 0 && dayOfWeek !== 0) {
+        for (let i = dayOfWeek - 1; i >= 0; i--) {
+          const prevDate = subDays(date, i + 1);
+          currentWeek.unshift({ dayOfWeek: prevDate.getDay(), date: prevDate, count: 0 });
+        }
+      }
+
       currentWeek.push({ dayOfWeek, date, count });
 
       // Si llegamos a sábado (6) o es el último día, terminar la semana
-      if (dayOfWeek === 6 || date.getTime() === allDays[allDays.length - 1].getTime()) {
+      if (dayOfWeek === 6 || index === allDays.length - 1) {
+        // Rellenar con días vacíos si la última semana no termina en sábado
+        if (index === allDays.length - 1 && dayOfWeek !== 6) {
+          for (let i = dayOfWeek + 1; i < 7; i++) {
+            const nextDate = new Date(date);
+            nextDate.setDate(nextDate.getDate() + (i - dayOfWeek));
+            currentWeek.push({ dayOfWeek: i, date: nextDate, count: 0 });
+          }
+        }
         weeks.push(currentWeek);
         currentWeek = [];
       }
@@ -164,12 +181,12 @@ export function ContributionHeatmap({ data = [], title = 'Actividad Último Año
           <div className="overflow-x-auto pb-4">
             <div className="inline-block min-w-full">
               {/* Month labels */}
-              <div className="flex gap-1 pb-2 pl-12">
+              <div className="flex gap-1 pb-3 pl-14">
                 {months.map((item, idx) => (
                   <div
                     key={idx}
-                    className="text-xs text-gray-500 font-medium"
-                    style={{ minWidth: `${item.weekIndex > 0 ? 16 : 0}px` }}
+                    className="text-xs text-gray-600 font-semibold flex-shrink-0"
+                    style={{ width: '48px', textAlign: 'left' }}
                   >
                     {item.month}
                   </div>
@@ -177,13 +194,13 @@ export function ContributionHeatmap({ data = [], title = 'Actividad Último Año
               </div>
 
               {/* Day labels + heatmap grid */}
-              <div className="flex gap-1">
+              <div className="flex gap-2">
                 {/* Day labels (left side) */}
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1 pr-2">
                   {dayLabels.map((label, idx) => (
                     <div
                       key={idx}
-                      className="h-3 w-10 flex items-center justify-end pr-2 text-xs text-gray-500 font-medium"
+                      className="h-5 w-11 flex items-center justify-end pr-2 text-xs text-gray-600 font-medium flex-shrink-0"
                     >
                       {label}
                     </div>
@@ -191,7 +208,7 @@ export function ContributionHeatmap({ data = [], title = 'Actividad Último Año
                 </div>
 
                 {/* Heatmap weeks */}
-                <div className="flex gap-1">
+                <div className="flex gap-1 flex-wrap">
                   {heatmapData.weeks.map((week, weekIdx) => (
                     <div key={weekIdx} className="flex flex-col gap-1">
                       {week.map((day, dayIdx) => {
@@ -203,7 +220,7 @@ export function ContributionHeatmap({ data = [], title = 'Actividad Último Año
                           <div
                             key={`${weekIdx}-${dayIdx}`}
                             title={`${format(day.date, 'dd/MM/yyyy')}: ${getTooltip(count)}`}
-                            className={`h-3 w-3 rounded-sm border cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all ${getColor(count)}`}
+                            className={`h-5 w-5 rounded-sm border cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-blue-500 transition-all ${getColor(count)}`}
                           />
                         );
                       })}
@@ -213,14 +230,14 @@ export function ContributionHeatmap({ data = [], title = 'Actividad Último Año
               </div>
 
               {/* Legend */}
-              <div className="flex items-center gap-2 mt-4 text-xs text-gray-500">
-                <span>Menos</span>
-                <div className="h-3 w-3 bg-gray-100 border border-gray-200 rounded-sm" />
-                <div className="h-3 w-3 bg-blue-100 border border-blue-200 rounded-sm" />
-                <div className="h-3 w-3 bg-blue-300 border border-blue-400 rounded-sm" />
-                <div className="h-3 w-3 bg-blue-500 border border-blue-600 rounded-sm" />
-                <div className="h-3 w-3 bg-blue-700 border border-blue-800 rounded-sm" />
-                <span>Más</span>
+              <div className="flex items-center gap-2 mt-5 text-xs text-gray-600">
+                <span className="font-medium">Menos</span>
+                <div className="h-4 w-4 bg-gray-100 border border-gray-300 rounded-sm" />
+                <div className="h-4 w-4 bg-blue-100 border border-blue-300 rounded-sm" />
+                <div className="h-4 w-4 bg-blue-300 border border-blue-400 rounded-sm" />
+                <div className="h-4 w-4 bg-blue-500 border border-blue-600 rounded-sm" />
+                <div className="h-4 w-4 bg-blue-700 border border-blue-800 rounded-sm" />
+                <span className="font-medium">Más</span>
               </div>
             </div>
           </div>
