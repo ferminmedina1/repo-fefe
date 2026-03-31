@@ -60,12 +60,17 @@ const heatmapStyles = `
     font-size: 11px;
     font-weight: 500;
     color: #8b949e;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .month-label {
+    flex-shrink: 0;
     width: 53px;
     text-align: left;
     padding-left: 2px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .days-column {
@@ -152,6 +157,7 @@ export function ContributionHeatmap({
   onDayClick
 }: ContributionHeatmapProps) {
   const [hoveredDay, setHoveredDay] = useState<{ date: string; count: number } | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Build 53-week x 7-day matrix
   const { weeks, totalCount, monthLabels } = useMemo(() => {
@@ -299,6 +305,13 @@ export function ContributionHeatmap({
                             title={tooltipText}
                             onMouseEnter={() => setHoveredDay({ date: dateStr, count: day.count })}
                             onMouseLeave={() => setHoveredDay(null)}
+                            onMouseMove={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setTooltipPos({
+                                x: rect.left + rect.width / 2,
+                                y: rect.top - 10 // Position above the element with 10px gap
+                              });
+                            }}
                             onClick={() => {
                               if (onDayClick) onDayClick(dateStr, day.count);
                               console.log(`[Contribution] ${dateStr}: ${day.count} tasks`);
@@ -337,7 +350,16 @@ export function ContributionHeatmap({
 
             {/* Tooltip */}
             {hoveredDay && (
-              <div className="contribution-tooltip" style={{ position: 'fixed', pointerEvents: 'none' }}>
+              <div 
+                className="contribution-tooltip" 
+                style={{ 
+                  position: 'fixed',
+                  left: `${tooltipPos.x}px`,
+                  top: `${tooltipPos.y}px`,
+                  transform: 'translateX(-50%)',
+                  pointerEvents: 'none'
+                }}
+              >
                 {hoveredDay.count === 0
                   ? `Sin actividad el ${format(new Date(hoveredDay.date), 'd')} de ${format(new Date(hoveredDay.date), 'MMMM', { locale: es })}`
                   : `${hoveredDay.count} tarea${hoveredDay.count !== 1 ? 's' : ''} el ${format(new Date(hoveredDay.date), 'd')} de ${format(new Date(hoveredDay.date), 'MMMM', { locale: es })}`}

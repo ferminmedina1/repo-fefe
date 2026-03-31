@@ -17,6 +17,7 @@ import { Briefcase, Plus, Filter, X } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { ContributionHeatmap } from "./ContributionHeatmap";
+import { DateRangeSelector, type DateRange } from "@/components/common/DateRangeSelector";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-500/10 text-yellow-700 border-yellow-500/20",
@@ -62,7 +63,17 @@ export function EmployeeWorkLog({ preselectedEmployeeId }: EmployeeWorkLogProps)
   const workLogsRef = useRef<HTMLDivElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
-  const [filterDate, setFilterDate] = useState(new Date().toISOString().split("T")[0]);
+  
+  // Initialize dateRange with default (last week)
+  const today = new Date().toISOString().split("T")[0];
+  const lastWeek = format(subDays(new Date(), 7), 'yyyy-MM-dd');
+  const [dateRange, setDateRange] = useState<DateRange>({
+    type: 'week',
+    startDate: lastWeek,
+    endDate: today,
+    label: 'Última semana'
+  });
+  
   const [selectedFromHeatmap, setSelectedFromHeatmap] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -105,7 +116,7 @@ export function EmployeeWorkLog({ preselectedEmployeeId }: EmployeeWorkLogProps)
 
   // Fetch work logs
   const { data: workLogs = [], isLoading } = useQuery({
-    queryKey: ["work-logs", currentCompany?.id, filterDate],
+    queryKey: ["work-logs", currentCompany?.id, dateRange.startDate, dateRange.endDate],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       const supabaseClient = supabase as any;
@@ -113,7 +124,8 @@ export function EmployeeWorkLog({ preselectedEmployeeId }: EmployeeWorkLogProps)
         .from("work_logs")
         .select("*")
         .eq("company_id", currentCompany.id)
-        .eq("task_date", filterDate)
+        .gte("task_date", dateRange.startDate)
+        .lte("task_date", dateRange.endDate)
         .order("task_date", { ascending: false })
         .order("created_at", { ascending: false });
 
@@ -139,14 +151,18 @@ export function EmployeeWorkLog({ preselectedEmployeeId }: EmployeeWorkLogProps)
         .order("task_date", { ascending: true });
 
       if (error) throw error;
-      return (data || []).map((item: any) => ({
-        task_date: item?.task_date,
-        status: item?.status,
-        employee_id: item?.employee_id
-      })) as Array<{ task_date: string; status: string; employee_id: string }>;
+      return (data || []).map((item: any) => {
+        // Validate data before mapping
+        if (!item || !item.task_date) return null;
+        return {
+          task_date: item.task_date,
+          status: item.status || '',
+          employee_id: item.employee_id || ''
+        };
+      }).filter((item): item is { task_date: string; status: string; employee_id: string } => item !== null);
     },
     enabled: !!currentCompany?.id,
-    refetchInterval: 5000, // Actualizar cada 5 segundos para cambios en tiempo real
+    refetchInterval: 60000, // Actualizar cada 60 segundos para cambios en tiempo real
   });
 
   // Calculate contribution data for heatmap - filtered by selected employees
@@ -157,11 +173,11 @@ export function EmployeeWorkLog({ preselectedEmployeeId }: EmployeeWorkLogProps)
     // If employees selected, filter by selected employees
     const logsToUse = selectedEmployees.size === 0 
       ? yearlyWorkLogs 
-      : yearlyWorkLogs.filter((log: any) => selectedEmployees.has(log.employee_id));
+      : yearlyWorkLogs.filter((log: any) => log && log.employee_id && selectedEmployees.has(log.employee_id));
     
     const dateMap = new Map<string, number>();
     logsToUse.forEach((log: any) => {
-      if (log && log.task_date) {
+      if (log && log.task_date && typeof log.task_date === 'string') {
         dateMap.set(log.task_date, (dateMap.get(log.task_date) || 0) + 1);
       }
     });
@@ -280,7 +296,12 @@ export function EmployeeWorkLog({ preselectedEmployeeId }: EmployeeWorkLogProps)
 
   // Handle click on heatmap day
   const handleDayClick = (date: string, count: number) => {
-    setFilterDate(date);
+    setDateRange({
+      type: 'custom',
+      startDate: date,
+      endDate: date,
+      label: format(new Date(date), 'dd/MM/yyyy', { locale: es })
+    });
     setSelectedFromHeatmap(true);
     // Scroll to work logs section after a short delay to ensure render
     setTimeout(() => {
@@ -293,7 +314,14 @@ export function EmployeeWorkLog({ preselectedEmployeeId }: EmployeeWorkLogProps)
   // Clear heatmap filter
   const clearHeatmapFilter = () => {
     setSelectedFromHeatmap(false);
-    setFilterDate(new Date().toISOString().split("T")[0]);
+    const today = new Date().toISOString().split("T")[0];
+    const lastWeek = format(subDays(new Date(), 7), 'yyyy-MM-dd');
+    setDateRange({
+      type: 'week',
+      startDate: lastWeek,
+      endDate: today,
+      label: 'Última semana'
+    });
   };
 
   return (
@@ -362,7 +390,7 @@ export function EmployeeWorkLog({ preselectedEmployeeId }: EmployeeWorkLogProps)
                 {selectedFromHeatmap && (
                   <div className="flex items-center gap-2 mt-2">
                     <Badge variant="secondary" className="bg-blue-500/10 text-blue-700 border-blue-500/20">
-                      📊 Filtrado desde gráfico: {format(new Date(filterDate), 'dd/MM/yyyy', { locale: es })}
+                      📊 Filtrado desde gráfico: {dateRange.label}
                     </Badge>
                     <Button
                       variant="ghost"
@@ -376,12 +404,10 @@ export function EmployeeWorkLog({ preselectedEmployeeId }: EmployeeWorkLogProps)
                 )}
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <Input
-                type="date"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="w-full sm:w-auto"
+            <div className="flex flex-col gap-3 w-full">
+              <DateRangeSelector 
+                value={dateRange}
+                onChange={setDateRange}
               />
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
