@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Briefcase, Plus, Filter } from "lucide-react";
+import { Briefcase, Plus, Filter, X } from "lucide-react";
 import { format, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { ContributionHeatmap } from "./ContributionHeatmap";
@@ -55,9 +55,11 @@ interface Employee {
 export function EmployeeWorkLog() {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
+  const workLogsRef = useRef<HTMLDivElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedEmployees, setSelectedEmployees] = useState<Set<string>>(new Set());
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedFromHeatmap, setSelectedFromHeatmap] = useState(false);
 
   const [formData, setFormData] = useState({
     employee_id: "",
@@ -265,12 +267,31 @@ export function EmployeeWorkLog() {
     return emp ? `${emp.first_name} ${emp.last_name}` : "Desconocido";
   };
 
+  // Handle click on heatmap day
+  const handleDayClick = (date: string, count: number) => {
+    setFilterDate(date);
+    setSelectedFromHeatmap(true);
+    // Scroll to work logs section after a short delay to ensure render
+    setTimeout(() => {
+      if (workLogsRef.current) {
+        workLogsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+  };
+
+  // Clear heatmap filter
+  const clearHeatmapFilter = () => {
+    setSelectedFromHeatmap(false);
+    setFilterDate(new Date().toISOString().split("T")[0]);
+  };
+
   return (
     <div className="space-y-6">
       {/* Contribution Heatmap - Yearly Activity */}
       <ContributionHeatmap 
         data={contributionData} 
         title="Actividad del Último Año"
+        onDayClick={handleDayClick}
       />
 
       {/* Employees Filter */}
@@ -315,7 +336,7 @@ export function EmployeeWorkLog() {
       </Card>
 
       {/* Work Logs */}
-      <Card>
+      <Card ref={workLogsRef}>
         <CardHeader>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -327,6 +348,21 @@ export function EmployeeWorkLog() {
                     ? `Mostrando ${filteredLogs.length} tareas de ${selectedEmployees.size} empleado(s)`
                     : `Total: ${workLogs.length} tareas`}
                 </CardDescription>
+                {selectedFromHeatmap && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="secondary" className="bg-blue-500/10 text-blue-700 border-blue-500/20">
+                      📊 Filtrado desde gráfico: {format(new Date(filterDate), 'dd/MM/yyyy', { locale: es })}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearHeatmapFilter}
+                      className="h-5 w-5 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
