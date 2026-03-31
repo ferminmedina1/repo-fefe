@@ -692,11 +692,12 @@ export function TutorialRunner() {
   const handleNarrationNext = useCallback(() => {
     if (isLastStep && currentTutorial) {
       triggerCompletion(currentTutorial.moduleName);
-      nextStep();
+      // Delay endTutorial to allow completion flash to show
+      setTimeout(() => endTutorial(), 100);
     } else {
       nextStep();
     }
-  }, [isLastStep, currentTutorial, nextStep, triggerCompletion]);
+  }, [isLastStep, currentTutorial, endTutorial, triggerCompletion]);
 
   const handleNarrationBack = useCallback(() => {
     goToStep(stepIndex - 1);
@@ -704,9 +705,15 @@ export function TutorialRunner() {
 
   // MiniBar advance
   const handleMiniBarNext = useCallback(() => {
-    setMinimized(false);
-    setTimeout(() => nextStep(), 160);
-  }, [nextStep]);
+    if (isLastStep && currentTutorial) {
+      setMinimized(false);
+      triggerCompletion(currentTutorial.moduleName);
+      setTimeout(() => endTutorial(), 160);
+    } else {
+      setMinimized(false);
+      setTimeout(() => nextStep(), 160);
+    }
+  }, [isLastStep, currentTutorial, nextStep, endTutorial, triggerCompletion]);
 
   // Cleanup on unmount or when tutorial ends
   useEffect(() => {
