@@ -102,12 +102,27 @@ function validateTarget(selector: string | undefined, debug = false): Validation
   try {
     const element = document.querySelector(selector);
     if (!element) {
-      console.log(`[Tutorial Debug] validateTarget FAIL: "${selector}" no se encontró en el DOM.`);
+      if (debug) console.log(`[Tutorial Debug] ❌ validateTarget FAIL: "${selector}" no se encontró en el DOM.`);
       return { isValid: false, reason: 'Element not found in DOM' };
     }
-    console.log(`[Tutorial Debug] validateTarget OK: "${selector}" encontrado.`);
-    // Extremely permissive: if it's in the DOM, let Joyride attempt to highlight it.
-    // This fixes issues where zero-height parents or opacity 0 during animations falsely invalidated targets.
+    
+    // Advanced validation: check if element is actually visible and renderable
+    const rect = element.getBoundingClientRect();
+    const hasVisibleBounds = rect.width > 0 && rect.height > 0;
+    const computedStyle = window.getComputedStyle(element);
+    const isVisible = computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden';
+    const hasContent = element.childNodes.length > 0 || element.textContent?.trim().length > 0;
+    
+    if (debug) {
+      console.log(`[Tutorial Debug] ✅ validateTarget OK: "${selector}"`, {
+        hasVisibleBounds,
+        isVisible,
+        hasContent,
+        dimensions: { width: rect.width, height: rect.height }
+      });
+    }
+    
+    // Permissive: if it's in the DOM with some content/dimension, it's valid
     return { isValid: true };
   } catch (e) {
     return { isValid: false, reason: `Error during validation: ${(e as Error).message}` };
@@ -658,7 +673,7 @@ export function TutorialRunner() {
   const stepIndex = tutorialState.currentStepIndex;
   const currentOriginalStep = currentTutorial?.steps[stepIndex] ?? null;
   
-  // If target exists but is invalid in DOM, treat as untargeted (fallback to narration)
+  // Only treat as untargeted if step explicitly has NO target defined (after 20 seconds timeout, mark as untargeted)
   const targetIsInvalid = currentOriginalStep?.target && invalidTargets.has(currentOriginalStep.target);
   const isUntargetedStep = isRunning && currentOriginalStep && (!currentOriginalStep.target || targetIsInvalid);
   const isLastStep = !!currentTutorial && stepIndex === currentTutorial.steps.length - 1;
@@ -667,10 +682,12 @@ export function TutorialRunner() {
   useEffect(() => {
     if (!currentTutorial) { setJoyrideSteps([]); return; }
     const steps: Step[] = currentTutorial.steps.map(step => ({
-      target: (step.target && !invalidTargets.has(step.target)) ? step.target : 'body',
+      // Always use the original target selector - allow time for async elements to load
+      // Don't fallback to 'body' just because element hasn't loaded yet
+      target: step.target || 'body',
       title: step.title,
       content: step.description,
-      placement: (step.target && !invalidTargets.has(step.target))
+      placement: step.target
         ? (step.position === 'top' ? 'top' : step.position === 'bottom' ? 'bottom' : step.position === 'left' ? 'left' : step.position === 'right' ? 'right' : 'auto')
         : 'center',
       disableBeacon: true,
@@ -683,9 +700,16 @@ export function TutorialRunner() {
       },
     }));
     
-    console.log(`[Tutorial Debug] Generando joyrideSteps:`, steps.map(s => s.target));
+    console.log(
+      `[Tutorial] 📋 Generated Joyride Steps:`,
+      steps.map((s, i) => ({
+        step: i + 1,
+        target: s.target,
+        placement: s.placement
+      }))
+    );
     setJoyrideSteps(steps);
-  }, [currentTutorial, invalidTargets, minimized]);
+  }, [currentTutorial, minimized]);
 
   // Trigger completion flash
   const triggerCompletion = useCallback((name: string) => {

@@ -17,7 +17,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'dashboard-1',
-        target: '[data-tutorial="kpis"]',
+        target: '[data-tutorial-kpis]',
         blockName: 'KPIs / Indicadores Clave',
         title: '👋 Bienvenido a tu Dashboard',
         description: 'Este es tu panel de control principal. Aquí verás un resumen de todas tus operaciones: ventas totales del mes, rentabilidad, cuentas por cobrar y saldo de clientes en tiempo real.',
@@ -26,7 +26,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'dashboard-2',
-        target: '[data-tutorial="kpis"]',
+        target: '[data-tutorial-kpis]',
         blockName: 'KPIs / Indicadores Clave',
         title: '📊 4 Indicadores Clave (KPIs)',
         description: 'Las 4 tarjetas principales muestran: (1) Ventas del Mes total, (2) Margen Bruto %, (3) Total Por Cobrar a clientes, (4) Saldo en cuentas de clientes. Cada tarjeta tiene un badge % que muestra cambio vs. mes anterior.',
@@ -36,7 +36,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'dashboard-3',
-        target: '[data-tutorial="chart-sales"]',
+        target: '[data-tutorial-chart]',
         blockName: 'Gráfico de Ventas',
         title: '📈 Gráfico: Ventas de los Últimos 7 Días',
         description: 'Gráfico interactivo que muestra tendencia diaria de ventas. Eje X = Fecha, Eje Y = Monto en ARS. Es útil para identificar días picos y tendencias semanales. Pasa mouse sobre puntos para ver valores exactos.',
@@ -46,7 +46,7 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
       },
       {
         id: 'dashboard-4',
-        target: '[data-tutorial="stock-alerts"]',
+        target: '[data-tutorial-alerts]',
         blockName: 'Alertas de Stock',
         title: '🚨 Alertas de Stock Bajo',
         description: 'En la parte inferior ves el panel de "Alertas de Stock Bajo". Aquí aparecen los productos que cayeron por debajo de su stock mínimo configurado. Cada alerta muestra: Nombre del producto, Stock mínimo requerido, Cantidad actual. Si ves alertas, es hora de reponer!',
