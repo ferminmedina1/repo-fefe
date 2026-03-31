@@ -526,9 +526,16 @@ export function TutorialRunner() {
   }, [location.pathname, isRunning, endTutorial]);
 
   // Reset minimized on step change
-  useEffect(() => { setMinimized(false); }, [tutorialState.currentStepIndex]);
+  useEffect(() => { 
+    setMinimized(false);
+    
+    // Clear invalid targets on step change to allow re-validation
+    // This ensures each step gets a fresh chance to validate its target
+    setInvalidTargets(new Set());
+    setTargetFailureReasons(new Map());
+  }, [tutorialState.currentStepIndex]);
 
-  // Continuously validate current target (robust: 8 sec retry with exponential backoff)
+  // Continuously validate current target (robust: 20 sec retry tolerance)
   useEffect(() => {
     if (!isRunning || minimized) {
       if (validationTimerRef.current) clearInterval(validationTimerRef.current);
@@ -540,12 +547,11 @@ export function TutorialRunner() {
 
     const selector = currentStep.target;
     let attempts = 0;
-    const maxAttempts = 20; // 10 seconds total (500ms each)
+    const maxAttempts = 40; // 20 seconds total (500ms each) - increased from 20
     let observer: IntersectionObserver | null = null;
 
     const checkAndUpdateTarget = () => {
       const validation = validateTarget(selector, attempts === 0);
-      console.log(`[Tutorial Debug] checkAndUpdateTarget Attempt ${attempts} for "${selector}", isValid=${validation.isValid}`);
       
       if (validation.isValid) {
         // Target is valid, ensure it's not in invalid set
@@ -570,7 +576,9 @@ export function TutorialRunner() {
         if (observer) observer.disconnect();
         
         if (attempts > 0) {
-          console.log(`[Tutorial] Target "${selector}" recovered after ${attempts} attempts`);
+          console.log(`[Tutorial] ✅ Target "${selector}" found after ${attempts} attempts (${(attempts * 0.5).toFixed(1)}s)`);
+        } else {
+          console.log(`[Tutorial] ✅ Target "${selector}" found immediately`);
         }
         return true;
       }
@@ -581,8 +589,8 @@ export function TutorialRunner() {
     // Check immediately
     if (checkAndUpdateTarget()) return;
 
-    // Mark as temporarily invalid
-    setInvalidTargets(prev => new Set([...prev, selector]));
+    // DON'T mark as invalid yet - wait for maxAttempts first
+    // This allows time for async-loaded elements to appear
 
     // Set up IntersectionObserver to catch async-loaded elements
     try {
@@ -593,7 +601,9 @@ export function TutorialRunner() {
             entries.forEach(entry => {
               if (entry.isIntersecting) {
                 // Element became visible
-                checkAndUpdateTarget();
+                if (checkAndUpdateTarget()) {
+                  console.log(`[Tutorial] ✅ Target visibility detected: "${selector}"`);
+                }
               }
             });
           },
@@ -614,10 +624,10 @@ export function TutorialRunner() {
       }
 
       if (attempts >= maxAttempts) {
-        // 10+ seconds passed, mark as permanently unavailable
+        // 20+ seconds passed, NOW mark as permanently unavailable
         const validation = validateTarget(selector);
         console.warn(
-          `[Tutorial Debug] Target "${selector}" not found after ${maxAttempts} attempts. Marcándolo como inválido.`,
+          `[Tutorial] ❌ Target "${selector}" not found after ${maxAttempts} attempts (${(maxAttempts * 0.5).toFixed(1)}s). Marcándolo como inválido.`,
           validation
         );
         
@@ -626,7 +636,7 @@ export function TutorialRunner() {
         // Save failure reason
         setTargetFailureReasons(prev => {
           const updated = new Map(prev);
-          updated.set(selector, validation.reason || 'Elemento no encontrado');
+          updated.set(selector, `Element not found (waited ${(maxAttempts * 0.5).toFixed(0)}s)`);
           return updated;
         });
         
