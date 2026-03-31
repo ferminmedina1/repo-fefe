@@ -708,6 +708,14 @@ export function TutorialRunner() {
     setTimeout(() => nextStep(), 160);
   }, [nextStep]);
 
+  // Cleanup on unmount or when tutorial ends
+  useEffect(() => {
+    return () => {
+      if (completionTimerRef.current) clearTimeout(completionTimerRef.current);
+      if (validationTimerRef.current) clearInterval(validationTimerRef.current);
+    };
+  }, []);
+
   // Joyride should be running only when:
   // - isRunning AND not minimized AND current step HAS a VALID target
   const shouldRunJoyride = isRunning && !minimized && !isUntargetedStep;
@@ -716,13 +724,12 @@ export function TutorialRunner() {
 
   return (
     <>
-      {/* Joyride â€” only for targeted steps */}
-      {isRunning && joyrideSteps.length > 0 && (
+      {/* Joyride â€" only for targeted steps */}
+      {shouldRunJoyride && (
         <Joyride
           key={currentTutorial?.moduleId}
           steps={joyrideSteps}
           stepIndex={stepIndex}
-          run={shouldRunJoyride}
           callback={handleJoyrideCallback}
           continuous
           scrollToFirstStep
