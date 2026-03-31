@@ -769,7 +769,7 @@ export function TutorialRunner() {
           styles={{
             options: {
               zIndex: 10000,
-              overlayColor: 'rgba(0, 0, 0, 0.65)',
+              overlayColor: 'rgba(0, 0, 0, 0.75)',
               arrowColor: 'transparent',
               backgroundColor: 'transparent',
               textColor: 'transparent',
