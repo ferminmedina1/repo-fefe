@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, ArrowRight, ArrowLeft, AlertCircle } from "lucide-react";
+import { CreditCard, ArrowRight, AlertCircle } from "lucide-react";
 import { SignupFormData } from "@/hooks/useSignupWizard";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements } from "@stripe/react-stripe-js";
@@ -153,9 +153,8 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
 
       {/* Navigation Buttons */}
       <div className="flex justify-between pt-4">
-        <Button variant="ghost" onClick={prevStep} disabled={loading}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Anterior
+        <Button onClick={prevStep} variant="outline" size="lg" disabled={loading} className="text-black dark:text-black">
+          Atrás
         </Button>
       </div>
     </div>

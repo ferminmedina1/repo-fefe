@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
@@ -289,22 +288,6 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
     };
   }, [onSuccess]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCardError(null); // Limpiar errores previos
-    if (!cardPaymentRef.current) return;
-
-    try {
-      setSaving(true);
-      await cardPaymentRef.current.submit();
-    } catch (error: any) {
-      console.error("[MP] Submit error:", error);
-      const friendlyMessage = translateMercadoPagoError(error?.message);
-      setCardError(friendlyMessage);
-      setSaving(false);
-    }
-  };
-
   if (mpError) {
     return (
       <Alert variant="destructive">
@@ -315,7 +298,7 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="space-y-6">
       <div className="text-sm text-muted-foreground mb-4">
         Usando Mercado Pago Bricks para procesar tu tarjeta de forma segura
       </div>
@@ -338,22 +321,6 @@ export function MercadoPagoCardFields({ onSuccess, isLoading }: MercadoPagoCardF
           <AlertDescription>{cardError}</AlertDescription>
         </Alert>
       )}
-
-      <div className="flex gap-3 justify-end">
-        <Button type="submit" disabled={saving || isLoading || !mpLoaded}>
-          {saving ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Guardando...
-            </>
-          ) : (
-            <>
-              Guardar y continuar
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </>
-          )}
-        </Button>
-      </div>
-    </form>
+    </div>
   );
 }

@@ -56,12 +56,23 @@ export function SignupStepper({ currentStep }: SignupStepperProps) {
               <p
                 className={cn(
                   "text-sm font-medium",
-                  index <= currentStep ? "text-foreground" : "text-muted-foreground"
+                  index < currentStep
+                    ? "text-green-600" // Pasos completados: verde
+                    : index === currentStep
+                    ? "text-foreground" // Paso actual: foreground
+                    : "text-muted-foreground" // Pasos no completados: muted
                 )}
               >
                 {step.title}
               </p>
-              <p className="text-xs text-muted-foreground">{step.description}</p>
+              <p
+                className={cn(
+                  "text-xs",
+                  index < currentStep ? "text-green-500" : "text-muted-foreground"
+                )}
+              >
+                {step.description}
+              </p>
             </div>
           </div>
         ))}

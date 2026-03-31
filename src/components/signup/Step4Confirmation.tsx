@@ -191,8 +191,8 @@ export function Step4Confirmation({
             onCheckedChange={(checked) => setAcceptedTerms(checked as boolean)}
             className="mt-1"
           />
-          <Label htmlFor="terms" className="cursor-pointer text-sm leading-relaxed">
-            Acepto los{" "}
+          <Label htmlFor="terms" className="cursor-pointer text-sm leading-relaxed text-black dark:text-black">
+            He leído y acepto los{" "}
             <a
               href="#terms-and-conditions"
               className="text-primary hover:underline font-semibold"
@@ -202,10 +202,7 @@ export function Step4Confirmation({
           </Label>
         </div>
 
-        <div className="flex justify-between gap-4">
-          <Button onClick={prevStep} variant="outline" size="lg" disabled={isCreating}>
-            Atrás
-          </Button>
+        <div className="flex justify-end gap-4">
           <Button onClick={handleConfirm} size="lg" disabled={isCreating || !acceptedTerms}>
             {isCreating ? (
               <>
