@@ -78,6 +78,8 @@ const Employees = () => {
   const [formData, setFormData] = useState<EmployeeFormData>(initialFormData);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState(canManageTimeTracking ? "all-times" : "list");
+  const [preselectedEmployeeId, setPreselectedEmployeeId] = useState<string | null>(null);
 
   const canCreate = hasPermission("employees", "create");
   const canEdit = hasPermission("employees", "edit");
@@ -403,7 +405,7 @@ const Employees = () => {
           <h1 className="text-2xl md:text-3xl font-bold">Empleados</h1>
         </div>
 
-        <Tabs defaultValue={defaultTab} className="space-y-4 md:space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
           <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
             <TabsTrigger value="list" className="flex-1 min-w-[100px] text-xs sm:text-sm">
               <Users className="mr-1 sm:mr-2 h-4 w-4" />
@@ -750,6 +752,17 @@ const Employees = () => {
                           {(canEdit || canDelete) && (
                             <TableCell>
                               <div className="flex gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  title="Ver registros de trabajo"
+                                  onClick={() => {
+                                    setPreselectedEmployeeId(employee.id);
+                                    setActiveTab("work");
+                                  }}
+                                >
+                                  <Briefcase className="h-4 w-4" />
+                                </Button>
                                 {canEdit && (
                                   <Button
                                     variant="ghost"
@@ -816,7 +829,7 @@ const Employees = () => {
           </TabsContent>
 
           <TabsContent value="work">
-            <EmployeeWorkLog />
+            <EmployeeWorkLog preselectedEmployeeId={preselectedEmployeeId} />
           </TabsContent>
 
           {showMyTime && (

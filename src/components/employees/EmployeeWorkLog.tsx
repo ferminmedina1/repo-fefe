@@ -52,7 +52,11 @@ interface Employee {
   email?: string;
 }
 
-export function EmployeeWorkLog() {
+interface EmployeeWorkLogProps {
+  preselectedEmployeeId?: string | null;
+}
+
+export function EmployeeWorkLog({ preselectedEmployeeId }: EmployeeWorkLogProps) {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const workLogsRef = useRef<HTMLDivElement>(null);
@@ -73,6 +77,13 @@ export function EmployeeWorkLog() {
     notes: "",
     status: "pending" as const,
   });
+
+  // Auto-select employee when preselectedEmployeeId changes
+  useEffect(() => {
+    if (preselectedEmployeeId) {
+      setSelectedEmployees(new Set([preselectedEmployeeId]));
+    }
+  }, [preselectedEmployeeId]);
 
   // Fetch employees
   const { data: employees = [] } = useQuery({
@@ -299,7 +310,7 @@ export function EmployeeWorkLog() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            <CardTitle>Filtrar Empleados</CardTitle>
+            <CardTitle>Seleccionar Empleados</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
