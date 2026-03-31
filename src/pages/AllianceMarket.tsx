@@ -12,10 +12,12 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, BarChart3, TrendingUp, Zap, RefreshCw, Download, Eye } from 'lucide-react';
+import { AlertCircle, BarChart3, TrendingUp, Zap, RefreshCw, Download, Eye, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCompany } from '@/contexts/CompanyContext';
 import { intelligentSegmentationRepository } from '@/data/allianceMarket/intelligentSegmentationRepository';
+import { AllianceMarketDataConsent } from '@/components/allianceMarket/AllianceMarketDataConsent';
+import { useAllianceMarketConsent } from '@/hooks/useAllianceMarketConsent';
 import type {
   SegmentationReport,
   AllianceSuggestion,
@@ -27,6 +29,8 @@ export default function AllianceMarket() {
   const queryClient = useQueryClient();
   const companyId = currentCompany?.id ?? '';
 
+  const { showDialog, setShowDialog, preferences, resetConsent } = useAllianceMarketConsent();
+  
   const [selectedSuggestion, setSelectedSuggestion] = useState<AllianceSuggestion | null>(null);
   const [selectedGap, setSelectedGap] = useState<OpportunityGap | null>(null);
 
@@ -89,15 +93,26 @@ export default function AllianceMarket() {
               Análisis de segmentación inteligente basado en tus datos comerciales reales
             </p>
           </div>
-          <Button
-            onClick={() => regenerateMutation.mutate()}
-            disabled={regenerateMutation.isPending}
-            variant="outline"
-            className="gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
-            Actualizar Análisis
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowDialog(true)}
+              variant="ghost"
+              size="icon"
+              title="Preferencias de datos"
+              className="h-10 w-10"
+            >
+              <Settings className="h-5 w-5" />
+            </Button>
+            <Button
+              onClick={() => regenerateMutation.mutate()}
+              disabled={regenerateMutation.isPending}
+              variant="outline"
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
+              Actualizar Análisis
+            </Button>
+          </div>
         </div>
 
         {reportLoading || !report ? (
@@ -501,6 +516,9 @@ export default function AllianceMarket() {
             </Card>
           </>
         )}
+
+        {/* Data Consent Dialog */}
+        <AllianceMarketDataConsent open={showDialog} onOpenChange={setShowDialog} />
       </div>
     </Layout>
   );
