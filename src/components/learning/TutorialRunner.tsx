@@ -10,21 +10,38 @@ import { cn } from '@/lib/utils';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Spotlight pulse animation
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Spotlight pulse animation - Enhanced visibility with strong glow and border
+// Better highlight effect with multiple layers
 const spotlightStyles = `
   @keyframes spotlight-pulse {
     0%, 100% {
-      box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.6), 0 0 0 8px rgba(59, 130, 246, 0.2), 0 0 20px rgba(59, 130, 246, 0.4) !important;
+      box-shadow: 
+        inset 0 0 0 2px rgba(59, 130, 246, 0.8),
+        0 0 0 6px rgba(59, 130, 246, 0.7),
+        0 0 0 12px rgba(59, 130, 246, 0.4),
+        0 0 0 18px rgba(59, 130, 246, 0.2),
+        0 0 25px 2px rgba(59, 130, 246, 0.5),
+        0 0 50px 4px rgba(59, 130, 246, 0.3) !important;
+      outline: 3px solid rgba(59, 130, 246, 0.6) !important;
+      outline-offset: -2px;
     }
     50% {
-      box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.8), 0 0 0 12px rgba(59, 130, 246, 0.3), 0 0 30px rgba(59, 130, 246, 0.6) !important;
+      box-shadow: 
+        inset 0 0 0 2px rgba(59, 130, 246, 1),
+        0 0 0 8px rgba(59, 130, 246, 0.85),
+        0 0 0 16px rgba(59, 130, 246, 0.5),
+        0 0 0 24px rgba(59, 130, 246, 0.25),
+        0 0 35px 3px rgba(59, 130, 246, 0.7),
+        0 0 70px 5px rgba(59, 130, 246, 0.4) !important;
+      outline: 3px solid rgba(59, 130, 246, 0.8) !important;
+      outline-offset: -2px;
     }
   }
   
   .react-joyride__spotlight {
-    animation: spotlight-pulse 2s ease-in-out infinite !important;
+    animation: spotlight-pulse 3s ease-in-out infinite !important;
     border-radius: 14px !important;
+    background-color: transparent !important;
   }
 `;
 
@@ -649,7 +666,7 @@ export function TutorialRunner() {
       disableBeacon: true,
       disableOverlayClose: true,
       spotlightClicks: minimized,
-      spotlightPadding: 13,
+      spotlightPadding: 20,
       floaterProps: { 
         disableAnimation: true,
         autoUpdate: true, // Recalculate position on scroll/resize
