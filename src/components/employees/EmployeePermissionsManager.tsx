@@ -19,15 +19,15 @@ import { validateString, validateUUID } from "@/lib/validators";
 type AppRole = "admin" | "manager" | "cashier" | "accountant" | "viewer" | "warehouse" | "technician" | "auditor" | "employee";
 
 const AVAILABLE_ROLES: { value: AppRole; label: string; description: string }[] = [
-  { value: "admin", label: "Administrador", description: "Acceso completo a todos los módulos" },
-  { value: "manager", label: "Gerente", description: "Gestión general con algunas restricciones" },
-  { value: "cashier", label: "Cajero", description: "Acceso a POS y gestión de caja" },
-  { value: "accountant", label: "Contador", description: "Acceso a finanzas y reportes" },
-  { value: "warehouse", label: "Depósito", description: "Gestión de inventario y stock" },
-  { value: "technician", label: "Técnico", description: "Servicios técnicos" },
-  { value: "auditor", label: "Auditor", description: "Solo lectura para auditorías" },
-  { value: "viewer", label: "Visualizador", description: "Solo lectura básica" },
-  { value: "employee", label: "Empleado", description: "Acceso básico limitado" },
+  { value: "admin", label: "👑 Administrador", description: "Acceso completo a todos los módulos" },
+  { value: "manager", label: "👔 Gerente", description: "Gestión general con algunas restricciones" },
+  { value: "cashier", label: "💰 Cajero", description: "Acceso a POS y gestión de caja" },
+  { value: "accountant", label: "📊 Contador", description: "Acceso a finanzas y reportes" },
+  { value: "warehouse", label: "📦 Depósito", description: "Gestión de inventario y stock" },
+  { value: "technician", label: "🔧 Técnico", description: "Servicios técnicos" },
+  { value: "auditor", label: "🔍 Auditor", description: "Solo lectura para auditorías" },
+  { value: "viewer", label: "👁️ Visualizador", description: "Solo lectura básica" },
+  { value: "employee", label: "👤 Empleado", description: "Acceso básico limitado" },
 ];
 
 interface PermissionModule {
