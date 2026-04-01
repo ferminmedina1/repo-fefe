@@ -17,7 +17,6 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'dashboard-1',
-        target: '[data-tutorial-kpis]',
         blockName: 'KPIs / Indicadores Clave',
         title: '👋 Bienvenido a tu Dashboard',
         description: 'Este es tu panel de control principal. Aquí verás un resumen de todas tus operaciones: ventas totales del mes, rentabilidad, cuentas por cobrar y saldo de clientes en tiempo real.',
@@ -169,7 +168,6 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'customers-1',
-        target: '[data-tutorial="customer-table"]',
         blockName: 'Base de Clientes',
         title: '👥 Base de Clientes Completa',
         description: 'Registro centralizado de todos tus clientes: Nombre, Teléfono, Email, Dirección, CUIT/DNI, Límite de crédito, Saldo pendiente, Última compra, Total gasto histórico. Es la fuente de verdad para gestionar relaciones.',
@@ -221,7 +219,6 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'inventory-1',
-        target: '[data-tutorial="inventory-alerts-panel"]',
         blockName: 'Centro de Control',
         title: '📦 Centro de Control de Stock',
         description: 'Vista centralizada de QUÉ productos tienen bajo stock. El sistema monitorea automáticamente todos tus productos contra su nivel mínimo configurado. Es tu early warning system para evitar desabastecimiento.',
@@ -273,7 +270,6 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'pos-1',
-        target: '[data-tutorial="pos-interface"]',
         blockName: 'Interfaz POS Completa',
         title: '🛒 Terminal de Punto de Venta (POS)',
         description: 'Este es tu caja rápida. Aquí capturarás ventas del mostrador en segundos: busca producto, agrega cantidad, selecciona método de pago, confirma. El flujo está optimizado para velocidad. Se genera automáticamente recibo o factura fiscal.',
@@ -335,7 +331,6 @@ export const TUTORIAL_MODULES: ModuleTutorial[] = [
     steps: [
       {
         id: 'quotations-1',
-        target: '[data-tutorial="quotations-table"]',
         blockName: 'Gestión de Presupuestos',
         title: '📋 Gestión de Presupuestos',
         description: 'Crea cotizaciones detalladas para tus clientes antes de cerrar ventas. Presupuestos incluyen: Cliente, Productos con precios, Descuentos, Validez (días hasta vencimiento), Notas comerciales, Total final.',
