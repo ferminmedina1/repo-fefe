@@ -76,6 +76,9 @@ export default function PlatformAdmin() {
   const [auditLogSearch, setAuditLogSearch] = useState("");
   const [auditLogActionFilter, setAuditLogActionFilter] = useState<string>("all");
   const [userSearch, setUserSearch] = useState("");
+  const [userStatusFilter, setUserStatusFilter] = useState<string>("all");
+  const [userRoleFilter, setUserRoleFilter] = useState<string>("all");
+  const [userCompanyFilter, setUserCompanyFilter] = useState<string>("all");
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
@@ -690,15 +693,30 @@ export default function PlatformAdmin() {
     return matchesSearch && matchesAction;
   });
 
+  const filteredUsers = allUsers?.filter(user => {
+    const matchesSearch = !userSearch || 
+      user.user_id?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      user.companies?.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
+      user.role?.toLowerCase().includes(userSearch.toLowerCase());
+    
+    const matchesStatus = userStatusFilter === "all" || 
+      (userStatusFilter === "active" && user.active) ||
+      (userStatusFilter === "inactive" && !user.active);
+    
+    const matchesRole = userRoleFilter === "all" || user.role === userRoleFilter;
+    
+    const matchesCompany = userCompanyFilter === "all" || user.company_id === userCompanyFilter;
+    
+    return matchesSearch && matchesStatus && matchesRole && matchesCompany;
+  });
+
   // Pagination hooks
   const companiesPagination = usePagination(filteredCompanies, { initialPageSize: 10 });
   const notificationsPagination = usePagination(filteredNotifications, { initialPageSize: 10 });
   const feedbackPagination = usePagination(filteredFeedback, { initialPageSize: 10 });
   const paymentsPagination = usePagination(filteredPayments, { initialPageSize: 10 });
   const auditLogsPagination = usePagination(filteredAuditLogs, { initialPageSize: 20 });
-  const usersPagination = usePagination(allUsers?.filter(u => 
-    u.companies?.name?.toLowerCase().includes(userSearch.toLowerCase())
-  ), { initialPageSize: 10 });
+  const usersPagination = usePagination(filteredUsers, { initialPageSize: 10 });
 
   // Show loading while checking admin status
   if (adminLoading) {
@@ -2195,23 +2213,64 @@ export default function PlatformAdmin() {
 
           {/* Users Tab */}
           <TabsContent value="users" className="space-y-4">
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Usuarios</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{allUsers?.length || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Todos los registrados</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Usuarios Activos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">{allUsers?.filter(u => u.active).length || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">En la plataforma</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Usuarios Inactivos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-amber-600">{allUsers?.filter(u => !u.active).length || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Deshabilitados</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Empresas Únicas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-600">{new Set(allUsers?.map(u => u.company_id)).size || 0}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Con usuarios</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Main Card with Filters and Table */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Gestión de Usuarios Globales</CardTitle>
+                    <CardTitle className="text-lg">Gestión de Usuarios Globales</CardTitle>
                     <CardDescription>
-                      Todos los usuarios registrados en todas las empresas
+                      {filteredUsers?.length || 0} usuarios encontrados de {allUsers?.length || 0} total
                     </CardDescription>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      const data = allUsers?.map(user => ({
-                        ID: user.id,
+                      const data = filteredUsers?.map(user => ({
+                        'Email': user.user_id || 'N/A',
                         'Empresa': (user.companies as any)?.name || 'N/A',
-                        'Rol': user.role,
+                        'Rol': user.role || 'N/A',
                         'Estado': user.active ? 'Activo' : 'Inactivo',
                         'Fecha Creación': formatDate(user.created_at || '')
                       })) || [];
@@ -2222,69 +2281,138 @@ export default function PlatformAdmin() {
                     Exportar Excel
                   </Button>
                 </div>
-                <div className="relative mt-4">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar usuarios..."
-                    value={userSearch}
-                    onChange={(e) => setUserSearch(e.target.value)}
-                    className="pl-9"
-                  />
+
+                {/* Search and Filters */}
+                <div className="mt-4 space-y-4">
+                  {/* Search Bar */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por email, empresa o rol..."
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+
+                  {/* Filter Row */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium">Estado</Label>
+                      <Select value={userStatusFilter} onValueChange={setUserStatusFilter}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="active">Activos</SelectItem>
+                          <SelectItem value="inactive">Inactivos</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium">Rol</Label>
+                      <Select value={userRoleFilter} onValueChange={setUserRoleFilter}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos</SelectItem>
+                          {Array.from(new Set(allUsers?.map(u => u.role))).map((role) => (
+                            <SelectItem key={role} value={role || ''}>
+                              {role || 'Sin rol'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium">Empresa</Label>
+                      <Select value={userCompanyFilter} onValueChange={setUserCompanyFilter}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todas</SelectItem>
+                          {Array.from(new Set(allUsers?.map(u => u.company_id))).map((companyId) => {
+                            const company = allUsers?.find(u => u.company_id === companyId)?.companies;
+                            return (
+                              <SelectItem key={companyId} value={companyId || ''}>
+                                {(company as any)?.name || 'Sin empresa'}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
               </CardHeader>
+
               <CardContent>
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>ID Usuario</TableHead>
-                      <TableHead>Empresa</TableHead>
-                      <TableHead>Rol</TableHead>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Fecha Creación</TableHead>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="font-semibold">Email</TableHead>
+                      <TableHead className="font-semibold">Empresa</TableHead>
+                      <TableHead className="font-semibold">Rol</TableHead>
+                      <TableHead className="font-semibold">Estado</TableHead>
+                      <TableHead className="font-semibold">Fecha Creación</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {usersPagination.paginatedData?.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-mono text-xs">
-                          {user.user_id?.substring(0, 8)}...
-                        </TableCell>
-                        <TableCell>
-                          {(user.companies as any)?.name || 'N/A'}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{user.role}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {user.active ? (
-                            <Badge variant="default">Activo</Badge>
-                          ) : (
-                            <Badge variant="secondary">Inactivo</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {formatDate(user.created_at || '')}
+                    {usersPagination.paginatedData && usersPagination.paginatedData.length > 0 ? (
+                      usersPagination.paginatedData.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium text-sm">{user.user_id || 'N/A'}</TableCell>
+                          <TableCell className="text-sm">{(user.companies as any)?.name || 'N/A'}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">{user.role || 'Sin rol'}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {user.active ? (
+                              <Badge variant="default" className="text-xs">Activo</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">Inactivo</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDate(user.created_at || '')}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                          No se encontraron usuarios con los filtros aplicados
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
-                <PaginationControls
-                  currentPage={usersPagination.currentPage}
-                  totalPages={usersPagination.totalPages}
-                  totalItems={usersPagination.totalItems}
-                  startIndex={usersPagination.startIndex}
-                  endIndex={usersPagination.endIndex}
-                  pageSize={usersPagination.pageSize}
-                  canGoNext={usersPagination.canGoNext}
-                  canGoPrevious={usersPagination.canGoPrevious}
-                  onPageChange={usersPagination.setCurrentPage}
-                  onPageSizeChange={usersPagination.setPageSize}
-                  onNextPage={usersPagination.goToNextPage}
-                  onPreviousPage={usersPagination.goToPreviousPage}
-                  onFirstPage={usersPagination.goToFirstPage}
-                  onLastPage={usersPagination.goToLastPage}
-                />
+
+                {usersPagination.totalItems > 0 && (
+                  <div className="mt-4">
+                    <PaginationControls
+                      currentPage={usersPagination.currentPage}
+                      totalPages={usersPagination.totalPages}
+                      totalItems={usersPagination.totalItems}
+                      startIndex={usersPagination.startIndex}
+                      endIndex={usersPagination.endIndex}
+                      pageSize={usersPagination.pageSize}
+                      canGoNext={usersPagination.canGoNext}
+                      canGoPrevious={usersPagination.canGoPrevious}
+                      onPageChange={usersPagination.setCurrentPage}
+                      onPageSizeChange={usersPagination.setPageSize}
+                      onNextPage={usersPagination.goToNextPage}
+                      onPreviousPage={usersPagination.goToPreviousPage}
+                      onFirstPage={usersPagination.goToFirstPage}
+                      onLastPage={usersPagination.goToLastPage}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
