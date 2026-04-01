@@ -782,39 +782,36 @@ export default function PlatformAdmin() {
   return (
     <div className="min-h-screen bg-background">
       <PlatformAdminHeader onLogout={handleLogout} />
+        
+        <div className="container mx-auto px-3 md:px-6 py-4 md:py-6 space-y-4 md:space-y-6">
+          <div className="space-y-2 md:space-y-4">
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">Panel de Administración</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
+              Gestión completa de empresas, notificaciones, feedback y pagos
+            </p>
+          </div>
 
-      <div className="container mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Panel de Administración</h1>
-          <p className="text-muted-foreground">
-            Gestión completa de empresas, notificaciones, feedback y pagos
-          </p>
-        </div>
-
-        <PlatformAdminDashboard 
-          stats={stats} 
-          revenueData={revenueAnalytics}
-          ticketStats={{
-            open: platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0,
-            inProgress: platformSupportTickets?.filter((t: any) => t.status === 'in_progress').length || 0,
-            resolved: platformSupportTickets?.filter((t: any) => t.status === 'resolved').length || 0,
-            slaBreach: platformSupportTickets?.filter((t: any) => t.sla_response_breached || t.sla_resolution_breached).length || 0,
-          }}
-          companiesGrowth={0}
-          usersCount={totalUsers}
-          overduePayments={overduePayments}
-        />
-
-        <Tabs defaultValue="companies" className="flex gap-6">
-          <PlatformAdminNav 
-            openTicketsCount={platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0}
-            unreadNotificationsCount={stats?.unreadNotifications || 0}
+          <PlatformAdminDashboard 
+            stats={stats} 
+            revenueData={revenueAnalytics}
+            ticketStats={{
+              open: platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0,
+              inProgress: platformSupportTickets?.filter((t: any) => t.status === 'in_progress').length || 0,
+              resolved: platformSupportTickets?.filter((t: any) => t.status === 'resolved').length || 0,
+              slaBreach: platformSupportTickets?.filter((t: any) => t.sla_response_breached || t.sla_resolution_breached).length || 0,
+            }}
+            companiesGrowth={0}
+            usersCount={totalUsers}
+            overduePayments={overduePayments}
           />
 
-          <div className="flex-1 min-w-0">
+          <Tabs defaultValue="companies" className="flex flex-col md:flex-row gap-3 md:gap-6">
+            <PlatformAdminNav 
+              openTicketsCount={platformSupportTickets?.filter((t: any) => t.status === 'open').length || 0}
+              unreadNotificationsCount={stats?.unreadNotifications || 0}
+            />
 
-          {/* Pricing Configuration Tab */}
-          <TabsContent value="pricing" className="space-y-4">
+            <div className="w-full min-w-0">
             <PricingConfiguration />
           </TabsContent>
 
@@ -863,7 +860,7 @@ export default function PlatformAdmin() {
                     Exportar
                   </Button>
                 </div>
-                <div className="flex gap-4 mt-4">
+                <div className="flex flex-col md:flex-row gap-3 md:gap-4 mt-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -1373,7 +1370,7 @@ export default function PlatformAdmin() {
                           
                           {/* Botones de envío */}
                           <div className="space-y-2">
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3">
                               <Button
                                 onClick={() => {
                                   if (!selectedPlatformTicket?.id || !platformTicketMessage.trim()) {
@@ -1510,7 +1507,7 @@ export default function PlatformAdmin() {
                     </CardDescription>
                   </div>
                 </div>
-                <div className="flex gap-4 mt-4">
+                <div className="flex flex-col md:flex-row gap-3 md:gap-4 mt-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -1804,7 +1801,7 @@ export default function PlatformAdmin() {
                     </CardDescription>
                   </div>
                 </div>
-                <div className="flex gap-4 mt-4">
+                <div className="flex flex-col md:flex-row gap-3 md:gap-4 mt-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -2032,7 +2029,7 @@ export default function PlatformAdmin() {
                     </DialogContent>
                   </Dialog>
                 </div>
-                <div className="flex gap-4 mt-4">
+                <div className="flex flex-col md:flex-row gap-3 md:gap-4 mt-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -2248,7 +2245,7 @@ export default function PlatformAdmin() {
           {/* Users Tab */}
           <TabsContent value="users" className="space-y-4">
             {/* Statistics Cards */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">Total Usuarios</CardTitle>
@@ -2330,7 +2327,7 @@ export default function PlatformAdmin() {
                   </div>
 
                   {/* Filter Row */}
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="space-y-2">
                       <Label className="text-xs font-medium">Estado</Label>
                       <Select value={userStatusFilter} onValueChange={setUserStatusFilter}>
@@ -2719,7 +2716,7 @@ export default function PlatformAdmin() {
                     </CardDescription>
                   </div>
                 </div>
-                <div className="flex gap-4 mt-4">
+                <div className="flex flex-col md:flex-row gap-3 md:gap-4 mt-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
