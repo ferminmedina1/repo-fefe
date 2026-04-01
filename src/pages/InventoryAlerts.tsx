@@ -598,8 +598,8 @@ export default function InventoryAlerts() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <Card className="p-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4" data-tutorial="inventory-alerts-panel">
+        <Card className="p-4" data-tutorial="critical-alerts">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Stock Bajo</p>
@@ -657,7 +657,7 @@ export default function InventoryAlerts() {
         />
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" data-tutorial="stock-table">
         <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="my-alerts" className="flex-1 min-w-[100px] text-xs sm:text-sm">Mis Alertas</TabsTrigger>
           <TabsTrigger value="low-stock" className="flex-1 min-w-[100px] text-xs sm:text-sm">Stock Bajo</TabsTrigger>
@@ -772,8 +772,14 @@ export default function InventoryAlerts() {
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
           ) : filteredLowStock?.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">No hay productos con stock bajo</p>
+            <Card className="p-8">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <AlertTriangle className="h-10 w-10 text-muted-foreground/40" />
+                <div>
+                  <p className="font-medium text-sm">Sin productos con stock bajo</p>
+                  <p className="text-xs text-muted-foreground">Tu inventario está en óptimo nivel</p>
+                </div>
+              </div>
             </Card>
           ) : (
             filteredLowStock?.map((product) => (
@@ -815,10 +821,14 @@ export default function InventoryAlerts() {
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
           ) : filteredExpiring?.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">
-                No hay productos próximos a vencer
-              </p>
+            <Card className="p-8">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <CheckCircle2 className="h-10 w-10 text-green-600/40" />
+                <div>
+                  <p className="font-medium text-sm">Sin productos próximos a vencer</p>
+                  <p className="text-xs text-muted-foreground">Todos tus productos tienen plazo suficiente</p>
+                </div>
+              </div>
             </Card>
           ) : (
             filteredExpiring?.map((product) => (

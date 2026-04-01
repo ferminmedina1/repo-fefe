@@ -90,7 +90,7 @@ export const AIAssistantFloating = () => {
       <SheetTrigger asChild>
         <Button
           size="lg"
-          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all z-50 p-0"
+          className="fixed bottom-6 right-20 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all z-10 p-0"
         >
           <Sparkles className="h-6 w-6" />
         </Button>

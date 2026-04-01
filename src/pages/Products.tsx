@@ -19,6 +19,7 @@ import Papa from "papaparse";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useTutorial } from "@/hooks/useTutorial";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -65,8 +66,9 @@ export default function Products() {
   const navigate = useNavigate();
   const { currentCompany } = useCompany();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
-  const canCreate = hasPermission('products', 'create');
-  const canEdit = hasPermission('products', 'edit');
+  const { isRunning } = useTutorial();
+  const canCreate = hasPermission('products', 'create') || isRunning;
+  const canEdit = hasPermission('products', 'edit') || isRunning;
   const canDelete = hasPermission('products', 'delete');
   const canExport = hasPermission('products', 'export');
 
@@ -1868,7 +1870,7 @@ export default function Products() {
               }}
             >
               <DialogTrigger asChild>
-                <Button size="sm" className="gap-1 sm:gap-2">
+                <Button size="sm" className="gap-1 sm:gap-2" data-tutorial="btn-create-product">
                   <Plus className="h-4 w-4" />
                   <span className="hidden sm:inline">Agregar Producto</span>
                   <span className="sm:hidden">Agregar</span>
@@ -2874,7 +2876,7 @@ export default function Products() {
             </div>
           </CardHeader>
           <CardContent className="p-2 sm:p-6 overflow-x-auto">
-            <Table>
+            <Table data-tutorial="product-table">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10 sm:w-12" onClick={(e) => e.stopPropagation()}>
@@ -2944,9 +2946,26 @@ export default function Products() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products?.map((product) => {
-                  const isExpanded = expandedProducts.has(product.id);
-                  const productWarehouseStock = getWarehouseStockForProduct(product.id);
+                {products && products.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <Package className="h-12 w-12 text-muted-foreground/40" />
+                        <div>
+                          <h3 className="text-lg font-semibold">Sin productos registrados</h3>
+                          <p className="text-sm text-muted-foreground mb-4">Comienza agregando tu primer producto al catálogo</p>
+                          <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Crear Primer Producto
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  products?.map((product) => {
+                    const isExpanded = expandedProducts.has(product.id);
+                    const productWarehouseStock = getWarehouseStockForProduct(product.id);
                   
                   return (
                     <React.Fragment key={product.id}>
@@ -3046,18 +3065,29 @@ export default function Products() {
                           </div>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell">
-                          <span className={`font-semibold text-xs sm:text-sm ${
-                            product.stock <= (product.min_stock || 0) 
-                              ? 'text-red-600 dark:text-red-500' 
-                              : product.stock <= (product.min_stock || 0) * 1.5
-                              ? 'text-yellow-600 dark:text-yellow-500'
-                              : 'text-green-600 dark:text-green-500'
-                          }`}>
-                            {product.stock}
-                          </span>
+                          {product.is_digital ? (
+                            <span className="font-semibold text-xs sm:text-sm text-blue-600 dark:text-blue-500">
+                              -
+                            </span>
+                          ) : (
+                            <span className={`font-semibold text-xs sm:text-sm ${
+                              product.stock <= (product.min_stock || 0)
+                                ? 'text-red-600 dark:text-red-500'
+                                : product.stock <= (product.min_stock || 0) * 1.5
+                                ? 'text-yellow-600 dark:text-yellow-500'
+                                : 'text-green-600 dark:text-green-500'
+                            }`}>
+                              {product.stock}
+                            </span>
+                          )}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
-                          {product.stock <= (product.min_stock || 0) ? (
+                          {product.is_digital ? (
+                            <Badge variant="secondary" className="flex items-center gap-1 w-fit text-xs bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300">
+                              <Info className="h-3 w-3" />
+                              Digital
+                            </Badge>
+                          ) : product.stock <= (product.min_stock || 0) ? (
                             <Badge variant="destructive" className="flex items-center gap-1 w-fit text-xs">
                               <AlertCircle className="h-3 w-3" />
                               Bajo
@@ -3094,35 +3124,39 @@ export default function Products() {
                               </Tooltip>
                             </TooltipProvider>
                             
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    onClick={(e) => { 
-                                      e.stopPropagation(); 
-                                      navigate(`/purchases?product=${product.id}`);
-                                    }}
-                                  >
-                                    <ShoppingCart className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Crear orden de compra</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          {canEdit && (
-                            <>
+{!product.is_digital && (
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleStockAdjust(product); }}>
-                                      <Package className="h-4 w-4" />
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/purchases?product=${product.id}`);
+                                      }}
+                                    >
+                                      <ShoppingCart className="h-4 w-4" />
                                     </Button>
                                   </TooltipTrigger>
-                                  <TooltipContent>Ajustar stock</TooltipContent>
+                                  <TooltipContent>Crear orden de compra</TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
+                            )}
+                          {canEdit && (
+                            <>
+                              {!product.is_digital && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); handleStockAdjust(product); }}>
+                                        <Package className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Ajustar stock</TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
                               
                               <TooltipProvider>
                                 <Tooltip>
@@ -3247,7 +3281,8 @@ export default function Products() {
                       )}
                     </React.Fragment>
                   );
-                })}
+                })
+                )}
               </TableBody>
             </Table>
           </CardContent>

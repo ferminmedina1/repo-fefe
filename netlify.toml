@@ -1,6 +1,20 @@
 [build]
-  command = "npm ci --include=optional --no-audit --no-fund && npm install --no-save --include=optional @rollup/rollup-linux-x64-gnu@4.59.0 @swc/core-linux-x64-gnu@1.13.2 --no-audit --no-fund && npm run build"
-  publish = "dist"
+command = "npm run build"
+functions = "netlify/functions"
+publish = "dist"
 
 [build.environment]
-  NPM_FLAGS = "--include=optional"
+# Node version
+NODE_VERSION = "20"
+
+# Build environment
+CI = "true"
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
+
+# Function settings
+[functions]
+node_bundler = "esbuild"

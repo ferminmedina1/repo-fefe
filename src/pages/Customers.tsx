@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { z } from "zod";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useTutorial } from "@/hooks/useTutorial";
 import { useCompany } from "@/contexts/CompanyContext";
 
 const customerSchema = z.object({
@@ -44,8 +45,9 @@ export default function Customers() {
   const navigate = useNavigate();
   const { currentCompany } = useCompany();
   const { hasPermission } = usePermissions();
-  const canCreate = hasPermission('customers', 'create');
-  const canEdit = hasPermission('customers', 'edit');
+  const { isRunning } = useTutorial();
+  const canCreate = hasPermission('customers', 'create') || isRunning;
+  const canEdit = hasPermission('customers', 'edit') || isRunning;
   
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -534,7 +536,7 @@ export default function Customers() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DialogTrigger asChild>
-                      <Button onClick={() => { setEditingCustomer(null); resetForm(); }} className="gap-2">
+                      <Button onClick={() => { setEditingCustomer(null); resetForm(); }} className="gap-2" data-tutorial="btn-create-customer">
                         <Plus className="h-4 w-4" />
                         Nuevo Cliente
                       </Button>
@@ -668,11 +670,12 @@ export default function Customers() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
+                data-tutorial="customer-filters"
               />
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table data-tutorial="customer-table">
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
@@ -686,8 +689,25 @@ export default function Customers() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customers?.map((customer) => (
-                  <TableRow key={customer.id}>
+                {customers && customers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <Users className="h-12 w-12 text-muted-foreground/40" />
+                        <div>
+                          <h3 className="text-lg font-semibold">Sin clientes registrados</h3>
+                          <p className="text-sm text-muted-foreground mb-4">Comienza agregando tu primer cliente</p>
+                          <Button onClick={handleOpenDialog} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Crear Primer Cliente
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  customers?.map((customer) => (
+                    <TableRow key={customer.id}>
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell>{customer.email || "-"}</TableCell>
                     <TableCell>{customer.phone || "-"}</TableCell>
@@ -763,7 +783,8 @@ export default function Customers() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                ))
+                )}
               </TableBody>
             </Table>
           </CardContent>

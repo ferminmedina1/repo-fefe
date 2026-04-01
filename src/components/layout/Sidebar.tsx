@@ -48,6 +48,8 @@ import {
   MessageCircle,
   LifeBuoy,
   Plus,
+  HelpCircle,
+  Network,
 } from "lucide-react";
 import { useActiveModules } from "@/hooks/useActiveModules";
 import { usePermissions, Module } from "@/hooks/usePermissions";
@@ -447,6 +449,19 @@ export function Sidebar() {
       ],
     },
 
+    // Alianzas & Negocios
+    {
+      section: "Alianzas",
+      items: [
+        {
+          title: "Alliance Market",
+          href: "/alliance-market",
+          icon: Network,
+          module: "alliance_market",
+        },
+      ],
+    },
+
     // RRHH
     {
       section: "RRHH",
@@ -582,6 +597,23 @@ export function Sidebar() {
         },
       ],
     },
+
+    // Recursos y Ayuda
+    {
+      section: "Recursos",
+      items: [
+        {
+          title: "Centro de Aprendizaje",
+          href: "/learning-center",
+          icon: BookOpen,
+        },
+        {
+          title: "Centro de Ayuda",
+          href: "/help",
+          icon: HelpCircle,
+        },
+      ],
+    },
   ];
 
   const isNavItemVisible = (item: NavItem) => {
@@ -605,6 +637,19 @@ export function Sidebar() {
       }
     }
     
+    return true;
+  };
+
+  // Verificar si un item es realmente visible (incluyendo si tiene children sin permisos)
+  const isItemReallyVisible = (item: NavItem): boolean => {
+    if (!isNavItemVisible(item)) return false;
+    
+    // Si tiene children, verificar que al menos uno sea visible
+    if (item.children && item.children.length > 0) {
+      return item.children.some(isItemReallyVisible);
+    }
+    
+    // Si no tiene children, es visible
     return true;
   };
 
@@ -657,6 +702,7 @@ export function Sidebar() {
       'integrations': 'integrations',
       'afip': 'afip',
       'pos_afip': 'pos_afip',
+      'alliance_market': 'alliance_market',
     };
     return moduleMap[sidebarModule] || null;
   };
@@ -888,7 +934,8 @@ export function Sidebar() {
         <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-4 sidebar-scroll">
           {filteredNavItems.map((section) => {
             if ("section" in section) {
-              const visibleItems = section.items.filter(isNavItemVisible);
+              // Filtrar items que sean realmente visibles (incluyendo verificar children)
+              const visibleItems = section.items.filter(isItemReallyVisible);
               if (visibleItems.length === 0) return null;
 
               return (
@@ -896,7 +943,7 @@ export function Sidebar() {
                   <h3 className="px-2 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                     {section.section}
                   </h3>
-                  <div className="space-y-0.5">{section.items.map((item) => renderNavItem(item))}</div>
+                  <div className="space-y-0.5">{visibleItems.map((item) => renderNavItem(item))}</div>
                 </div>
               );
             }

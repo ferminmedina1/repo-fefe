@@ -10,6 +10,8 @@ import { User, Session } from "@supabase/supabase-js";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
 import { usePermissions } from "@/hooks/usePermissions";
+import { TutorialRunner } from "./components/learning/TutorialRunner";
+import { TutorialProvider } from "@/contexts/TutorialContext";
 
 // Lazy load all page components
 const Landing = lazy(() => import("./pages/Landing"));
@@ -75,6 +77,12 @@ const SignupMaintenance = lazy(() => import("./pages/SignupMaintenance"));
 const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRequests"));
+const LearningCenter = lazy(() => import("./pages/LearningCenter"));
+const KnowledgeBaseCenter = lazy(() => import("./pages/KnowledgeBaseCenter"));
+const SetupWizardPage = lazy(() =>
+  import("./pages/SetupWizardPage").then((module) => ({ default: module.SetupWizardPage }))
+);
+const AllianceMarket = lazy(() => import("./pages/AllianceMarket"));
 
 
 const Opportunities = lazy(() => import("./pages/Opportunities"));
@@ -318,47 +326,53 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <CompanyProvider>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
-            {/* ONLY FOR PROD <Route path="/signup" element={<SignupWizard />} />*/}
-            <Route path="/signup" element={<SignupMaintenance />} />
-            <Route path="/signup/success" element={<SignupSuccess />} />
-            <Route path="/signup/cancel" element={<SignupCancel />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/set-password/:token" element={<SetPasswordToken />} />
-            <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
-            {/* Mostrar landing solo en la raíz */}
-            <Route path="/" element={<Landing />} />
+        <TutorialProvider>
+          <CompanyProvider>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                {/* ONLY FOR PROD <Route path="/signup" element={<SignupWizard />} />*/}
+                <Route path="/signup" element={<SignupMaintenance />} />
+                <Route path="/signup/success" element={<SignupSuccess />} />
+                <Route path="/signup/cancel" element={<SignupCancel />} />
+                <Route path="/setup-wizard" element={<ProtectedRoute><SetupWizardPage /></ProtectedRoute>} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/set-password/:token" element={<SetPasswordToken />} />
+                <Route path="/module-not-available" element={<ProtectedRoute><ModuleNotAvailable /></ProtectedRoute>} />
+                {/* Mostrar landing solo en la raíz */}
+                <Route path="/" element={<Landing />} />
 
-            {/* Dashboard privado en /app */}
-            <Route path="/app" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="dashboard"><Dashboard /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/pos" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos"><POS /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/products" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="products"><Products /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/customers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customers"><Customers /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/sales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><Sales /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/analytics/indicadores-comerciales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><IndicadoresComerciales /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/analytics/monthly-sales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><MonthlySalesAnalytics /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/analytics/gross-margin" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><GrossMarginAnalytics /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/analytics/accounts-receivable" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><ReceivablesAnalytics /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/analytics/daily-sales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><DailySalesAnalytics /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="settings"><Settings /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/settings/email" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="settings"><EmailConfig /></ModuleProtectedRoute></ProtectedRoute>} />
-            
-           
+                {/* Dashboard privado en /app */}
+                <Route path="/app" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="dashboard"><Dashboard /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/pos" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos"><POS /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/products" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="products"><Products /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/customers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customers"><Customers /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/sales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><Sales /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/analytics/indicadores-comerciales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><IndicadoresComerciales /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/analytics/monthly-sales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><MonthlySalesAnalytics /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/analytics/gross-margin" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><GrossMarginAnalytics /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/analytics/accounts-receivable" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><ReceivablesAnalytics /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/analytics/daily-sales" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="sales"><DailySalesAnalytics /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="settings"><Settings /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/settings/email" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="settings"><EmailConfig /></ModuleProtectedRoute></ProtectedRoute>} />
+
+                {/* Learning Center - siempre disponible */}
+                <Route path="/learning-center" element={<ProtectedRoute><LearningCenter /></ProtectedRoute>} />
+                {/* Knowledge Base - siempre disponible */}
+                <Route path="/help" element={<ProtectedRoute><KnowledgeBaseCenter /></ProtectedRoute>} />
             {/* Módulos Adicionales - requieren contrato */}
             <Route path="/quotations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="quotations"><Quotations /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/delivery-notes" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="delivery_notes"><DeliveryNotes /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/returns" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="returns"><Returns /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/reservations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="reservations"><Reservations /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/customer-account" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><CustomerAccount /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/accounts-receivable" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><AccountsReceivable /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/promotions" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="promotions"><Promotions /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/opportunities" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><Opportunities /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/pipelines" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pipelines"><Pipelines /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/crm-reports" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmReports /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/settings/crm-roles" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmRoles /></ModuleProtectedRoute></ProtectedRoute>} />
+              <Route path="/customer-account" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><CustomerAccount /></ModuleProtectedRoute></ProtectedRoute>} />
+              <Route path="/accounts-receivable" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><AccountsReceivable /></ModuleProtectedRoute></ProtectedRoute>} />
+              <Route path="/promotions" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="promotions"><Promotions /></ModuleProtectedRoute></ProtectedRoute>} />
+              <Route path="/opportunities" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><Opportunities /></ModuleProtectedRoute></ProtectedRoute>} />
+              <Route path="/pipelines" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pipelines"><Pipelines /></ModuleProtectedRoute></ProtectedRoute>} />
+              <Route path="/crm-reports" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmReports /></ModuleProtectedRoute></ProtectedRoute>} />
+              <Route path="/settings/crm-roles" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmRoles /></ModuleProtectedRoute></ProtectedRoute>} />
+              <Route path="/alliance-market" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="alliance_market"><AllianceMarket /></ModuleProtectedRoute></ProtectedRoute>} />
             
 
             {/* Inventario & Compras */}
@@ -429,8 +443,11 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-          </Suspense>
-        </CompanyProvider>
+          {/* Tutorial System - Global Execution */}
+          <TutorialRunner />
+            </Suspense>
+          </CompanyProvider>
+        </TutorialProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

@@ -191,7 +191,7 @@ export function BusinessHealthPanel({ companyId }: BusinessHealthPanelProps) {
 
       {/* Priority Alerts */}
       {recentAlerts && recentAlerts.length > 0 && (
-        <Card>
+        <Card data-tutorial="stock-alerts">
           <CardHeader
             className="flex flex-row items-center justify-between cursor-pointer select-none p-4 md:p-6"
             onClick={() => setIsAlertsOpen((v) => !v)}
