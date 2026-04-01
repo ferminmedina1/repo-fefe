@@ -698,16 +698,31 @@ export function TutorialRunner() {
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
     const { action, index, status, type } = data;
 
+    // Si Joyride marca el tour como finalizado u omitido, cerramos el tutorial globalmente
     if (([STATUS.FINISHED, STATUS.SKIPPED] as string[]).includes(status)) {
       endTutorial();
       return;
     }
+
     if (type === EVENTS.STEP_AFTER) {
-      if (action === ACTIONS.NEXT) goToStep(index + 1);
-      else if (action === ACTIONS.PREV) goToStep(index - 1);
+      const totalSteps = currentTutorial?.steps.length ?? 0;
+      const isLastIndex = totalSteps > 0 && index >= totalSteps - 1;
+
+      if (action === ACTIONS.NEXT) {
+        // En el último paso, hacer lo mismo que el botón "Finalizar" de la MiniBar
+        if (isLastIndex) {
+          endTutorial();
+        } else {
+          goToStep(index + 1);
+        }
+      } else if (action === ACTIONS.PREV) {
+        goToStep(index - 1);
+      }
     } else if (type === EVENTS.TARGET_NOT_FOUND) {
       console.warn(`Tutorial: target no encontrado en paso ${index}`);
     }
+
+    // Cierre explícito con la X del tooltip
     if (action === ACTIONS.CLOSE && type === EVENTS.STEP_AFTER) endTutorial();
   }, [currentTutorial, endTutorial, goToStep]);
 
