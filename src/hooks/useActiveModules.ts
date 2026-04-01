@@ -55,6 +55,15 @@ export const useActiveModules = () => {
     console.log('[useActiveModules] Setting up realtime subscription for company_modules:', currentCompany.id);
     const channelName = `company_modules_realtime_${currentCompany.id}_${Math.random().toString(36).slice(2)}`;
 
+    const channelName = `company_modules_realtime_${currentCompany.id}`;
+
+    // Si ya existe un canal con el mismo nombre (por renders previos), eliminarlo
+    const existingChannel = supabase.getChannels().find((ch) => ch.topic === `realtime:${channelName}`);
+    if (existingChannel) {
+      console.log('[useActiveModules] Removing existing realtime channel before creating a new one');
+      supabase.removeChannel(existingChannel);
+    }
+
     const channel = supabase
       .channel(channelName)
       .on(
