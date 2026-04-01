@@ -115,7 +115,7 @@ export function Step2Plan({ formData, updateFormData, nextStep, prevStep }: Step
       </div>
 
       <div className="flex justify-between">
-        <Button onClick={prevStep} variant="outline" size="lg">
+        <Button onClick={prevStep} variant="outline" size="lg" className="text-black dark:text-black">
           Atrás
         </Button>
         <Button onClick={handleNext} disabled={!formData.plan_id} size="lg">
