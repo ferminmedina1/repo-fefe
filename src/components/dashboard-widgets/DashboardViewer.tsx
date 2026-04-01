@@ -91,33 +91,36 @@ const DashboardViewer: React.FC<DashboardViewerProps> = ({
   }, [autoRefreshInterval, refreshAll]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="bg-gradient-to-r from-white via-slate-50 to-white border-b border-gray-200/50 sticky top-0 z-10 shadow-sm backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900">{config.name}</h1>
+            <div className="flex-1 animate-in fade-in duration-500">
+              <h1 className="text-3xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                {config.name}
+              </h1>
               {config.description && (
                 <p className="text-gray-600 mt-1">{config.description}</p>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-500">
+            <div className="flex items-center gap-3">
+              <div className="text-sm text-gray-500 transition-all duration-300">
                 {widgetsState.size > 0
                   ? `Last updated: ${widgetsState.get(config.widgets[0]?.id)?.lastFetch
                     ?.toLocaleTimeString() || 'never'}`
                   : ''}
-              </span>
+              </div>
 
               <Button
                 variant="outline"
                 size="sm"
                 onClick={refreshAll}
                 disabled={isRefreshing}
+                className="transition-all duration-300 hover:shadow-lg hover:shadow-blue-400/20 hover:border-blue-300 hover:scale-105 active:scale-95 group"
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-300'}`} />
                 Refresh
               </Button>
 
@@ -126,6 +129,7 @@ const DashboardViewer: React.FC<DashboardViewerProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={onEditClick}
+                  className="transition-all duration-300 hover:shadow-lg hover:shadow-purple-400/20 hover:border-purple-300 hover:scale-105 active:scale-95"
                 >
                   <Settings className="w-4 h-4 mr-2" />
                   Edit

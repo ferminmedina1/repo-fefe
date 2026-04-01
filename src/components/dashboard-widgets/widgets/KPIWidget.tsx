@@ -63,29 +63,29 @@ const KPIWidget: React.FC<KPIWidgetProps> = ({
   }, [evaluation.value, evaluation.error, format]);
 
   return (
-    <div className="h-full flex flex-col bg-white rounded-lg border border-gray-200 p-4">
+    <div className="h-full flex flex-col bg-gradient-to-br from-white to-slate-50 rounded-lg border border-gray-200/50 p-4 shadow-sm hover:shadow-lg hover:border-blue-300/50 transition-all duration-300 group">
       {/* Header */}
-      <div className="mb-4">
-        <h3 className="text-sm font-medium text-gray-600">{widget.name}</h3>
+      <div className="mb-4 animate-in fade-in duration-300">
+        <h3 className="text-sm font-semibold text-gray-600 group-hover:text-blue-600 transition-colors">{widget.name}</h3>
         {widget.description && (
-          <p className="text-xs text-gray-500 mt-1">{widget.description}</p>
+          <p className="text-xs text-gray-500 mt-1 group-hover:text-gray-600 transition-colors">{widget.description}</p>
         )}
       </div>
 
       {/* Content */}
       <div className="flex-1 flex flex-col items-center justify-center">
         {evaluation.error ? (
-          <div className="text-center">
+          <div className="text-center animate-in fade-in duration-300">
             <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
             <p className="text-xs text-red-600">{evaluation.error.message}</p>
           </div>
         ) : (
           <div className="text-center">
-            <div className={`text-4xl font-bold ${formattedValue.className}`}>
+            <div className={`text-4xl font-bold transition-all duration-500 group-hover:scale-110 ${formattedValue.className}`}>
               {formattedValue.display}
             </div>
             {config.metric && (
-              <p className="text-sm text-gray-500 mt-2">{config.metric}</p>
+              <p className="text-sm text-gray-500 mt-3 group-hover:text-gray-600 transition-colors">{config.metric}</p>
             )}
           </div>
         )}
@@ -93,7 +93,7 @@ const KPIWidget: React.FC<KPIWidgetProps> = ({
 
       {/* Formula */}
       {formula && (
-        <div className="mt-4 p-2 bg-gray-50 rounded border border-gray-100">
+        <div className="mt-4 p-2 bg-gradient-to-r from-gray-50 to-blue-50/30 rounded border border-gray-200/50 group-hover:border-blue-200/70 transition-all duration-300">
           <code className="text-xs text-gray-600 font-mono break-all">
             {formula}
           </code>

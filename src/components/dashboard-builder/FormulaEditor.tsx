@@ -117,13 +117,14 @@ const FormulaEditor: React.FC<FormulaEditorProps> = ({
     <div className="flex flex-col h-full space-y-4 p-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-900">Formulas</h3>
+        <h3 className="font-semibold text-gray-900 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Formulas</h3>
         {!readOnly && (
           <Button
             size="sm"
             variant="outline"
             onClick={handleCreateFormula}
             disabled={showNewForm}
+            className="h-7 px-2 transition-all duration-200 hover:shadow-md hover:border-blue-300 hover:scale-110 active:scale-95"
           >
             <Plus className="w-4 h-4" />
           </Button>
@@ -141,13 +142,13 @@ const FormulaEditor: React.FC<FormulaEditorProps> = ({
           formulas.map(formula => (
             <div
               key={formula.id}
-              className="p-2 bg-gray-50 rounded border border-gray-200 hover:border-gray-300"
+              className="p-3 bg-gradient-to-br from-gray-50 to-white rounded-lg border border-gray-200/50 hover:border-blue-300 hover:shadow-md hover:bg-blue-50/30 transition-all duration-300 group cursor-pointer"
             >
               <div className="flex items-start justify-between">
-                <div className="flex-1 cursor-pointer hover:text-blue-600">
-                  <h4 className="text-sm font-medium text-gray-900">{formula.name}</h4>
+                <div className="flex-1">
+                  <h4 className="text-sm font-medium text-gray-900 group-hover:text-blue-600 transition-colors">{formula.name}</h4>
                   <p className="text-xs text-gray-500 mt-1">{formula.description}</p>
-                  <code className="text-xs bg-white p-1 rounded mt-1 block font-mono text-gray-600">
+                  <code className="text-xs bg-white p-1.5 rounded mt-2 block font-mono text-gray-600 border border-gray-100 group-hover:border-blue-200 transition-colors">
                     {formula.expression}
                   </code>
                 </div>
@@ -156,7 +157,7 @@ const FormulaEditor: React.FC<FormulaEditorProps> = ({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="text-red-600 hover:text-red-700 flex-shrink-0"
+                    className="text-red-600 hover:text-red-700 h-7 w-7 px-0 opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-red-100/50"
                     onClick={() => onRemoveFormula(formula.id)}
                   >
                     <Trash2 className="w-4 h-4" />

@@ -159,12 +159,12 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white rounded-lg border border-gray-200 p-4">
+    <div className="h-full flex flex-col bg-gradient-to-br from-white to-slate-50 rounded-lg border border-gray-200/50 p-4 shadow-sm hover:shadow-lg hover:border-blue-300/50 transition-all duration-300 group">
       {/* Header */}
-      <div className="mb-4">
-        <h3 className="text-sm font-medium text-gray-900">{widget.name}</h3>
+      <div className="mb-4 animate-in fade-in duration-300">
+        <h3 className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{widget.name}</h3>
         {widget.description && (
-          <p className="text-xs text-gray-600 mt-1">{widget.description}</p>
+          <p className="text-xs text-gray-600 mt-1 group-hover:text-gray-700 transition-colors">{widget.description}</p>
         )}
       </div>
 
@@ -174,10 +174,10 @@ const ChartWidget: React.FC<ChartWidgetProps> = ({
       </div>
 
       {/* Config Info */}
-      <div className="mt-4 p-2 bg-gray-50 rounded border border-gray-100 text-xs text-gray-600">
-        <span className="font-medium">Type:</span> {chartType} |{' '}
-        <span className="font-medium">X:</span> {xAxisKey} |{' '}
-        <span className="font-medium">Y:</span> {yAxisKey}
+      <div className="mt-4 p-2.5 bg-gradient-to-r from-gray-50 to-blue-50/30 rounded border border-gray-200/50 group-hover:border-blue-200/70 transition-all duration-300 text-xs text-gray-600 font-mono">
+        <span className="font-semibold text-gray-700">Type:</span> {chartType} |{' '}
+        <span className="font-semibold text-gray-700">X:</span> {xAxisKey} |{' '}
+        <span className="font-semibold text-gray-700">Y:</span> {yAxisKey}
       </div>
     </div>
   );

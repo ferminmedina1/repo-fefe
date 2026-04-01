@@ -165,8 +165,10 @@ const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
                   key={widget.id}
                   className={`
                     absolute bg-white rounded-lg border-2 transition-all cursor-move
-                    ${isSelected ? 'border-blue-500 shadow-lg' : 'border-gray-200 hover:border-gray-300'}
-                    ${isDragging ? 'opacity-75' : 'opacity-100'}
+                    ${isSelected 
+                      ? 'border-blue-500 shadow-2xl shadow-blue-500/20 scale-105' 
+                      : 'border-gray-200 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-400/10 hover:scale-102'}
+                    ${isDragging ? 'opacity-75 shadow-2xl' : 'opacity-100'}
                   `}
                   style={{
                     left: `calc(${pos.x * (100 / config.layout.columns)}% + ${config.layout.padding}px)`,
@@ -178,14 +180,14 @@ const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
                   onClick={() => onSelectWidget(widget.id)}
                 >
                   {/* Widget Header */}
-                  <div className="p-3 border-b border-gray-200 bg-gray-50 rounded-t flex items-center justify-between">
+                  <div className="p-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white rounded-t flex items-center justify-between hover:from-blue-50/30 transition-colors duration-300">
                     <div>
-                      <h4 className="font-medium text-gray-900">{widget.name}</h4>
+                      <h4 className="font-semibold text-gray-900">{widget.name}</h4>
                       <p className="text-xs text-gray-500">{widget.type}</p>
                     </div>
 
                     {!readOnly && (
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-300">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -193,6 +195,7 @@ const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
                             e.stopPropagation();
                             duplicateWidget(widget);
                           }}
+                          className="h-7 w-7 px-0 hover:bg-blue-100/80 hover:scale-110 transition-all duration-200 active:scale-95"
                         >
                           <Copy className="w-4 h-4" />
                         </Button>
@@ -204,6 +207,7 @@ const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
                             e.stopPropagation();
                             onSelectWidget(widget.id);
                           }}
+                          className="h-7 w-7 px-0 hover:bg-blue-100/80 hover:scale-110 transition-all duration-200 active:scale-95"
                         >
                           <Settings className="w-4 h-4" />
                         </Button>
@@ -211,7 +215,7 @@ const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-red-600 hover:text-red-700"
+                          className="text-red-600 hover:text-red-700 h-7 w-7 px-0 hover:bg-red-100/80 hover:scale-110 transition-all duration-200 active:scale-95"
                           onClick={(e) => {
                             e.stopPropagation();
                             onRemoveWidget(widget.id);

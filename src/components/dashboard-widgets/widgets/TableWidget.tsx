@@ -66,29 +66,29 @@ const TableWidget: React.FC<TableWidgetProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white rounded-lg border border-gray-200 p-4">
+    <div className="h-full flex flex-col bg-gradient-to-br from-white to-slate-50 rounded-lg border border-gray-200/50 p-4 shadow-sm hover:shadow-lg hover:border-blue-300/50 transition-all duration-300 group">
       {/* Header */}
-      <div className="mb-4">
-        <h3 className="text-sm font-medium text-gray-900">{widget.name}</h3>
+      <div className="mb-4 animate-in fade-in duration-300">
+        <h3 className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{widget.name}</h3>
         {widget.description && (
-          <p className="text-xs text-gray-600 mt-1">{widget.description}</p>
+          <p className="text-xs text-gray-600 mt-1 group-hover:text-gray-700 transition-colors">{widget.description}</p>
         )}
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto rounded-lg border border-gray-200/50 group-hover:border-blue-200/70 transition-all duration-300">
         {tableData.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-gray-500">
             <p className="text-sm">No data available</p>
           </div>
         ) : (
           <table className="w-full text-sm border-collapse">
-            <thead className="bg-gray-50 sticky top-0">
+            <thead className="bg-gradient-to-r from-gray-50 to-white sticky top-0">
               <tr>
                 {columns.map(column => (
                   <th
                     key={column}
-                    className="px-3 py-2 text-left font-medium text-gray-700 border-b border-gray-200"
+                    className="px-3 py-2 text-left font-semibold text-gray-700 border-b border-gray-200/50 group-hover:text-blue-600 transition-colors"
                   >
                     {column}
                   </th>
@@ -97,7 +97,7 @@ const TableWidget: React.FC<TableWidgetProps> = ({
             </thead>
             <tbody>
               {paginatedData.map((row, idx) => (
-                <tr key={idx} className="hover:bg-gray-50 border-b border-gray-100">
+                <tr key={idx} className="hover:bg-blue-50/50 border-b border-gray-100 transition-colors duration-200">
                   {columns.map(column => (
                     <td
                       key={`${idx}-${column}`}
@@ -118,7 +118,7 @@ const TableWidget: React.FC<TableWidgetProps> = ({
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-3">
-          <div className="text-xs text-gray-600">
+          <div className="text-xs text-gray-600 font-medium">
             Page {currentPage + 1} of {totalPages} ({tableData.length} rows)
           </div>
 
@@ -128,6 +128,7 @@ const TableWidget: React.FC<TableWidgetProps> = ({
               variant="outline"
               onClick={handlePrevPage}
               disabled={currentPage === 0}
+              className="h-7 w-7 px-0 transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-40"
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
@@ -137,6 +138,7 @@ const TableWidget: React.FC<TableWidgetProps> = ({
               variant="outline"
               onClick={handleNextPage}
               disabled={currentPage === totalPages - 1}
+              className="h-7 w-7 px-0 transition-all duration-200 hover:scale-110 active:scale-95 disabled:opacity-40"
             >
               <ChevronRight className="w-4 h-4" />
             </Button>

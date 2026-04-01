@@ -31,23 +31,23 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
 }) => {
   const containerClassName = `
     h-full w-full flex flex-col
-    bg-white rounded-lg border border-gray-200
-    hover:border-gray-300 transition-colors
-    shadow-sm hover:shadow-md
+    bg-gradient-to-br from-white to-slate-50 rounded-lg border border-gray-200/50
+    hover:border-blue-300/50 transition-all duration-300
+    shadow-sm hover:shadow-lg group
   `;
 
   // Error state
   if (error) {
     return (
       <div className={containerClassName + ' items-center justify-center'}>
-        <div className="text-center p-4">
+        <div className="text-center p-4 animate-in fade-in duration-300">
           <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
           <p className="text-sm text-red-600 font-medium">{widget.name}</p>
           <p className="text-xs text-red-500 mt-1">{error.message}</p>
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="text-xs text-blue-600 hover:text-blue-700 mt-2 underline"
+              className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100/30 mt-2 underline px-2 py-1 rounded transition-all duration-200 hover:scale-105 active:scale-95"
             >
               Retry
             </button>
@@ -61,7 +61,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
   if (isLoading) {
     return (
       <div className={containerClassName + ' items-center justify-center'}>
-        <div className="text-center">
+        <div className="text-center animate-in fade-in duration-300">
           <Loader className="w-8 h-8 text-blue-500 mx-auto animate-spin mb-2" />
           <p className="text-xs text-gray-600">{widget.name}</p>
         </div>
@@ -137,9 +137,9 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({
     default:
       return (
         <div className={containerClassName + ' items-center justify-center'}>
-          <div className="text-center p-4">
+          <div className="text-center p-4 animate-in fade-in duration-300">
             <AlertCircle className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-            <p className="text-sm text-gray-600">Unknown widget type</p>
+            <p className="text-sm text-gray-900 font-medium">Unknown widget type</p>
             <p className="text-xs text-gray-500 mt-1">{(widget as any).type}</p>
           </div>
         </div>

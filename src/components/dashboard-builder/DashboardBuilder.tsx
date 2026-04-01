@@ -242,55 +242,65 @@ const DashboardBuilder: React.FC<DashboardBuilderProps> = ({
       {/* Main Canvas Area */}
       <div className="flex-1 flex flex-col">
         {/* Toolbar */}
-        <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-slate-50 via-white to-slate-50 border-b border-gray-200/50 p-4 flex items-center justify-between backdrop-blur-md shadow-sm">
           <div className="flex items-center gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">{state.config.name}</h2>
-              <p className="text-sm text-gray-500">{state.config.description}</p>
+            <div className="animate-in fade-in duration-500">
+              <h2 className="text-lg font-bold text-gray-900 bg-gradient-to-r from-blue-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                {state.config.name}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">{state.config.description}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={undo}
-              disabled={state.historyIndex <= 0 || readOnly}
-            >
-              <Undo2 className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-1 px-2 py-1.5 bg-gradient-to-br from-gray-100 to-gray-50 rounded-lg border border-gray-200/50 transition-all duration-300 hover:shadow-md hover:border-gray-300/70">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={undo}
+                disabled={state.historyIndex <= 0 || readOnly}
+                className="h-7 w-7 px-0 transition-all duration-200 hover:bg-white/80 hover:scale-110 active:scale-95 disabled:opacity-40"
+              >
+                <Undo2 className="w-4 h-4" />
+              </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={redo}
-              disabled={state.historyIndex >= state.history.length - 1 || readOnly}
-            >
-              <Redo2 className="w-4 h-4" />
-            </Button>
+              <div className="w-px h-4 bg-gradient-to-b from-gray-300 to-gray-200" />
 
-            <div className="w-px h-6 bg-gray-200" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={redo}
+                disabled={state.historyIndex >= state.history.length - 1 || readOnly}
+                className="h-7 w-7 px-0 transition-all duration-200 hover:bg-white/80 hover:scale-110 active:scale-95 disabled:opacity-40"
+              >
+                <Redo2 className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <div className="w-px h-6 bg-gradient-to-b from-transparent via-gray-300 to-transparent" />
 
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowWidgetLibrary(!showWidgetLibrary)}
               disabled={readOnly}
+              className="transition-all duration-300 hover:shadow-lg hover:shadow-blue-400/20 hover:border-blue-300 hover:scale-105 active:scale-95 group font-medium"
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform duration-300" />
               Add Widget
             </Button>
 
             {state.error && (
-              <div className="text-red-600 text-sm">{state.error}</div>
+              <div className="text-red-600 text-sm animate-in fade-in duration-300 px-3 py-1.5 bg-red-50 rounded-lg border border-red-200/70 shadow-sm">{state.error}</div>
             )}
 
             {onSave && (
               <Button
                 onClick={handleSave}
                 disabled={state.isSaving || readOnly}
+                className="transition-all duration-300 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:shadow-lg hover:shadow-blue-500/30 hover:scale-105 active:scale-95 text-white font-medium"
               >
-                <Save className="w-4 h-4 mr-2" />
+                <Save className={`w-4 h-4 mr-2 ${state.isSaving ? 'animate-spin' : ''}`} />
                 {state.isSaving ? 'Saving...' : 'Save'}
               </Button>
             )}
@@ -299,6 +309,7 @@ const DashboardBuilder: React.FC<DashboardBuilderProps> = ({
               <Button
                 variant="outline"
                 onClick={onCancel}
+                className="transition-all duration-300 hover:bg-gray-100 hover:border-gray-400 hover:scale-105 active:scale-95 font-medium"
               >
                 Cancel
               </Button>

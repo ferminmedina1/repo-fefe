@@ -42,14 +42,14 @@ const NumberWidget: React.FC<NumberWidgetProps> = ({
   }, [value, format]);
 
   return (
-    <div className="h-full flex flex-col bg-white rounded-lg border border-gray-200 p-4 items-center justify-center">
-      <div>
-        <h3 className="text-sm font-medium text-gray-600 text-center">{widget.name}</h3>
-        <div className="text-4xl font-bold text-gray-900 mt-4 text-center">
+    <div className="h-full flex flex-col bg-gradient-to-br from-white to-slate-50 rounded-lg border border-gray-200/50 p-4 shadow-sm hover:shadow-lg hover:border-blue-300/50 transition-all duration-300 items-center justify-center group">
+      <div className="w-full">
+        <h3 className="text-sm font-semibold text-gray-900 text-center group-hover:text-blue-600 transition-colors animate-in fade-in duration-300">{widget.name}</h3>
+        <div className="text-4xl font-bold text-gray-900 mt-4 text-center transition-all duration-500 group-hover:scale-110">
           {formattedValue}
         </div>
         {widget.description && (
-          <p className="text-xs text-gray-600 mt-4 text-center">{widget.description}</p>
+          <p className="text-xs text-gray-600 mt-4 text-center group-hover:text-gray-700 transition-colors">{widget.description}</p>
         )}
       </div>
     </div>
