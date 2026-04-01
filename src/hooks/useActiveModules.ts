@@ -53,8 +53,6 @@ export const useActiveModules = () => {
     if (!currentCompany?.id) return;
 
     console.log('[useActiveModules] Setting up realtime subscription for company_modules:', currentCompany.id);
-    const channelName = `company_modules_realtime_${currentCompany.id}_${Math.random().toString(36).slice(2)}`;
-
     const channelName = `company_modules_realtime_${currentCompany.id}`;
 
     // Si ya existe un canal con el mismo nombre (por renders previos), eliminarlo
