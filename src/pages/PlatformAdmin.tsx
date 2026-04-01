@@ -812,10 +812,11 @@ export default function PlatformAdmin() {
             />
 
             <div className="w-full min-w-0">
-            <PricingConfiguration />
-          </TabsContent>
+              <TabsContent value="pricing" className="space-y-4">
+                <PricingConfiguration />
+              </TabsContent>
 
-          {/* Pricing Calculator Tab */}
+              {/* Pricing Calculator Tab */}
           <TabsContent value="calculator" className="space-y-4">
             <PricingCalculator />
           </TabsContent>
@@ -3236,11 +3237,11 @@ export default function PlatformAdmin() {
               </CardContent>
             </Card>
           </TabsContent>
-          </div>
-        </Tabs>
-      </div>
+            </div>
+          </Tabs>
+        </div>
 
-      {/* Dialog para gestionar módulos de empresa */}
+        {/* Dialog para gestionar módulos de empresa */}
       <Dialog open={modulesDialogOpen} onOpenChange={setModulesDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
