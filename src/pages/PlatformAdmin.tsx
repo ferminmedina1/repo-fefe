@@ -72,7 +72,9 @@ export default function PlatformAdmin() {
   const [companyStatusFilter, setCompanyStatusFilter] = useState<string>("active");
   const [notificationFilter, setNotificationFilter] = useState<string>("all");
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<string>("all");
+  const [feedbackSearch, setFeedbackSearch] = useState("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
+  const [paymentSearch, setPaymentSearch] = useState("");
   const [auditLogSearch, setAuditLogSearch] = useState("");
   const [auditLogActionFilter, setAuditLogActionFilter] = useState<string>("all");
   const [userSearch, setUserSearch] = useState("");
@@ -659,7 +661,10 @@ export default function PlatformAdmin() {
 
   // Filtered data
   const filteredCompanies = companies?.filter(company => {
-    const matchesSearch = company.name.toLowerCase().includes(companySearch.toLowerCase());
+    const matchesSearch = !companySearch || 
+      company.name.toLowerCase().includes(companySearch.toLowerCase()) ||
+      company.email?.toLowerCase().includes(companySearch.toLowerCase()) ||
+      company.phone?.toLowerCase().includes(companySearch.toLowerCase());
     const matchesStatus = companyStatusFilter === "all" || 
       (companyStatusFilter === "active" && company.active) ||
       (companyStatusFilter === "inactive" && !company.active);
@@ -673,13 +678,24 @@ export default function PlatformAdmin() {
   });
 
   const filteredFeedback = feedbacks?.filter(f => {
-    if (feedbackStatusFilter === "all") return true;
-    return f.status === feedbackStatusFilter;
+    const matchesSearch = !feedbackSearch || 
+      f.message?.toLowerCase().includes(feedbackSearch.toLowerCase()) ||
+      f.category?.toLowerCase().includes(feedbackSearch.toLowerCase());
+    
+    const matchesStatus = feedbackStatusFilter === "all" || f.status === feedbackStatusFilter;
+    
+    return matchesSearch && matchesStatus;
   });
 
   const filteredPayments = payments?.filter(payment => {
-    if (paymentStatusFilter === "all") return true;
-    return payment.status === paymentStatusFilter;
+    const company = companies?.find(c => c.id === payment.company_id);
+    const matchesSearch = !paymentSearch || 
+      company?.name?.toLowerCase().includes(paymentSearch.toLowerCase()) ||
+      payment.payment_method?.toLowerCase().includes(paymentSearch.toLowerCase());
+    
+    const matchesStatus = paymentStatusFilter === "all" || payment.status === paymentStatusFilter;
+    
+    return matchesSearch && matchesStatus;
   });
 
   const filteredAuditLogs = auditLogs?.filter(log => {
@@ -1498,7 +1514,7 @@ export default function PlatformAdmin() {
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Buscar empresas..."
+                      placeholder="Buscar por nombre, email o teléfono..."
                       value={companySearch}
                       onChange={(e) => setCompanySearch(e.target.value)}
                       className="pl-9"
@@ -1789,6 +1805,15 @@ export default function PlatformAdmin() {
                   </div>
                 </div>
                 <div className="flex gap-4 mt-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por mensaje o categoría..."
+                      value={feedbackSearch}
+                      onChange={(e) => setFeedbackSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
                   <Select value={feedbackStatusFilter} onValueChange={setFeedbackStatusFilter}>
                     <SelectTrigger className="w-[200px]">
                       <SelectValue placeholder="Filtrar por estado" />
@@ -2008,6 +2033,15 @@ export default function PlatformAdmin() {
                   </Dialog>
                 </div>
                 <div className="flex gap-4 mt-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por empresa o método de pago..."
+                      value={paymentSearch}
+                      onChange={(e) => setPaymentSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
                   <Select value={paymentStatusFilter} onValueChange={setPaymentStatusFilter}>
                     <SelectTrigger className="w-[200px]">
                       <SelectValue placeholder="Filtrar por estado" />
