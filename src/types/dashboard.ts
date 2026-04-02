@@ -4,6 +4,9 @@ export type WidgetType = 'kpi' | 'chart' | 'table' | 'map' | 'formula' | 'gauge'
 export type ChartType = 'line' | 'bar' | 'pie' | 'area' | 'scatter';
 export type FormulaType = 'calculation' | 'aggregation' | 'conditional';
 export type DataSourceType = 'table' | 'query' | 'api';
+
+// Widget Types Array
+export const WIDGET_TYPES: WidgetType[] = ['kpi', 'chart', 'table', 'map', 'formula', 'gauge', 'number'];
 export type SourceTableName = 
   | 'sales' 
   | 'products' 
