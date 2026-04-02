@@ -1,11 +1,12 @@
 // Dashboard Types and Interfaces
+// Last updated: April 1, 2026 - Widget Types Export Fix
 
 export type WidgetType = 'kpi' | 'chart' | 'table' | 'map' | 'formula' | 'gauge' | 'number';
 export type ChartType = 'line' | 'bar' | 'pie' | 'area' | 'scatter';
 export type FormulaType = 'calculation' | 'aggregation' | 'conditional';
 export type DataSourceType = 'table' | 'query' | 'api';
 
-// Widget Types Array
+// Widget Types Array - Exported for use in PropertyPanel and WidgetLibrary
 export const WIDGET_TYPES: WidgetType[] = ['kpi', 'chart', 'table', 'map', 'formula', 'gauge', 'number'];
 export type SourceTableName = 
   | 'sales' 
