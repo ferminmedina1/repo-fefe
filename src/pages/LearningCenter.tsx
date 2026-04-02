@@ -2,7 +2,7 @@
 // Learning Center - Página principal de tutoriales
 // ============================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { TutorialSelector } from '@/components/learning/TutorialSelector';
 import { WelcomeOnboarding } from '@/components/learning/WelcomeOnboarding';
@@ -12,16 +12,8 @@ import { TUTORIAL_MODULES } from '@/lib/tutorial/config';
 
 export default function LearningCenterPage() {
   const { isRunning, startTutorial } = useTutorial();
-  const [showWelcome, setShowWelcome] = useState(false);
-
-  // Check if user has seen welcome onboarding
-  useEffect(() => {
-    const hasSeenWelcome = localStorage.getItem('ventify_welcome_onboarding_v1');
-    if (!hasSeenWelcome) {
-      setShowWelcome(true);
-      localStorage.setItem('ventify_welcome_onboarding_v1', 'true');
-    }
-  }, []);
+  // Mostrar onboarding siempre para testing
+  const [showWelcome, setShowWelcome] = useState(true);
 
   const handleWelcomeComplete = () => {
     setShowWelcome(false);
