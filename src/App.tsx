@@ -78,6 +78,8 @@ const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRequests"));
 const LearningCenter = lazy(() => import("./pages/LearningCenter"));
+const DashboardEditor = lazy(() => import("./pages/DashboardEditor"));
+const DashboardExampleBuilder = lazy(() => import("./pages/DashboardExampleBuilder"));
 const KnowledgeBaseCenter = lazy(() => import("./pages/KnowledgeBaseCenter"));
 const SetupWizardPage = lazy(() =>
   import("./pages/SetupWizardPage").then((module) => ({ default: module.SetupWizardPage }))
@@ -346,6 +348,8 @@ const App = () => (
 
                 {/* Dashboard privado en /app */}
                 <Route path="/app" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="dashboard"><Dashboard /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/dashboard-builder" element={<ProtectedRoute><DashboardExampleBuilder /></ProtectedRoute>} />
+                <Route path="/dashboards/:dashboardId/editor" element={<ProtectedRoute><DashboardEditor /></ProtectedRoute>} />
                 <Route path="/pos" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos"><POS /></ModuleProtectedRoute></ProtectedRoute>} />
                 <Route path="/products" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="products"><Products /></ModuleProtectedRoute></ProtectedRoute>} />
                 <Route path="/customers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customers"><Customers /></ModuleProtectedRoute></ProtectedRoute>} />
