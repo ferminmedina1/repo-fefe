@@ -24,8 +24,6 @@ const TechnicalServices = lazy(() => import("./pages/TechnicalServices"));
 const Employees = lazy(() => import("./pages/Employees"));
 const CashRegister = lazy(() => import("./pages/CashRegister"));
 const Purchases = lazy(() => import("./pages/Purchases"));
-const PurchaseOrders = lazy(() => import("./pages/PurchaseOrders"));
-const PurchaseReception = lazy(() => import("./pages/PurchaseReception"));
 const PurchaseReturns = lazy(() => import("./pages/PurchaseReturns"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -352,8 +350,6 @@ const App = () => (
             {/* Inventario & Compras */}
             <Route path="/suppliers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="suppliers"><Suppliers /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/purchases" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><Purchases /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/purchase-orders" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><PurchaseOrders /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/purchase-reception" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><PurchaseReception /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/purchase-returns" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><PurchaseReturns /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/warehouses" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouses"><Warehouses /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/warehouse-stock" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouse_stock"><WarehouseStock /></ModuleProtectedRoute></ProtectedRoute>} />

@@ -12,12 +12,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Trash2, ShoppingCart, Package, DollarSign, AlertCircle, CheckCircle2, Info, TrendingUp, BarChart3 } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Trash2, ShoppingCart, Package, DollarSign, AlertCircle, CheckCircle2, Info, TrendingUp, BarChart3 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface PurchaseItem {
   product_id: string;
@@ -30,10 +31,18 @@ interface PurchaseItem {
 const Purchases = () => {
   const navigate = useNavigate();
   const { currentCompany } = useCompany();
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission("purchases", "create");
+  const canEdit = hasPermission("purchases", "edit");
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
+  const [isPurchaseDetailOpen, setIsPurchaseDetailOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState<any>(null);
+  const [editPaymentStatus, setEditPaymentStatus] = useState("");
+  const [editNotes, setEditNotes] = useState("");
   
   // New purchase form state
   const [supplierId, setSupplierId] = useState("");
@@ -68,6 +77,7 @@ const Purchases = () => {
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   // Fetch suppliers
@@ -83,6 +93,7 @@ const Purchases = () => {
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   // Fetch products
@@ -98,11 +109,29 @@ const Purchases = () => {
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
+  });
+
+  // Fetch items for the selected purchase detail view
+  const { data: selectedPurchaseItems, isLoading: isItemsLoading } = useQuery({
+    queryKey: ["purchase-items", selectedPurchase?.id],
+    queryFn: async () => {
+      if (!selectedPurchase?.id || !currentCompany?.id) return [];
+      const { data, error } = await (supabase as any)
+        .from("purchase_items")
+        .select("*")
+        .eq("purchase_id", selectedPurchase.id)
+        .eq("company_id", currentCompany.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!selectedPurchase?.id && !!currentCompany?.id,
   });
 
   // Create purchase mutation
   const createPurchaseMutation = useMutation({
     mutationFn: async () => {
+      if (!currentCompany?.id) throw new Error("No company selected");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
@@ -110,8 +139,8 @@ const Purchases = () => {
       const tax = subtotal * (taxRate / 100);
       const total = subtotal + tax;
 
-      // Generate purchase number
-      const purchaseNumber = `PUR-${Date.now()}`;
+      // Generate purchase number (timestamp + random suffix for low collision probability)
+      const purchaseNumber = `PUR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
 
       // Insert purchase
       const { data: purchase, error: purchaseError } = await supabase
@@ -141,7 +170,7 @@ const Purchases = () => {
         quantity: item.quantity,
         unit_cost: item.unit_cost,
         subtotal: item.subtotal,
-        company_id: currentCompany?.id!
+        company_id: currentCompany?.id
       }));
 
       const { error: itemsError } = await supabase
@@ -158,16 +187,20 @@ const Purchases = () => {
       const { error: stockError } = await supabase.rpc('batch_update_product_stock', { adjustments });
       if (stockError) throw stockError;
 
-      // Update supplier balance
-      const supplier = suppliers?.find(s => s.id === supplierId);
-      if (supplier) {
-        const { error: balanceError } = await supabase
-          .from("suppliers")
-          .update({ current_balance: (supplier.current_balance || 0) + total })
-          .eq("id", supplierId);
-
-        if (balanceError) throw balanceError;
-      }
+      // Update supplier balance — fresh fetch to avoid read-modify-write race (HIGH-1)
+      const { data: freshSupplier, error: fetchSupplierError } = await supabase
+        .from("suppliers")
+        .select("current_balance")
+        .eq("id", supplierId)
+        .eq("company_id", currentCompany?.id)
+        .single();
+      if (fetchSupplierError) throw fetchSupplierError;
+      const { error: balanceError } = await supabase
+        .from("suppliers")
+        .update({ current_balance: (freshSupplier?.current_balance || 0) + total })
+        .eq("id", supplierId)
+        .eq("company_id", currentCompany?.id);
+      if (balanceError) throw balanceError;
 
       return purchase;
     },
@@ -176,6 +209,7 @@ const Purchases = () => {
       queryClient.invalidateQueries({ queryKey: ["purchases"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers-stats"] });
       resetForm();
       setIsDialogOpen(false);
     },
@@ -184,6 +218,35 @@ const Purchases = () => {
       console.error(error);
     },
   });
+
+  // Update purchase mutation (payment_status + notes only — items/totals not editable to preserve stock integrity)
+  const updatePurchaseMutation = useMutation({
+    mutationFn: async (data: { id: string; payment_status: string; notes: string }) => {
+      if (!currentCompany?.id) throw new Error("No company selected");
+      const { error } = await supabase
+        .from("purchases")
+        .update({ payment_status: data.payment_status, notes: data.notes })
+        .eq("id", data.id)
+        .eq("company_id", currentCompany.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchases"] });
+      toast.success("Compra actualizada exitosamente");
+      setIsEditDialogOpen(false);
+      setEditingPurchase(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al actualizar la compra");
+    },
+  });
+
+  const openEditDialog = (purchase: any) => {
+    setEditingPurchase(purchase);
+    setEditPaymentStatus(purchase.payment_status);
+    setEditNotes(purchase.notes || "");
+    setIsEditDialogOpen(true);
+  };
 
   const resetForm = () => {
     setSupplierId("");
@@ -198,6 +261,14 @@ const Purchases = () => {
   const addItem = () => {
     if (!currentProduct) {
       toast.error("Selecciona un producto");
+      return;
+    }
+    if (currentQuantity <= 0) {
+      toast.error("La cantidad debe ser mayor a 0");
+      return;
+    }
+    if (currentCost < 0) {
+      toast.error("El costo no puede ser negativo");
       return;
     }
 
@@ -281,7 +352,7 @@ const Purchases = () => {
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Lista de Compras</span>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              {canCreate && <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -478,7 +549,7 @@ const Purchases = () => {
 
                     <Button
                       onClick={() => createPurchaseMutation.mutate()}
-                      disabled={!supplierId || purchaseItems.length === 0}
+                      disabled={!supplierId || purchaseItems.length === 0 || createPurchaseMutation.isPending}
                         className="w-full gap-2"
                     >
                         <CheckCircle2 className="h-4 w-4" />
@@ -486,7 +557,7 @@ const Purchases = () => {
                     </Button>
                   </div>
                 </DialogContent>
-              </Dialog>
+              </Dialog>}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -535,7 +606,7 @@ const Purchases = () => {
                       <TableCell>{purchase.suppliers?.name || "N/A"}</TableCell>
                         <TableCell className="font-semibold text-green-600 dark:text-green-400">${purchase.total.toFixed(2)}</TableCell>
                       <TableCell>{getPaymentStatusBadge(purchase.payment_status)}</TableCell>
-                      <TableCell>Usuario</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{purchase.user_id ? purchase.user_id.slice(0, 8) + "…" : "N/D"}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             <TooltipProvider>
@@ -546,7 +617,8 @@ const Purchases = () => {
                                     size="sm"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      // Ver detalle logic here
+                                      setSelectedPurchase(purchase);
+                                      setIsPurchaseDetailOpen(true);
                                     }}
                                   >
                                     <Eye className="h-4 w-4" />
@@ -555,6 +627,25 @@ const Purchases = () => {
                                 <TooltipContent>Ver detalle</TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
+                            {canEdit && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openEditDialog(purchase);
+                                      }}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Editar</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                           </div>
                         </TableCell>
                     </TableRow>
@@ -565,6 +656,170 @@ const Purchases = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit purchase dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => { setIsEditDialogOpen(open); if (!open) setEditingPurchase(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-primary" />
+              Editar Compra {editingPurchase?.purchase_number}
+            </DialogTitle>
+          </DialogHeader>
+          {editingPurchase && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg text-sm">
+                <div>
+                  <p className="text-muted-foreground">Proveedor</p>
+                  <p className="font-medium">{editingPurchase.suppliers?.name || "N/A"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Total</p>
+                  <p className="font-semibold text-green-600 dark:text-green-400">${editingPurchase.total?.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Fecha</p>
+                  <p className="font-medium">{format(new Date(editingPurchase.purchase_date), "dd/MM/yyyy")}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">N° Compra</p>
+                  <p className="font-medium font-mono text-xs">{editingPurchase.purchase_number}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Estado de Pago</Label>
+                <Select value={editPaymentStatus} onValueChange={setEditPaymentStatus}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pendiente</SelectItem>
+                    <SelectItem value="partial">Parcial</SelectItem>
+                    <SelectItem value="paid">Pagado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Notas</Label>
+                <Textarea
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="Notas adicionales..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => updatePurchaseMutation.mutate({
+                    id: editingPurchase.id,
+                    payment_status: editPaymentStatus,
+                    notes: editNotes,
+                  })}
+                  disabled={updatePurchaseMutation.isPending}
+                  className="gap-2"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {updatePurchaseMutation.isPending ? "Guardando..." : "Guardar Cambios"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Purchase detail dialog — MED-1 */}
+      <Dialog open={isPurchaseDetailOpen} onOpenChange={(open) => { setIsPurchaseDetailOpen(open); if (!open) setSelectedPurchase(null); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5 text-primary" />
+              Detalle de Compra {selectedPurchase?.purchase_number}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedPurchase && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                <div>
+                  <Label className="text-muted-foreground">Proveedor</Label>
+                  <p className="font-medium">{selectedPurchase.suppliers?.name || "N/A"}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Fecha</Label>
+                  <p className="font-medium">{format(new Date(selectedPurchase.purchase_date), "dd/MM/yyyy")}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Estado de Pago</Label>
+                  <div className="mt-1">{getPaymentStatusBadge(selectedPurchase.payment_status)}</div>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Registrado por</Label>
+                  <p className="font-medium text-sm text-muted-foreground">
+                    {selectedPurchase.user_id ? selectedPurchase.user_id.slice(0, 8) + "…" : "N/D"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3">Productos</h3>
+                {isItemsLoading ? (
+                  <p className="text-sm text-muted-foreground">Cargando productos...</p>
+                ) : selectedPurchaseItems && selectedPurchaseItems.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Producto</TableHead>
+                        <TableHead>Cantidad</TableHead>
+                        <TableHead>Costo Unit.</TableHead>
+                        <TableHead>Subtotal</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedPurchaseItems.map((item: any) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.product_name}</TableCell>
+                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>${item.unit_cost?.toFixed(2)}</TableCell>
+                          <TableCell>${item.subtotal?.toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Sin productos registrados</p>
+                )}
+              </div>
+
+              <div className="bg-muted/30 border rounded-lg p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Subtotal:</span>
+                  <span className="font-medium">${selectedPurchase.subtotal?.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Impuesto ({selectedPurchase.tax_rate}%):</span>
+                  <span className="font-medium text-amber-600 dark:text-amber-500">${selectedPurchase.tax?.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t">
+                  <span>Total:</span>
+                  <span className="text-green-600 dark:text-green-400">${selectedPurchase.total?.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {selectedPurchase.notes && (
+                <div>
+                  <Label className="text-muted-foreground">Notas</Label>
+                  <p className="text-sm mt-1">{selectedPurchase.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

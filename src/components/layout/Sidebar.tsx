@@ -43,7 +43,6 @@ import {
   BadgePercent,
   Search,
   Star,
-  PackageCheck,
   LogOut,
   MessageCircle,
   LifeBuoy,
@@ -367,22 +366,10 @@ export function Sidebar() {
 
           children: [
             {
-              title: "Órdenes de Compra",
-              href: "/purchase-orders",
-              icon: FileCheck,
-              module: "purchase_orders",
-            },
-            {
               title: "Historial de Compras",
               href: "/purchases",
               icon: ShoppingBag,
               module: "purchases",
-            },
-            {
-              title: "Recepción de Mercadería",
-              href: "/purchase-reception",
-              icon: PackageCheck,
-              module: "purchase_reception",
             },
             {
               title: "Devoluciones a Proveedores",
