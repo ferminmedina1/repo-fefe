@@ -1412,7 +1412,7 @@ figure {
 .footer-legal-link {
   color: var(--_colors---text--soft-400);
   transition: color .2s;
-  display: none;
+  display: inline-block;
 }
 
 .footer-legal-link:hover {
@@ -2115,6 +2115,60 @@ figure {
   box-shadow: inset 0 0 0 1px var(--_colors---base--primary-500);
 }
 
+.pricing-price .heading-style-h2 {
+  font-size: 2.5rem;
+  line-height: 1.1;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.pricing-plan.is-enterprise .pricing-price .heading-style-h2 {
+  font-size: 2.25rem;
+  line-height: 1.1;
+}
+
+.pricing-plan.is-enterprise .pricing-price .price-label {
+  font-size: 1.75rem;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+.pricing-custom-wrapper {
+  margin-top: var(--_spacing---space--spacing-xl);
+}
+
+.pricing-plan.is-custom-wide {
+  padding: var(--_spacing---space--spacing-3xl);
+  grid-column-gap: var(--_spacing---space--spacing-3xl);
+  grid-row-gap: var(--_spacing---space--spacing-xl);
+  border-radius: var(--radius--xlarge);
+  background-color: var(--_colors---background--surface-900);
+  box-shadow: inset 0 0 0 1px var(--_colors---background--surface-800);
+  flex-flow: row;
+  justify-content: space-between;
+  align-items: center;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+.pricing-plan.is-custom-wide .pricing-custom-left {
+  display: flex;
+  flex-flow: column;
+  gap: var(--_spacing---space--spacing-md);
+  flex: 1;
+}
+
+.pricing-plan.is-custom-wide .pricing-custom-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--_spacing---space--spacing-lg) var(--_spacing---space--spacing-3xl);
+}
+
+.pricing-plan.is-custom-wide .pricing-custom-right {
+  flex-shrink: 0;
+}
+
 .pricing-feature-list {
   grid-column-gap: var(--_spacing---space--spacing-lg);
   grid-row-gap: var(--_spacing---space--spacing-lg);
@@ -2127,19 +2181,22 @@ figure {
   padding-top: .5rem;
   padding-bottom: .5rem;
   display: flex;
+  text-align: center;
 }
 
 .pricing-feature {
   grid-column-gap: var(--_spacing---space--spacing-md);
   grid-row-gap: var(--_spacing---space--spacing-md);
   display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .pricing-plans {
   grid-column-gap: var(--_spacing---space--spacing-xl);
   grid-row-gap: var(--_spacing---space--spacing-xl);
   grid-template-rows: auto;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   position: relative;
 }
 
@@ -2890,6 +2947,11 @@ figure {
 
   .pricing-plans {
     grid-template-columns: 1fr;
+  }
+
+  .pricing-plan.is-custom-wide {
+    flex-flow: column;
+    align-items: stretch;
   }
 
   .our-value-top {

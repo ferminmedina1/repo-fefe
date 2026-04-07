@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Calculator, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Calculator, TrendingUp, TrendingDown, DollarSign, HelpCircle } from "lucide-react";
 
 interface PayrollCalculatorProps {
   companyId: string;
@@ -163,12 +164,34 @@ export const PayrollCalculator = ({
 
         {/* Deductions Detail */}
         <div>
-          <h4 className="text-sm font-medium mb-2">Deducciones del Empleado</h4>
+          <div className="flex items-center gap-2 mb-2">
+            <h4 className="text-sm font-medium">Deducciones del Empleado</h4>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>Descuentos automáticos del sueldo: 11% jubilación + 3% PAMI + 3% obra social + otros</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
           <div className="space-y-1">
             {result.deductions.map((d, i) => (
-              <div key={i} className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {d.name} <Badge variant="outline" className="ml-1 text-xs">{d.rate}%</Badge>
+              <div key={i} className="flex justify-between text-sm items-center">
+                <span className="text-muted-foreground flex items-center gap-2">
+                  {d.name}
+                  <Badge variant="outline" className="text-xs">{d.rate}%</Badge>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      {d.name === "Jubilación" && "Descuento del 11% para sistema de pensión"}
+                      {d.name === "PAMI" && "Descuento del 3% para cobertura de salud jubilatorio"}
+                      {d.name === "Obra Social" && "Descuento del 3% para cobertura médica del empleado"}
+                      {d.name === "Sindicato" && "Descuento del 2% según afiliación sindical"}
+                    </TooltipContent>
+                  </Tooltip>
                 </span>
                 <span className="font-medium">-${d.amount.toLocaleString("es-AR", { maximumFractionDigits: 2 })}</span>
               </div>
@@ -180,12 +203,35 @@ export const PayrollCalculator = ({
 
         {/* Employer Contributions Detail */}
         <div>
-          <h4 className="text-sm font-medium mb-2">Aportes Patronales</h4>
+          <div className="flex items-center gap-2 mb-2">
+            <h4 className="text-sm font-medium">Aportes Patronales (Costo Empleador)</h4>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p>Aportes que paga el empleador por cada empleado: jubilación, ART, seguro, etc.</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
           <div className="space-y-1">
             {result.contributions.map((c, i) => (
-              <div key={i} className="flex justify-between text-sm">
-                <span className="text-muted-foreground">
-                  {c.name} <Badge variant="outline" className="ml-1 text-xs">{c.rate}%</Badge>
+              <div key={i} className="flex justify-between text-sm items-center">
+                <span className="text-muted-foreground flex items-center gap-2">
+                  {c.name}
+                  <Badge variant="outline" className="text-xs">{c.rate}%</Badge>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      {c.name.includes("Jubilación") && "Aporte patronal del 10.17% para sistema de pensión"}
+                      {c.name.includes("PAMI") && "Aporte patronal del 1.5% para cobertura jubilatorio"}
+                      {c.name.includes("Obra Social") && "Aporte patronal del 6% para cobertura del empleado"}
+                      {c.name === "ART" && "Seguro de Riesgos del Trabajo (2.5% promedio)"}
+                      {c.name === "Seguro de Vida" && "Póliza de Seguro de Vida colectivo (0.03%)"}
+                    </TooltipContent>
+                  </Tooltip>
                 </span>
                 <span className="font-medium">${c.amount.toLocaleString("es-AR", { maximumFractionDigits: 2 })}</span>
               </div>

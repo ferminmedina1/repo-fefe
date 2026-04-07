@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { z } from "zod";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useTutorial } from "@/hooks/useTutorial";
 import { useCompany } from "@/contexts/CompanyContext";
 
 const customerSchema = z.object({
@@ -44,14 +45,16 @@ export default function Customers() {
   const navigate = useNavigate();
   const { currentCompany } = useCompany();
   const { hasPermission } = usePermissions();
-  const canCreate = hasPermission('customers', 'create');
-  const canEdit = hasPermission('customers', 'edit');
+  const { isRunning } = useTutorial();
+  const canCreate = hasPermission('customers', 'create') || isRunning;
+  const canEdit = hasPermission('customers', 'edit') || isRunning;
   
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -75,7 +78,7 @@ export default function Customers() {
     queryFn: async () => {
       if (!currentCompany?.id) return [];
       
-      let query = supabase.from("customers").select("*").eq("company_id", currentCompany.id).order("created_at", { ascending: false });
+      let query: any = supabase.from("customers").select("*").eq("company_id", currentCompany.id).order("created_at", { ascending: false }).limit(100);
       
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -367,6 +370,7 @@ export default function Customers() {
       payment_terms: "",
       price_list_id: "",
     });
+    setFormErrors({});
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -403,7 +407,13 @@ export default function Customers() {
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
+        const newErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            newErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setFormErrors(newErrors);
       } else {
         toast.error("Error al validar los datos del cliente");
       }
@@ -510,12 +520,13 @@ export default function Customers() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
-            <p className="text-muted-foreground">Gestiona tu base de clientes</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Clientes</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Gestiona tu base de clientes</p>
           </div>
-            <Button variant="outline" onClick={() => navigate("/reports?tab=customers")}>
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => navigate("/reports?tab=customers")} className="w-full sm:w-auto">
               <BarChart3 className="h-4 w-4 mr-2" />
               Ver Reportes
             </Button>
@@ -525,7 +536,7 @@ export default function Customers() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DialogTrigger asChild>
-                      <Button onClick={() => { setEditingCustomer(null); resetForm(); }} className="gap-2">
+                      <Button onClick={() => { setEditingCustomer(null); resetForm(); }} className="gap-2" data-tutorial="btn-create-customer">
                         <Plus className="h-4 w-4" />
                         Nuevo Cliente
                       </Button>
@@ -542,6 +553,7 @@ export default function Customers() {
                   </DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  <p className="text-xs text-muted-foreground">Los campos con <span className="text-destructive">*</span> son obligatorios.</p>
                   {/* Sección Información Básica */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 pb-2 border-b">
@@ -552,12 +564,14 @@ export default function Customers() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="name">Nombre *</Label>
-                        <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+                        <Label htmlFor="name">Nombre <span className="text-destructive">*</span></Label>
+                        <Input id="name" value={formData.name} onChange={(e) => { setFormData({ ...formData, name: e.target.value }); if (formErrors.name) setFormErrors((p) => ({ ...p, name: "" })); }} className={formErrors.name ? "border-destructive" : ""} />
+                        {formErrors.name && <p className="text-sm text-destructive mt-1">{formErrors.name}</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                        <Input id="email" type="email" value={formData.email} onChange={(e) => { setFormData({ ...formData, email: e.target.value }); if (formErrors.email) setFormErrors((p) => ({ ...p, email: "" })); }} className={formErrors.email ? "border-destructive" : ""} />
+                        {formErrors.email && <p className="text-sm text-destructive mt-1">{formErrors.email}</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="phone">Teléfono</Label>
@@ -616,7 +630,8 @@ export default function Customers() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="credit_limit">Límite de Crédito</Label>
-                        <Input id="credit_limit" type="number" step="0.01" value={formData.credit_limit} onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })} />
+                        <Input id="credit_limit" type="number" step="0.01" value={formData.credit_limit} onChange={(e) => { setFormData({ ...formData, credit_limit: e.target.value }); if (formErrors.credit_limit) setFormErrors((p) => ({ ...p, credit_limit: "" })); }} className={formErrors.credit_limit ? "border-destructive" : ""} />
+                        {formErrors.credit_limit && <p className="text-sm text-destructive mt-1">{formErrors.credit_limit}</p>}
                       </div>
                       <div className="space-y-2">
                         <Label>Estado</Label>
@@ -642,7 +657,8 @@ export default function Customers() {
                 </form>
               </DialogContent>
             </Dialog>
-          )}
+           )}
+          </div>
         </div>
 
         <Card className="shadow-soft">
@@ -654,11 +670,12 @@ export default function Customers() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
+                data-tutorial="customer-filters"
               />
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table data-tutorial="customer-table">
               <TableHeader>
                 <TableRow>
                   <TableHead>Nombre</TableHead>
@@ -672,8 +689,25 @@ export default function Customers() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {customers?.map((customer) => (
-                  <TableRow key={customer.id}>
+                {customers && customers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <Users className="h-12 w-12 text-muted-foreground/40" />
+                        <div>
+                          <h3 className="text-lg font-semibold">Sin clientes registrados</h3>
+                          <p className="text-sm text-muted-foreground mb-4">Comienza agregando tu primer cliente</p>
+                          <Button onClick={handleOpenDialog} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Crear Primer Cliente
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  customers?.map((customer) => (
+                    <TableRow key={customer.id}>
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell>{customer.email || "-"}</TableCell>
                     <TableCell>{customer.phone || "-"}</TableCell>
@@ -749,7 +783,8 @@ export default function Customers() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -1057,10 +1092,11 @@ export default function Customers() {
 
                 <TabsContent value="sales" className="mt-4">
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                       <h3 className="text-lg font-semibold">Facturas Pendientes</h3>
                       <Button 
-                        size="sm" 
+                        size="sm"
+                        className="w-full sm:w-auto"
                         onClick={() => {
                           window.open(`/customers/${selectedCustomer.id}/account-statement`, '_blank');
                         }}

@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { UserCog, Mail, UserPlus } from "lucide-react";
+import { UserCog, Mail, UserPlus, RefreshCw } from "lucide-react";
 import { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
@@ -44,8 +44,26 @@ export function EmployeeRoleAssignment() {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<AppRole>("employee");
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["company-users", currentCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["company-users-roles", currentCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["employees-for-roles", currentCompany?.id] }),
+        queryClient.invalidateQueries({ queryKey: ["company-user-profiles", currentCompany?.id] }),
+      ]);
+      toast.success("Datos actualizados correctamente");
+    } catch (error) {
+      toast.error("Error al actualizar los datos");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Fetch company users with their roles
   const { data: companyUsers, isLoading } = useQuery({
@@ -56,8 +74,7 @@ export function EmployeeRoleAssignment() {
       const { data, error } = await supabase
         .from("company_users")
         .select("*")
-        .eq("company_id", currentCompany.id)
-        .eq("active", true);
+        .eq("company_id", currentCompany.id);
       
       if (error) throw error;
       return data;
@@ -82,6 +99,97 @@ export function EmployeeRoleAssignment() {
     enabled: !!currentCompany?.id,
   });
 
+  const companyUserIds = companyUsers?.map((user) => user.user_id).filter(Boolean) || [];
+  const normalizeEmail = (email?: string | null) => (email || "").trim().toLowerCase();
+  const employeeEmails = (employees || [])
+    .map((employee) => normalizeEmail(employee.email))
+    .filter((email) => email.length > 0);
+
+  const { data: profilesById } = useQuery({
+    queryKey: ["company-user-profiles", currentCompany?.id, companyUserIds],
+    queryFn: async () => {
+      if (!currentCompany?.id || companyUserIds.length === 0) return {};
+
+      const supabaseClient = supabase as any;
+      const { data, error } = await supabaseClient
+        .from("profiles")
+        .select("id, email")
+        .in("id", companyUserIds);
+
+      if (error) throw error;
+
+      return (data || []).reduce((acc: Record<string, { id: string; email: string | null }>, profile: { id: string; email: string | null }) => {
+        acc[profile.id] = profile;
+        return acc;
+      }, {});
+    },
+    enabled: !!currentCompany?.id && companyUserIds.length > 0,
+  });
+
+  const { data: employeeRoleItems } = useQuery({
+    queryKey: ["company-users-roles", currentCompany?.id, employeeEmails],
+    queryFn: async () => {
+      if (!currentCompany?.id || employeeEmails.length === 0) return [];
+
+      const { data, error } = await supabase.functions.invoke("company-users-roles", {
+        body: {
+          companyId: currentCompany.id,
+          emails: employeeEmails,
+        },
+      });
+      if (error) throw error;
+
+      return (data as any)?.items || [];
+    },
+    enabled: !!currentCompany?.id && employeeEmails.length > 0,
+  });
+
+  const roleByEmail = new Map<
+    string,
+    { email: string; user_id: string | null; role: AppRole | null; active: boolean | null }
+  >();
+  (employeeRoleItems || []).forEach((item: any) => {
+    const email = normalizeEmail(item?.email);
+    if (email) {
+      roleByEmail.set(email, {
+        email,
+        user_id: item?.user_id ?? null,
+        role: item?.role ?? null,
+        active: item?.active ?? null,
+      });
+    }
+  });
+
+  const matchedUserIds = new Set<string>();
+  const employeeRows = (employees || []).map((employee) => {
+    const normalizedEmail = normalizeEmail(employee.email);
+    const roleInfo = normalizedEmail ? roleByEmail.get(normalizedEmail) : undefined;
+    const userId = roleInfo?.user_id ?? null;
+    if (userId) matchedUserIds.add(userId);
+    return {
+      employee,
+      email: employee.email ?? roleInfo?.email ?? null,
+      userId,
+      role: roleInfo?.role ?? null,
+      active: roleInfo?.active ?? null,
+    };
+  });
+
+  const orphanUserRows = (companyUsers || [])
+    .filter((user) => !matchedUserIds.has(user.user_id))
+    .map((user) => {
+      const profile = profilesById?.[user.user_id];
+      return {
+        employee: null,
+        email: profile?.email ?? null,
+        userId: user.user_id,
+        role: user.role,
+        active: user.active ?? null,
+      };
+    });
+
+  const roleRows = [...employeeRows, ...orphanUserRows];
+
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, newRole }: { userId: string; newRole: AppRole }) => {
       // Prevent changing own role from the client side
@@ -100,6 +208,8 @@ export function EmployeeRoleAssignment() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["company-users"] });
+      queryClient.invalidateQueries({ queryKey: ["company-users-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
       toast.success("Rol actualizado correctamente");
     },
     onError: (error: any) => {
@@ -160,6 +270,8 @@ export function EmployeeRoleAssignment() {
     },
     onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: ["company-users"] });
+      queryClient.invalidateQueries({ queryKey: ["company-users-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
 
       if (result?.already_member) {
         toast.info(result?.message || "El usuario ya pertenece a esta empresa");
@@ -190,6 +302,16 @@ export function EmployeeRoleAssignment() {
     },
   });
 
+  const handleInviteForEmployee = (email?: string | null) => {
+    if (!email) {
+      toast.error("El empleado no tiene email para invitar");
+      return;
+    }
+    setInviteEmail(email);
+    setInviteRole("employee");
+    setInviteDialogOpen(true);
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -206,18 +328,28 @@ export function EmployeeRoleAssignment() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <UserCog className="h-5 w-5 text-primary" />
+            <UserCog className="h-5 w-5 text-primary shrink-0" />
             <CardTitle>Asignación de Roles</CardTitle>
           </div>
-          <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Invitar Usuario
-              </Button>
-            </DialogTrigger>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Actualizando...' : 'Actualizar'}
+            </Button>
+            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full sm:w-auto">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Invitar Usuario
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Invitar Usuario a la Empresa</DialogTitle>
@@ -265,14 +397,15 @@ export function EmployeeRoleAssignment() {
                 </Button>
               </div>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </div>
         <CardDescription>
           Asigna roles a los usuarios de la empresa para controlar sus permisos
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {companyUsers && companyUsers.length > 0 ? (
+        {roleRows.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -283,58 +416,79 @@ export function EmployeeRoleAssignment() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {companyUsers.map((user) => {
-                // Try to find matching employee
-                const employee = employees?.find(e => e.email === user.user_id);
+              {roleRows.map((row) => {
+                const employee = row.employee;
+                const displayEmail = row.email || employee?.email || null;
+                const hasMembership = !!row.userId && !!row.role;
                 
                 return (
-                  <TableRow key={user.id}>
+                  <TableRow key={row.userId || employee?.id}>
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium">
                           {employee ? `${employee.first_name} ${employee.last_name}` : "Usuario"}
                         </span>
                         <span className="text-sm text-muted-foreground">
-                          ID: {user.user_id.slice(0, 8)}...
+                          {hasMembership && row.userId
+                            ? `ID: ${row.userId.slice(0, 8)}...`
+                            : displayEmail || "Sin email"}
                         </span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={ROLE_COLORS[user.role] || ""}>
-                        {ROLE_LABELS[user.role] || user.role}
-                      </Badge>
+                      {hasMembership && row.role ? (
+                        <Badge className={ROLE_COLORS[row.role] || ""}>
+                          {ROLE_LABELS[row.role] || row.role}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">Sin rol</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={user.active ? "default" : "secondary"}>
-                        {user.active ? "Activo" : "Inactivo"}
-                      </Badge>
+                      {hasMembership ? (
+                        <Badge variant={row.active ? "default" : "secondary"}>
+                          {row.active ? "Activo" : "Inactivo"}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">Sin usuario</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <Select
-                        value={user.role}
-                        onValueChange={(newRole) => {
-                          if (authUserId && authUserId === user.user_id) {
-                            toast.error("No puedes cambiar tu propio rol");
-                            return;
-                          }
-                          updateRoleMutation.mutate({
-                            userId: user.user_id,
-                            newRole: newRole as AppRole,
-                          });
-                        }}
-                        disabled={updateRoleMutation.isPending || (authUserId === user.user_id)}
-                      >
-                        <SelectTrigger className="w-40" title={authUserId === user.user_id ? "No puedes cambiar tu propio rol" : undefined}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {hasMembership && row.role ? (
+                        <Select
+                          value={row.role}
+                          onValueChange={(newRole) => {
+                            if (authUserId && authUserId === row.userId) {
+                              toast.error("No puedes cambiar tu propio rol");
+                              return;
+                            }
+                            updateRoleMutation.mutate({
+                              userId: row.userId as string,
+                              newRole: newRole as AppRole,
+                            });
+                          }}
+                          disabled={updateRoleMutation.isPending || (authUserId === row.userId)}
+                        >
+                          <SelectTrigger className="w-40" title={authUserId === row.userId ? "No puedes cambiar tu propio rol" : undefined}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleInviteForEmployee(displayEmail)}
+                        >
+                          Invitar
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

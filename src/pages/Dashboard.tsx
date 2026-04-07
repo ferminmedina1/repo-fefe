@@ -1,22 +1,37 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, Package, ShoppingCart, TrendingUp, Users, AlertTriangle, BarChart3, Activity, ArrowUpRight, ArrowDownRight, TrendingDown, Calendar } from "lucide-react";
+import { DollarSign, Package, ShoppingCart, TrendingUp, Users, AlertTriangle, BarChart3, Activity, ArrowUpRight, ArrowDownRight, TrendingDown, Calendar, ChevronRight, CheckCircle2 } from "lucide-react";
 import { Layout } from "@/components/layout/Layout";
+import { useNavigate } from "react-router-dom";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { format, subDays, startOfDay, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useTutorial } from "@/hooks/useTutorial";
 import { Badge } from "@/components/ui/badge";
 import { BusinessHealthPanel } from "@/components/dashboard/BusinessHealthPanel";
+import { CurrencyDashboardNew } from "@/components/dashboard/CurrencyDashboardNew";
+
+interface InventoryByCurrencyItem {
+  currency: string;
+  totalValue: number;
+  totalCost: number;
+  productCount: number;
+  valueInARS: number;
+}
 
 export default function Dashboard() {
   const { currentCompany } = useCompany();
   const { hasPermission, loading } = usePermissions();
-  const canViewSales = hasPermission("sales", "view");
-  const canViewProducts = hasPermission("products", "view");
-  const canViewCustomers = hasPermission("customers", "view");
+  const navigate = useNavigate();
+  const { isRunning } = useTutorial();
+  
+  // Show tutorial elements even if user lacks permissions (for tutorial visibility)
+  const canViewSales = hasPermission("sales", "view") || isRunning;
+  const canViewProducts = hasPermission("products", "view") || isRunning;
+  const canViewCustomers = hasPermission("customers", "view") || isRunning;
 
   // Ventas del mes actual vs mes pasado
   const { data: monthlyComparison } = useQuery({
@@ -359,7 +374,7 @@ export default function Dashboard() {
   });
 
   // Inventory valuation by currency
-  const { data: inventoryByCurrency } = useQuery({
+  const { data: inventoryByCurrency } = useQuery<InventoryByCurrencyItem[]>({
     queryKey: ["inventory-by-currency", currentCompany?.id],
     queryFn: async () => {
       if (!currentCompany?.id) return [];
@@ -442,10 +457,10 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="space-y-4 md:space-y-8">
+      <div className="space-y-4 md:space-y-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Panel de control y salud del negocio</p>
+          <h1 className="text-xl md:text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-xs md:text-base text-muted-foreground">Panel de control y salud del negocio</p>
         </div>
 
         {/* Business Health Panel */}
@@ -454,14 +469,20 @@ export default function Dashboard() {
         )}
 
         {canViewSales && (
-          <div className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-4">
-            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-blue-500/30">
+          <div data-tutorial-kpis className="grid gap-3 md:gap-6 grid-cols-2 lg:grid-cols-4">
+            <Card
+              className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-blue-500/30 cursor-pointer"
+              onClick={() => navigate("/analytics/indicadores-comerciales")}
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
                 <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Ventas del Mes
                 </CardTitle>
-                <div className="p-1.5 md:p-2.5 rounded-lg bg-blue-500/10">
-                  <Calendar className="h-4 w-4 md:h-5 md:w-5 text-blue-600 dark:text-blue-500" />
+                <div className="flex items-center gap-1">
+                  <div className="p-1.5 md:p-2.5 rounded-lg bg-blue-500/10">
+                    <Calendar className="h-4 w-4 md:h-5 md:w-5 text-blue-600 dark:text-blue-500" />
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
@@ -493,13 +514,16 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-green-500/30">
+            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-green-500/30 cursor-pointer" onClick={() => navigate("/analytics/indicadores-comerciales")}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
                 <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Margen Bruto
                 </CardTitle>
-                <div className="p-1.5 md:p-2.5 rounded-lg bg-green-500/10">
-                  <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-green-600 dark:text-green-500" />
+                <div className="flex items-center gap-1">
+                  <div className="p-1.5 md:p-2.5 rounded-lg bg-green-500/10">
+                    <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-green-600 dark:text-green-500" />
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
@@ -517,13 +541,16 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-orange-500/30">
+            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-orange-500/30 cursor-pointer" onClick={() => navigate("/analytics/indicadores-comerciales")}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
                 <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Por Cobrar
                 </CardTitle>
-                <div className="p-1.5 md:p-2.5 rounded-lg bg-orange-500/10">
-                  <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-orange-600 dark:text-orange-500" />
+                <div className="flex items-center gap-1">
+                  <div className="p-1.5 md:p-2.5 rounded-lg bg-orange-500/10">
+                    <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-orange-600 dark:text-orange-500" />
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
@@ -543,13 +570,16 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-purple-500/30">
+            <Card className="shadow-soft hover:shadow-lg transition-all overflow-hidden border-l-4 border-purple-500/30 cursor-pointer" onClick={() => navigate("/analytics/indicadores-comerciales")}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 p-3 md:p-6">
                 <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground">
                   Ventas Hoy
                 </CardTitle>
-                <div className="p-1.5 md:p-2.5 rounded-lg bg-purple-500/10">
-                  <Activity className="h-4 w-4 md:h-5 md:w-5 text-purple-600 dark:text-purple-500" />
+                <div className="flex items-center gap-1">
+                  <div className="p-1.5 md:p-2.5 rounded-lg bg-purple-500/10">
+                    <Activity className="h-4 w-4 md:h-5 md:w-5 text-purple-600 dark:text-purple-500" />
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
                 </div>
               </CardHeader>
               <CardContent className="space-y-1 md:space-y-2 p-3 md:p-6 pt-0 md:pt-0">
@@ -567,143 +597,14 @@ export default function Dashboard() {
         )}
 
         <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
-          {/* Currency Dashboard Widget */}
-          {exchangeRates && exchangeRates.length > 0 && (
-            <div className="col-span-full">
-              <Card className="shadow-soft border-l-4 border-amber-500/30">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <div className="p-2 bg-amber-500/10 rounded-lg">
-                      <DollarSign className="h-5 w-5 text-amber-600 dark:text-amber-500" />
-                    </div>
-                    Dashboard de Monedas
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {/* Current Exchange Rates */}
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-semibold text-muted-foreground">Cotizaciones Actuales</h3>
-                      <div className="space-y-2">
-                        {exchangeRates.map((rate) => {
-                          const prevRate = rate.rate * 0.98; // Simulamos variación previa
-                          const variation = ((rate.rate - prevRate) / prevRate) * 100;
-                          const isPositive = variation >= 0;
-                          
-                          return (
-                            <div 
-                              key={rate.currency}
-                              className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors"
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className="font-semibold text-sm">{rate.currency}</div>
-                                <Badge variant="outline" className="text-xs">
-                                  {rate.currency === 'USD' ? '🇺🇸' : rate.currency === 'EUR' ? '🇪🇺' : rate.currency === 'BRL' ? '🇧🇷' : rate.currency === 'UYU' ? '🇺🇾' : '💱'}
-                                </Badge>
-                              </div>
-                              <div className="text-right">
-                                <div className="font-bold text-sm">${rate.rate.toFixed(2)}</div>
-                                <div className={`text-xs flex items-center gap-1 ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                                  {isPositive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                                  {Math.abs(variation).toFixed(2)}%
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Última actualización: {exchangeRates[0] ? format(new Date(exchangeRates[0].updated_at), "dd/MM/yyyy HH:mm", { locale: es }) : '-'}
-                      </p>
-                    </div>
-
-                    {/* Exchange Rate Evolution Chart */}
-                    {historicalRates && historicalRates.length > 0 && (
-                      <div className="space-y-3">
-                        <h3 className="text-sm font-semibold text-muted-foreground">Evolución (30 días)</h3>
-                        <ResponsiveContainer width="100%" height={200}>
-                          <LineChart data={historicalRates}>
-                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                            <XAxis dataKey="date" className="text-xs" />
-                            <YAxis className="text-xs" />
-                            <Tooltip 
-                              contentStyle={{ 
-                                backgroundColor: 'hsl(var(--card))', 
-                                border: '1px solid hsl(var(--border))',
-                                borderRadius: '8px'
-                              }}
-                              formatter={(value: number) => [`$${value.toFixed(2)}`]}
-                            />
-                            <Legend />
-                            <Line 
-                              type="monotone" 
-                              dataKey="USD" 
-                              stroke="#22c55e" 
-                              strokeWidth={2}
-                              dot={false}
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="EUR" 
-                              stroke="#3b82f6" 
-                              strokeWidth={2}
-                              dot={false}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    )}
-
-                    {/* Inventory Valuation by Currency */}
-                    {inventoryByCurrency && inventoryByCurrency.length > 0 && (
-                      <div className="space-y-3">
-                        <h3 className="text-sm font-semibold text-muted-foreground">Valorización de Inventario</h3>
-                        <div className="space-y-2">
-                          {inventoryByCurrency.map((item: any) => (
-                            <div 
-                              key={item.currency}
-                              className="p-3 rounded-lg bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20"
-                            >
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="font-semibold text-sm">{item.currency}</span>
-                                <Badge variant="secondary" className="text-xs">
-                                  {item.productCount} productos
-                                </Badge>
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-muted-foreground">Valor:</span>
-                                  <span className="font-medium">{item.currency} {item.totalValue.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-muted-foreground">En ARS:</span>
-                                  <span className="font-medium">$ {item.valueInARS.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                  <span className="text-muted-foreground">Margen:</span>
-                                  <span className="font-medium text-green-600">
-                                    {item.totalValue > 0 ? (((item.totalValue - item.totalCost) / item.totalValue) * 100).toFixed(1) : 0}%
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                          <div className="p-3 rounded-lg bg-gradient-to-r from-amber-500/10 to-amber-500/5 border border-amber-500/30">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-semibold">Total General (ARS)</span>
-                              <span className="text-lg font-bold">
-                                ${Number(inventoryByCurrency.reduce((acc: number, item: any) => acc + (item.valueInARS || 0), 0)).toFixed(2)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+          {/* New Premium Currency Dashboard */}
+          <div className="col-span-full">
+            <CurrencyDashboardNew
+              exchangeRates={exchangeRates || []}
+              historicalRates={historicalRates || []}
+              inventoryByCurrency={inventoryByCurrency || []}
+            />
+          </div>
 
           {canViewSales && canViewProducts && (
             <>
@@ -777,7 +678,7 @@ export default function Dashboard() {
         </div>
 
         {canViewSales && (
-          <Card className="shadow-soft">
+          <Card data-tutorial-chart className="shadow-soft">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <div className="p-2 bg-blue-500/10 rounded-lg">
@@ -815,7 +716,7 @@ export default function Dashboard() {
         )}
 
         {canViewProducts && (
-          <Card className="shadow-soft border-l-4 border-red-500/30">
+          <Card data-tutorial-alerts className="shadow-soft border-l-4 border-red-500/30">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <div className="p-2 bg-red-500/10 rounded-lg">
@@ -827,9 +728,12 @@ export default function Dashboard() {
             <CardContent>
               <div className="space-y-3">
                 {criticalStock?.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    ✅ No hay productos con stock crítico
-                  </p>
+                  <div className="flex items-center justify-center gap-2 py-8">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <p className="text-sm text-muted-foreground">
+                      Sin productos com stock crítico
+                    </p>
+                  </div>
                 ) : (
                   criticalStock?.map((product, index) => (
                     <div 

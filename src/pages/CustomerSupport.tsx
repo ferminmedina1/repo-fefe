@@ -44,6 +44,8 @@ export default function CustomerSupport() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
+  const [isNewCustomerDialogOpen, setIsNewCustomerDialogOpen] = useState(false);
+  const [isNewCategoryDialogOpen, setIsNewCategoryDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [newMessage, setNewMessage] = useState("");
   
@@ -54,6 +56,15 @@ export default function CustomerSupport() {
     priority: "medium",
     customer_id: ""
   });
+
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: "",
+    email: "",
+    phone: ""
+  });
+
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [customCategories, setCustomCategories] = useState<string[]>(["technical", "billing", "sales", "product", "other"]);
 
   // Fetch tickets
   const { data: tickets, isLoading } = useQuery({
@@ -114,6 +125,33 @@ export default function CustomerSupport() {
       return data;
     },
     enabled: !!selectedTicket?.id,
+  });
+
+  // Create new customer mutation
+  const createCustomerMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentCompany?.id) throw new Error("No company selected");
+      const { data, error } = await supabase
+        .from("customers")
+        .insert([{
+          ...newCustomerForm,
+          company_id: currentCompany.id
+        }])
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (newCustomer) => {
+      toast.success("Cliente creado exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["customers-support"] });
+      setTicketForm({...ticketForm, customer_id: newCustomer.id});
+      setIsNewCustomerDialogOpen(false);
+      setNewCustomerForm({name: "", email: "", phone: ""});
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al crear cliente");
+    }
   });
 
   // Create ticket mutation
@@ -243,14 +281,14 @@ export default function CustomerSupport() {
     <Layout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Atención al Cliente</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">Atención al Cliente</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
               Gestiona tickets de soporte. Las respuestas se envían automáticamente por email/SMS al cliente
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <Button variant="outline" onClick={() => navigate("/customer-support/knowledge-base")}>
               <BookOpen className="h-4 w-4 mr-2" />
               Base de Conocimiento
@@ -273,7 +311,67 @@ export default function CustomerSupport() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Cliente</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Cliente</Label>
+                      <Dialog open={isNewCustomerDialogOpen} onOpenChange={setIsNewCustomerDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            title="Crear nuevo cliente rápidamente"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Agregar Nuevo Cliente</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="customer-name">Nombre *</Label>
+                              <Input
+                                id="customer-name"
+                                value={newCustomerForm.name}
+                                onChange={(e) => setNewCustomerForm({...newCustomerForm, name: e.target.value})}
+                                placeholder="Nombre del cliente"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="customer-email">Email</Label>
+                              <Input
+                                id="customer-email"
+                                type="email"
+                                value={newCustomerForm.email}
+                                onChange={(e) => setNewCustomerForm({...newCustomerForm, email: e.target.value})}
+                                placeholder="email@ejemplo.com"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="customer-phone">Teléfono</Label>
+                              <Input
+                                id="customer-phone"
+                                value={newCustomerForm.phone}
+                                onChange={(e) => setNewCustomerForm({...newCustomerForm, phone: e.target.value})}
+                                placeholder="Número de teléfono"
+                              />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                              <Button variant="outline" onClick={() => setIsNewCustomerDialogOpen(false)}>
+                                Cancelar
+                              </Button>
+                              <Button 
+                                onClick={() => createCustomerMutation.mutate()}
+                                disabled={!newCustomerForm.name || createCustomerMutation.isPending}
+                              >
+                                {createCustomerMutation.isPending ? "Guardando..." : "Guardar"}
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                     <Select 
                       value={ticketForm.customer_id} 
                       onValueChange={(val) => setTicketForm({...ticketForm, customer_id: val})}
@@ -291,7 +389,67 @@ export default function CustomerSupport() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Categoría</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Categoría</Label>
+                      <Dialog open={isNewCategoryDialogOpen} onOpenChange={setIsNewCategoryDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            title="Crear nueva categoría rápidamente"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Agregar Nueva Categoría</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="category-name">Nombre de la Categoría *</Label>
+                              <Input
+                                id="category-name"
+                                value={newCategoryName}
+                                onChange={(e) => setNewCategoryName(e.target.value)}
+                                placeholder="ej: Soporte Técnico, Consulta..."
+                              />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                              <Button 
+                                variant="outline" 
+                                onClick={() => {
+                                  setIsNewCategoryDialogOpen(false);
+                                  setNewCategoryName("");
+                                }}
+                              >
+                                Cancelar
+                              </Button>
+                              <Button 
+                                onClick={() => {
+                                  if (newCategoryName.trim()) {
+                                    const categoryKey = newCategoryName.toLowerCase().replace(/\s+/g, '_');
+                                    if (!customCategories.includes(categoryKey)) {
+                                      setCustomCategories([...customCategories, categoryKey]);
+                                      setTicketForm({...ticketForm, category: categoryKey});
+                                      toast.success("Categoría creada");
+                                    } else {
+                                      toast.error("La categoría ya existe");
+                                    }
+                                    setIsNewCategoryDialogOpen(false);
+                                    setNewCategoryName("");
+                                  }
+                                }}
+                                disabled={!newCategoryName.trim()}
+                              >
+                                Crear
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                     <Select 
                       value={ticketForm.category} 
                       onValueChange={(val) => setTicketForm({...ticketForm, category: val})}
@@ -300,11 +458,20 @@ export default function CustomerSupport() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="technical">Técnico</SelectItem>
-                        <SelectItem value="billing">Facturación</SelectItem>
-                        <SelectItem value="sales">Ventas</SelectItem>
-                        <SelectItem value="product">Producto</SelectItem>
-                        <SelectItem value="other">Otro</SelectItem>
+                        {customCategories.map((cat) => {
+                          const labels: Record<string, string> = {
+                            technical: "Técnico",
+                            billing: "Facturación",
+                            sales: "Ventas",
+                            product: "Producto",
+                            other: "Otro"
+                          };
+                          return (
+                            <SelectItem key={cat} value={cat}>
+                              {labels[cat] || cat.replace(/_/g, ' ')}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
@@ -585,8 +752,9 @@ export default function CustomerSupport() {
                           value={newMessage}
                           onChange={(e) => setNewMessage(e.target.value)}
                           className="min-h-[80px]"
-                          onKeyPress={(e) => {
+                          onKeyDown={(e) => {
                             if (e.key === 'Enter' && e.ctrlKey && newMessage.trim()) {
+                              e.preventDefault();
                               sendMessageMutation.mutate();
                             }
                           }}

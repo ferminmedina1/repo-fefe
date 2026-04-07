@@ -1,0 +1,20 @@
+[build]
+command = "npm run build"
+functions = "netlify/functions"
+publish = "dist"
+
+[build.environment]
+# Node version
+NODE_VERSION = "20"
+
+# Build environment
+CI = "true"
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
+
+# Function settings
+[functions]
+node_bundler = "esbuild"

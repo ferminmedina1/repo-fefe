@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,12 +39,17 @@ import {
   Rocket,
   Circle,
   Calculator,
-  Package
+  Package,
+  AlertTriangle,
+  AlertOctagon
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 import { exportToExcel, exportToPDF, formatCurrency, formatDate } from "@/lib/exportUtils";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { usePlatformAdminRealtime } from "@/hooks/usePlatformAdminRealtime";
+import { usePlatformSupportTickets, type PlatformSupportTicket } from "@/hooks/usePlatformSupportTickets";
 import { useNavigate, Navigate } from "react-router-dom";
 import { PricingConfiguration } from "@/components/settings/PricingConfiguration";
 import { PricingCalculator } from "@/components/settings/PricingCalculator";
@@ -53,6 +58,7 @@ import { CustomPricingManager } from "@/components/settings/CustomPricingManager
 import { ModuleLimitsManager } from "@/components/settings/ModuleLimitsManager";
 import { ModuleAuditLog } from "@/components/settings/ModuleAuditLog";
 import { PlatformAdminHeader, PlatformAdminNav, PlatformAdminDashboard } from "@/components/platformAdmin";
+import { SendNotificationModule } from "@/components/platformAdmin/SendNotificationModule";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { usePagination } from "@/hooks/usePagination";
 
@@ -61,12 +67,9 @@ export default function PlatformAdmin() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   
-  // Enable realtime for platform admin to receive new tickets and messages
-  usePlatformAdminRealtime({ enabled: isPlatformAdmin });
-  
   // State for filters and dialogs
   const [companySearch, setCompanySearch] = useState("");
-  const [companyStatusFilter, setCompanyStatusFilter] = useState<string>("all");
+  const [companyStatusFilter, setCompanyStatusFilter] = useState<string>("active");
   const [notificationFilter, setNotificationFilter] = useState<string>("all");
   const [feedbackStatusFilter, setFeedbackStatusFilter] = useState<string>("all");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("all");
@@ -106,7 +109,7 @@ export default function PlatformAdmin() {
         .from("companies")
         .select(`
           *,
-          company_subscriptions (
+          subscriptions (
             *,
             subscription_plans (*)
           ),
@@ -166,8 +169,8 @@ export default function PlatformAdmin() {
         .from("platform_payments")
         .select(`
           *,
-          companies (name),
-          company_subscriptions (status)
+          companies:company_id (name),
+          subscriptions:subscription_id (status)
         `)
         .order("payment_date", { ascending: false });
 
@@ -250,209 +253,86 @@ export default function PlatformAdmin() {
     },
   });
 
-  // Fetch usage metrics per company
+  // Fetch usage metrics per company (single RPC with GROUP BY instead of 4N queries)
   const { data: usageMetrics, isLoading: isLoadingMetrics } = useQuery({
     queryKey: ['platform-usage-metrics'],
     queryFn: async () => {
-      const { data: companies } = await supabase
-        .from('companies')
-        .select('id, name')
-        .eq('active', true);
-      
-      if (!companies) return [];
-      
-      const metrics = await Promise.all(companies.map(async (company) => {
-        // Get sales count for current month
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-        
-        const { count: salesCount } = await supabase
-          .from('sales')
-          .select('*', { count: 'exact', head: true })
-          .eq('company_id', company.id)
-          .gte('created_at', startOfMonth.toISOString());
-        
-        // Get active products count
-        const { count: productsCount } = await supabase
-          .from('products')
-          .select('*', { count: 'exact', head: true })
-          .eq('company_id', company.id)
-          .eq('active', true);
-        
-        // Get active users count
-        const { count: usersCount } = await supabase
-          .from('company_users')
-          .select('*', { count: 'exact', head: true })
-          .eq('company_id', company.id)
-          .eq('active', true);
-        
-        // Get sales from last month for growth calculation
-        const lastMonthStart = new Date(startOfMonth);
-        lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
-        
-        const { count: lastMonthSales } = await supabase
-          .from('sales')
-          .select('*', { count: 'exact', head: true })
-          .eq('company_id', company.id)
-          .gte('created_at', lastMonthStart.toISOString())
-          .lt('created_at', startOfMonth.toISOString());
-        
-        const growth = lastMonthSales && lastMonthSales > 0
-          ? ((salesCount || 0) - lastMonthSales) / lastMonthSales * 100
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      const lastMonthStart = new Date(startOfMonth);
+      lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+
+      const { data, error } = await supabase.rpc('get_platform_usage_metrics', {
+        p_start_of_month: startOfMonth.toISOString(),
+        p_last_month_start: lastMonthStart.toISOString(),
+      });
+
+      if (error) {
+        console.error('Error fetching platform usage metrics:', error);
+        return [];
+      }
+
+      return (data || []).map((row: any) => {
+        const lastMonthSales = Number(row.last_month_sales) || 0;
+        const salesThisMonth = Number(row.sales_this_month) || 0;
+        const growth = lastMonthSales > 0
+          ? (salesThisMonth - lastMonthSales) / lastMonthSales * 100
           : 0;
-        
+
         return {
-          company_id: company.id,
-          company_name: company.name,
-          sales_this_month: salesCount || 0,
-          active_products: productsCount || 0,
-          active_users: usersCount || 0,
-          growth_percentage: growth
+          company_id: row.company_id,
+          company_name: row.company_name,
+          sales_this_month: salesThisMonth,
+          active_products: Number(row.active_products) || 0,
+          active_users: Number(row.active_users) || 0,
+          growth_percentage: growth,
         };
-      }));
-      
-      return metrics;
+      });
     }
   });
 
   // Fetch support tickets (sistema antiguo)
   // Fetch customer support tickets (nuevo sistema integrado)
   // Estados para gestión de tickets de plataforma
-  const [selectedPlatformTicket, setSelectedPlatformTicket] = useState<any>(null);
+  const [selectedPlatformTicketId, setSelectedPlatformTicketId] = useState<string | null>(null);
   const [platformTicketMessage, setPlatformTicketMessage] = useState("");
 
-  // Tickets de soporte de PLATAFORMA (empresas reportando problemas a admins)
-  const { data: platformSupportTickets, isLoading: platformTicketsLoading, error: platformTicketsError, refetch: refetchTickets } = useQuery({
-    queryKey: ["platform-support-tickets"],
-    queryFn: async () => {
-      try {
-        const { data, error } = await (supabase as any)
-          .from("platform_support_tickets")
-          .select(`
-            *,
-            companies!platform_support_tickets_company_id_fkey (
-              name,
-              email,
-              phone,
-              whatsapp_number
-            )
-          `)
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          console.error("Error fetching platform support tickets:", error);
-          return [];
-        }
-        return data || [];
-      } catch (err) {
-        console.error("Exception fetching tickets:", err);
-        return [];
-      }
-    },
-    retry: 1,
-    staleTime: 30000,
-    gcTime: 5 * 60 * 1000,
+  // Usar el hook optimizado para tickets de soporte
+  const {
+    platformSupportTickets,
+    platformTicketsLoading,
+    platformTicketsError,
+    platformTicketMessages,
+    respondPlatformTicketMutation,
+    updatePlatformTicketStatusMutation,
+    isMutatingRef,
+  } = usePlatformSupportTickets({
+    selectedTicketId: selectedPlatformTicketId,
   });
 
-  // Mensajes del ticket seleccionado
-  const { data: platformTicketMessages } = useQuery({
-    queryKey: ["platform-ticket-messages", selectedPlatformTicket?.id],
-    queryFn: async () => {
-      if (!selectedPlatformTicket?.id) return [];
-      const { data, error } = await (supabase as any)
-        .from("platform_support_messages")
-        .select("*")
-        .eq("ticket_id", selectedPlatformTicket.id)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!selectedPlatformTicket?.id,
+  // Derivar selectedPlatformTicket del cache (source of truth única)
+  const selectedPlatformTicket = useMemo(() => {
+    if (!selectedPlatformTicketId || !platformSupportTickets) return null;
+    const ticket = platformSupportTickets.find(t => t.id === selectedPlatformTicketId);
+    console.log("🔍 [useMemo RECOMPUTE] selectedPlatformTicket derived from cache:", {
+      selectedId: selectedPlatformTicketId?.slice(0,8),
+      found: !!ticket,
+      status: ticket?.status,
+      updated_at: ticket?.updated_at,
+      cacheSize: platformSupportTickets?.length
+    });
+    return ticket || null;
+  }, [selectedPlatformTicketId, platformSupportTickets]);
+
+  // Enable realtime for platform admin to receive new tickets and messages
+  // El cache de React Query se actualiza automáticamente via realtime
+  // selectedPlatformTicket se deriva del cache, no necesita callbacks
+  usePlatformAdminRealtime({
+    enabled: isPlatformAdmin,
+    isMutatingRef, // Bloquea realtime mientras hay mutaciones
   });
 
-  // Mutation para responder ticket
-  const respondPlatformTicketMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedPlatformTicket?.id || !platformTicketMessage.trim()) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      const { error } = await (supabase as any)
-        .from("platform_support_messages")
-        .insert([{
-          ticket_id: selectedPlatformTicket.id,
-          sender_type: "admin",
-          sender_id: user.id,
-          message: platformTicketMessage,
-        }]);
-
-      if (error) throw error;
-
-      // Retornar info para enviar notificación a la empresa
-      return {
-        ticketId: selectedPlatformTicket.id,
-        ticketNumber: selectedPlatformTicket.ticket_number,
-        companyId: selectedPlatformTicket.company_id,
-        companyEmail: selectedPlatformTicket.companies?.email,
-      };
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["platform-ticket-messages"] });
-      setPlatformTicketMessage("");
-      
-      // Enviar notificación a la empresa (opcional - solo si hay email)
-      if (data?.companyEmail) {
-        supabase.functions.invoke("notify-platform-support-ticket", {
-          body: {
-            ticket_id: data.ticketId,
-            type: "message_received",
-            send_email: true,
-            send_sms: false,
-          }
-        }).catch(() => {});
-      }
-      
-      toast.success("Respuesta enviada");
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al enviar respuesta");
-    },
-  });
-
-  // Mutation para cambiar estado del ticket
-  const updatePlatformTicketStatusMutation = useMutation({
-    mutationFn: async ({ ticketId, status }: { ticketId: string, status: string }) => {
-      const updates: any = { status };
-      if (status === "resolved") updates.resolved_at = new Date().toISOString();
-      if (status === "closed") updates.closed_at = new Date().toISOString();
-
-      const { error } = await (supabase as any)
-        .from("platform_support_tickets")
-        .update(updates)
-        .eq("id", ticketId);
-
-      if (error) throw error;
-      return { ticketId, status, ...updates };
-    },
-    onSuccess: (data) => {
-      toast.success("Estado actualizado");
-      queryClient.invalidateQueries({ queryKey: ["platform-support-tickets"] });
-      // Actualizar el ticket seleccionado localmente
-      if (selectedPlatformTicket && selectedPlatformTicket.id === data.ticketId) {
-        setSelectedPlatformTicket({
-          ...selectedPlatformTicket,
-          status: data.status,
-          resolved_at: data.resolved_at,
-          closed_at: data.closed_at
-        });
-        // Si se cierra, deselecciona después de 1 segundo
-        if (data.status === "closed") {
-          setTimeout(() => setSelectedPlatformTicket(null), 1000);
-        }
-      }
-    },
-  });
 
   // Fetch integrations data
   const { data: integrationsData } = useQuery({
@@ -707,23 +587,6 @@ export default function PlatformAdmin() {
 
   // Create ticket
 
-  // Show loading while checking admin status
-  if (adminLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Verificando permisos...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect if not platform admin
-  if (!isPlatformAdmin) {
-    return <Navigate to="/app" replace />;
-  }
-
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -837,6 +700,23 @@ export default function PlatformAdmin() {
     u.companies?.name?.toLowerCase().includes(userSearch.toLowerCase())
   ), { initialPageSize: 10 });
 
+  // Show loading while checking admin status
+  if (adminLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Verificando permisos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect if not platform admin
+  if (!isPlatformAdmin) {
+    return <Navigate to="/app" replace />;
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -861,7 +741,7 @@ export default function PlatformAdmin() {
 
   const totalUsers = companies?.reduce((acc, c) => acc + (c.company_users?.filter((u: any) => u.active).length || 0), 0) || 0;
   const overduePayments = companies?.filter(c => {
-    const sub = c.company_subscriptions?.[0];
+    const sub = c.subscriptions?.[0];
     return sub && sub.next_payment_date && new Date(sub.next_payment_date) < new Date();
   }).length || 0;
 
@@ -1137,8 +1017,6 @@ export default function PlatformAdmin() {
                           filtered = filtered.filter((t: any) => t.status === 'open');
                         } else if (platformSupportStatusFilter === 'in_progress') {
                           filtered = filtered.filter((t: any) => t.status === 'in_progress');
-                        } else if (platformSupportStatusFilter !== 'all') {
-                          filtered = filtered.filter((t: any) => t.status === platformSupportStatusFilter);
                         }
                         
                         if (filtered.length === 0) {
@@ -1155,7 +1033,7 @@ export default function PlatformAdmin() {
                           className={`p-3 border rounded-lg cursor-pointer transition-colors hover:bg-muted/50 ${
                             selectedPlatformTicket?.id === ticket.id ? "bg-muted border-2 border-primary" : ""
                           }`}
-                          onClick={() => setSelectedPlatformTicket(ticket)}
+                          onClick={() => setSelectedPlatformTicketId(ticket.id)}
                         >
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -1268,9 +1146,10 @@ export default function PlatformAdmin() {
                               onValueChange={(val) => {
                                 updatePlatformTicketStatusMutation.mutate({
                                   ticketId: selectedPlatformTicket.id,
-                                  status: val
+                                  status: val as PlatformSupportTicket["status"]
                                 });
                               }}
+                              disabled={updatePlatformTicketStatusMutation.isPending}
                             >
                               <SelectTrigger className="w-[140px] h-8">
                                 <SelectValue />
@@ -1278,7 +1157,6 @@ export default function PlatformAdmin() {
                               <SelectContent>
                                 <SelectItem value="open">Abierto</SelectItem>
                                 <SelectItem value="in_progress">En Progreso</SelectItem>
-                                <SelectItem value="pending">Pendiente</SelectItem>
                                 <SelectItem value="resolved">Resuelto</SelectItem>
                                 <SelectItem value="closed">Cerrado</SelectItem>
                               </SelectContent>
@@ -1289,7 +1167,7 @@ export default function PlatformAdmin() {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => setSelectedPlatformTicket(null)}
+                          onClick={() => setSelectedPlatformTicketId(null)}
                           className="mt-1"
                         >
                           ✕ Cerrar
@@ -1463,12 +1341,21 @@ export default function PlatformAdmin() {
                           <div className="space-y-2">
                             <div className="grid grid-cols-3 gap-2">
                               <Button
-                                onClick={() => respondPlatformTicketMutation.mutate()}
-                                disabled={!platformTicketMessage.trim()}
+                                onClick={() => {
+                                  if (!selectedPlatformTicket?.id || !platformTicketMessage.trim()) {
+                                    toast.error("Completa el mensaje antes de enviar");
+                                    return;
+                                  }
+                                  respondPlatformTicketMutation.mutate({
+                                    ticketId: selectedPlatformTicket.id,
+                                    message: platformTicketMessage
+                                  });
+                                }}
+                                disabled={!platformTicketMessage.trim() || respondPlatformTicketMutation.isPending}
                                 className="col-span-1"
                               >
                                 <MessageSquare className="h-4 w-4 mr-2" />
-                                Enviar
+                                {respondPlatformTicketMutation.isPending ? "Enviando..." : "Enviar"}
                               </Button>
                               <Button
                                 variant="outline"
@@ -1627,7 +1514,7 @@ export default function PlatformAdmin() {
                   </TableHeader>
                   <TableBody>
                     {companiesPagination.paginatedData?.map((company) => {
-                      const subscription = company.company_subscriptions?.[0];
+                      const subscription = company.subscriptions?.[0];
                       return (
                         <TableRow key={company.id}>
                           <TableCell className="font-medium">{company.name}</TableCell>
@@ -1637,7 +1524,7 @@ export default function PlatformAdmin() {
                             {getStatusBadge(company.active)}
                           </TableCell>
                           <TableCell>
-                            {getSubscriptionStatus(company.company_subscriptions)}
+                            {getSubscriptionStatus(company.subscriptions)}
                           </TableCell>
                           <TableCell>
                             {subscription?.next_payment_date
@@ -1654,7 +1541,7 @@ export default function PlatformAdmin() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-wrap">
                               <Button 
                                 variant="outline" 
                                 size="sm"
@@ -1716,96 +1603,157 @@ export default function PlatformAdmin() {
 
           {/* Notifications Tab */}
           <TabsContent value="notifications" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+            {/* Send Notifications Section */}
+            <SendNotificationModule />
+            
+            {/* View Sent Notifications Section */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-3 border-b">
+                <div className="flex items-center justify-between mb-4">
                   <div>
-                    <CardTitle>Notificaciones del Sistema</CardTitle>
-                    <CardDescription>
-                      Alertas y notificaciones importantes de todas las empresas
+                    <CardTitle className="flex items-center gap-2">
+                      <Bell className="h-5 w-5" />
+                      Historial de Notificaciones
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      {notificationsPagination.totalItems} notificaciones enviadas
+                      {notificationsPagination.totalItems > 0 && notificationsPagination.paginatedData?.some(n => !n.read) && (
+                        <span className="text-primary font-medium"> • {notificationsPagination.paginatedData?.filter(n => !n.read).length} sin leer</span>
+                      )}
                     </CardDescription>
                   </div>
                 </div>
-                <div className="flex gap-4 mt-4">
+
+                {/* Filtros */}
+                <div className="flex flex-wrap gap-2 items-center">
                   <Select value={notificationFilter} onValueChange={setNotificationFilter}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Filtrar por tipo" />
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filtrar..." />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="unread">No leídas</SelectItem>
-                      <SelectItem value="payment_overdue">Pagos vencidos</SelectItem>
-                      <SelectItem value="system_error">Errores del sistema</SelectItem>
+                      <SelectItem value="unread">Sin leer</SelectItem>
+                      <SelectItem value="info">Información</SelectItem>
+                      <SelectItem value="warning">Advertencias</SelectItem>
+                      <SelectItem value="error">Errores</SelectItem>
+                      <SelectItem value="critical">Críticas</SelectItem>
                     </SelectContent>
                   </Select>
+                  
+                  {notificationsPagination.paginatedData?.some(n => !n.read) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const unreadCount = notificationsPagination.paginatedData?.filter(n => !n.read).length || 0;
+                        if (confirm(`¿Marcar ${unreadCount} notificaciones como leídas?`)) {
+                          notificationsPagination.paginatedData?.forEach(n => {
+                            if (!n.read) {
+                              markNotificationReadMutation.mutate(n.id);
+                            }
+                          });
+                        }
+                      }}
+                      disabled={markNotificationReadMutation.isPending}
+                      className="gap-1"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      Marcar todas como leídas
+                    </Button>
+                  )}
                 </div>
               </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Estado</TableHead>
-                      <TableHead>Título</TableHead>
-                      <TableHead>Mensaje</TableHead>
-                      <TableHead>Severidad</TableHead>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {notificationsPagination.paginatedData?.map((notification) => (
-                      <TableRow key={notification.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            {!notification.read && (
-                              <div className="h-2 w-2 rounded-full bg-primary" />
-                            )}
-                            <Badge variant={notification.read ? "outline" : "default"}>
-                              {notification.read ? "Leída" : "Nueva"}
-                            </Badge>
+              <CardContent className="pt-6">
+                {notificationsPagination.paginatedData && notificationsPagination.paginatedData.length > 0 ? (
+                  <div className="space-y-3">
+                    {notificationsPagination.paginatedData.map((notification) => {
+                      const severityConfig: Record<string, any> = {
+                        info: { bg: "bg-blue-50 dark:bg-blue-950/30", border: "border-blue-200 dark:border-blue-800", badge: "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200", icon: <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" /> },
+                        warning: { bg: "bg-amber-50 dark:bg-amber-950/30", border: "border-amber-200 dark:border-amber-800", badge: "bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200", icon: <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" /> },
+                        error: { bg: "bg-red-50 dark:bg-red-950/30", border: "border-red-200 dark:border-red-800", badge: "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200", icon: <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" /> },
+                        critical: { bg: "bg-destructive/10", border: "border-destructive/50", badge: "bg-destructive/20 text-destructive", icon: <AlertOctagon className="h-4 w-4 text-destructive" /> },
+                      };
+
+                      const config = severityConfig[notification.severity] || severityConfig.info;
+
+                      return (
+                        <div
+                          key={notification.id}
+                          className={`p-4 rounded-lg border transition-all ${config.bg} ${config.border} hover:shadow-md`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="pt-1">{config.icon}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-sm leading-tight">
+                                    {notification.title}
+                                  </h3>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {formatDistanceToNow(new Date(notification.created_at), { locale: es, addSuffix: true })}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <Badge className={config.badge} variant="outline">
+                                    {notification.severity}
+                                  </Badge>
+                                  {!notification.read && (
+                                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-sm text-foreground/80 mb-3">
+                                {notification.message}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(notification.created_at).toLocaleString()}
+                                </span>
+                                {!notification.read && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => markNotificationReadMutation.mutate(notification.id)}
+                                    disabled={markNotificationReadMutation.isPending}
+                                    className="h-6 px-2 ml-auto text-xs"
+                                  >
+                                    Marcar como leída
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </TableCell>
-                        <TableCell className="font-medium">{notification.title}</TableCell>
-                        <TableCell className="max-w-md">{notification.message}</TableCell>
-                        <TableCell>
-                          {getSeverityBadge(notification.severity)}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(notification.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          {!notification.read && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                markNotificationReadMutation.mutate(notification.id)
-                              }
-                            >
-                              Marcar como leída
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <PaginationControls
-                  currentPage={notificationsPagination.currentPage}
-                  totalPages={notificationsPagination.totalPages}
-                  totalItems={notificationsPagination.totalItems}
-                  startIndex={notificationsPagination.startIndex}
-                  endIndex={notificationsPagination.endIndex}
-                  pageSize={notificationsPagination.pageSize}
-                  canGoNext={notificationsPagination.canGoNext}
-                  canGoPrevious={notificationsPagination.canGoPrevious}
-                  onPageChange={notificationsPagination.setCurrentPage}
-                  onPageSizeChange={notificationsPagination.setPageSize}
-                  onNextPage={notificationsPagination.goToNextPage}
-                  onPreviousPage={notificationsPagination.goToPreviousPage}
-                  onFirstPage={notificationsPagination.goToFirstPage}
-                  onLastPage={notificationsPagination.goToLastPage}
-                />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Bell className="h-12 w-12 text-muted-foreground/20 mx-auto mb-3" />
+                    <p className="text-muted-foreground">No hay notificaciones para mostrar</p>
+                  </div>
+                )}
+
+                {notificationsPagination.totalPages > 1 && (
+                  <div className="mt-6 pt-6 border-t">
+                    <PaginationControls
+                      currentPage={notificationsPagination.currentPage}
+                      totalPages={notificationsPagination.totalPages}
+                      totalItems={notificationsPagination.totalItems}
+                      startIndex={notificationsPagination.startIndex}
+                      endIndex={notificationsPagination.endIndex}
+                      pageSize={notificationsPagination.pageSize}
+                      canGoNext={notificationsPagination.canGoNext}
+                      canGoPrevious={notificationsPagination.canGoPrevious}
+                      onPageChange={notificationsPagination.setCurrentPage}
+                      onPageSizeChange={notificationsPagination.setPageSize}
+                      onNextPage={notificationsPagination.goToNextPage}
+                      onPreviousPage={notificationsPagination.goToPreviousPage}
+                      onFirstPage={notificationsPagination.goToFirstPage}
+                      onLastPage={notificationsPagination.goToLastPage}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

@@ -8,15 +8,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Search, DollarSign, Package, CheckCircle, XCircle, ShoppingCart } from "lucide-react";
+import { Plus, Search, DollarSign, Package, CheckCircle, XCircle, ShoppingCart, FileText, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useCompany } from "@/contexts/CompanyContext";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 
 interface CartItem {
   product_id: string;
@@ -28,10 +30,12 @@ interface CartItem {
 
 export default function Reservations() {
   const { currentCompany } = useCompany();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [isNewReservationOpen, setIsNewReservationOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<any>(null);
+  const [isGeneratingDocument, setIsGeneratingDocument] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
@@ -57,7 +61,10 @@ export default function Reservations() {
         .order("created_at", { ascending: false });
 
       if (searchQuery) {
-        query = query.or(`reservation_number.ilike.%${searchQuery}%,customer_name.ilike.%${searchQuery}%`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.or(`reservation_number.ilike.%${sanitized}%,customer_name.ilike.%${sanitized}%`);
+        }
       }
 
       const { data, error } = await query;
@@ -97,13 +104,15 @@ export default function Reservations() {
     queryKey: ["products-search", productSearch, currentCompany?.id],
     queryFn: async () => {
       if (!productSearch) return [];
+      const sanitized = sanitizeSearchQuery(productSearch);
+      if (!sanitized) return [];
       
       const { data, error } = await supabase
         .from("products")
         .select("*")
         .eq("company_id", currentCompany?.id)
         .eq("active", true)
-        .or(`name.ilike.%${productSearch}%,sku.ilike.%${productSearch}%,barcode.ilike.%${productSearch}%`)
+        .or(`name.ilike.%${sanitized}%,sku.ilike.%${sanitized}%,barcode.ilike.%${sanitized}%`)
         .limit(10);
       
       if (error) throw error;
@@ -119,9 +128,14 @@ export default function Reservations() {
 
       const customer = customers?.find(c => c.id === selectedCustomer);
       if (!customer) throw new Error("Cliente no encontrado");
+      if (!currentCompany?.id) throw new Error("Empresa no seleccionada");
 
       const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
-      const { data: settings } = await supabase.from("companies").select("default_tax_rate").single();
+      const { data: settings } = await supabase
+        .from("companies")
+        .select("default_tax_rate")
+        .eq("id", currentCompany.id)
+        .single();
       const taxRate = settings?.default_tax_rate || 0;
       const tax = subtotal * (taxRate / 100);
       const total = subtotal + tax;
@@ -294,19 +308,182 @@ export default function Reservations() {
     }
   };
 
+  const handleGenerateSale = async (reservation: any) => {
+    try {
+      setIsGeneratingDocument(true);
+      
+      // Get reservation items with product names
+      const { data: items, error: itemsError } = await supabase
+        .from("reservation_items")
+        .select(`
+          *,
+          products(name)
+        `)
+        .eq("reservation_id", reservation.id);
+      
+      if (itemsError) throw itemsError;
+      if (!items || items.length === 0) throw new Error("No hay items en la reserva");
+      
+      // Get user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+      
+      // Calculate subtotal (before discount)
+      const subtotal = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
+      
+      // Create sale with required fields matching schema
+      const { data: sale, error: saleError } = await supabase
+        .from("sales")
+        .insert({
+          sale_number: `SALE-${Date.now()}`,
+          customer_id: reservation.customer_id,
+          user_id: user.id,
+          company_id: currentCompany?.id,
+          subtotal: subtotal,
+          discount: 0,
+          tax: 0,
+          total: reservation.total,
+          payment_method: "cash",
+          status: "completed",
+          notes: `Generada desde reserva ${reservation.reservation_number || reservation.id}`,
+        })
+        .select()
+        .single();
+      
+      if (saleError) throw saleError;
+      
+      // Create sale items with product names and company_id
+      const saleItems = items.map((item: any) => ({
+        sale_id: sale.id,
+        product_id: item.product_id,
+        product_name: item.products?.name || item.product_name || "Producto",
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.subtotal,
+        company_id: currentCompany?.id,
+      }));
+      
+      const { error: itemsInsertError } = await supabase
+        .from("sale_items")
+        .insert(saleItems);
+      
+      if (itemsInsertError) throw itemsInsertError;
+
+      // Update reservation status to completed
+      const { error: updateError } = await supabase
+        .from("reservations")
+        .update({ status: "completed" })
+        .eq("id", reservation.id);
+
+      if (updateError) throw updateError;
+      
+      toast.success(`Factura generada exitosamente`);
+      navigate(`/sales`);
+    } catch (error: any) {
+      console.error("Error generating sale:", error);
+      toast.error(error.message || "Error al generar factura");
+    } finally {
+      setIsGeneratingDocument(false);
+    }
+  };
+
+  const handleGenerateDeliveryNote = async (reservation: any) => {
+    try {
+      setIsGeneratingDocument(true);
+      
+      // Get reservation items with product names
+      const { data: items, error: itemsError } = await supabase
+        .from("reservation_items")
+        .select(`
+          *,
+          products(name)
+        `)
+        .eq("reservation_id", reservation.id);
+      
+      if (itemsError) throw itemsError;
+      if (!items || items.length === 0) throw new Error("No hay items en la reserva");
+      
+      // Get customer info
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("name")
+        .eq("id", reservation.customer_id)
+        .single();
+      
+      // Get user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+      
+      // Calculate subtotal
+      const subtotal = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
+      
+      // Create delivery note with correct fields matching schema
+      const { data: deliveryNote, error: deliveryError } = await supabase
+        .from("delivery_notes")
+        .insert({
+          delivery_number: `DN-${Date.now()}`,
+          customer_id: reservation.customer_id,
+          customer_name: customer?.name || "Cliente",
+          user_id: user.id,
+          company_id: currentCompany?.id,
+          status: "pending",
+          subtotal: subtotal,
+          total: reservation.total,
+          notes: `Generado desde reserva ${reservation.reservation_number || reservation.id}`,
+        })
+        .select()
+        .single();
+      
+      if (deliveryError) throw deliveryError;
+      
+      // Create delivery note items with product names and company_id
+      const deliveryItems = items.map((item: any) => ({
+        delivery_note_id: deliveryNote.id,
+        product_id: item.product_id,
+        product_name: item.products?.name || item.product_name || "Producto",
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        subtotal: item.subtotal,
+        company_id: currentCompany?.id,
+      }));
+      
+      const { error: itemsInsertError } = await supabase
+        .from("delivery_note_items")
+        .insert(deliveryItems);
+      
+      if (itemsInsertError) throw itemsInsertError;
+
+      // Update reservation status to completed
+      const { error: updateError } = await supabase
+        .from("reservations")
+        .update({ status: "completed" })
+        .eq("id", reservation.id);
+
+      if (updateError) throw updateError;
+      
+      toast.success(`Remito generado exitosamente`);
+      navigate(`/delivery-notes`);
+    } catch (error: any) {
+      console.error("Error generating delivery note:", error);
+      toast.error(error.message || "Error al generar remito");
+    } finally {
+      setIsGeneratingDocument(false);
+    }
+  };
+
   const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
 
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Reservas / Layaway</h1>
-            <p className="text-muted-foreground">Gestiona productos apartados con anticipo</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Reservas / Layaway</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Gestiona productos apartados con anticipo</p>
           </div>
           <Dialog open={isNewReservationOpen} onOpenChange={setIsNewReservationOpen}>
             <DialogTrigger asChild>
-              <Button onClick={resetReservationForm}>
+              <Button onClick={resetReservationForm} className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Reserva
               </Button>
@@ -491,6 +668,26 @@ export default function Reservations() {
                           >
                             <DollarSign className="h-4 w-4 mr-1" />
                             Pago
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleGenerateSale(reservation)}
+                            disabled={isGeneratingDocument}
+                            title="Generar factura"
+                          >
+                            <FileText className="h-4 w-4 mr-1" />
+                            Factura
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleGenerateDeliveryNote(reservation)}
+                            disabled={isGeneratingDocument}
+                            title="Generar remito"
+                          >
+                            <Truck className="h-4 w-4 mr-1" />
+                            Remito
                           </Button>
                           <Button
                             size="sm"

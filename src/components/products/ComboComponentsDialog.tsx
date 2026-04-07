@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { useCompany } from "@/contexts/CompanyContext";
-import { Plus, Trash2, Loader2, Package } from "lucide-react";
+import { Plus, Trash2, Loader2, Package, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useFormValidation, useSecureMutation } from "@/lib/useSecureMutation";
+import { validateUUID, validateNumber } from "@/lib/validators";
 
 interface ComboComponentsDialogProps {
   productId: string;
@@ -29,11 +31,26 @@ interface Component {
   };
 }
 
+// Validadores específicos para cómponents
+const FIELD_VALIDATORS = {
+  component_product_id: (value: any) =>
+    validateUUID(value).valid 
+      ? { valid: true } 
+      : { valid: false, error: "Debe seleccionar un producto válido" },
+  quantity: (value: any) => {
+    const result = validateNumber(value, { required: true, min: 0.01 });
+    return result.valid 
+      ? { valid: true } 
+      : { valid: false, error: result.error || "Cantidad debe ser mayor a 0" };
+  },
+};
+
 export function ComboComponentsDialog({ productId, productName, isOpen, onClose }: ComboComponentsDialogProps) {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [selectedProduct, setSelectedProduct] = useState("");
   const [quantity, setQuantity] = useState("1");
+  const { errors, validate, clearError } = useFormValidation(FIELD_VALIDATORS);
 
   const { data: components, isLoading } = useQuery({
     queryKey: ["product-components", productId],
@@ -88,28 +105,18 @@ export function ComboComponentsDialog({ productId, productName, isOpen, onClose 
     },
   });
 
-  const deleteComponentMutation = useMutation({
-    mutationFn: async (componentId: string) => {
-      const { error } = await supabase
-        .from("product_components")
-        .delete()
-        .eq("id", componentId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Componente eliminado");
-      queryClient.invalidateQueries({ queryKey: ["product-components"] });
-    },
-    onError: (error: Error) => {
-      toast.error("Error: " + error.message);
-    },
-  });
-
   const handleAddComponent = () => {
-    if (!selectedProduct || !quantity || parseFloat(quantity) <= 0) {
-      toast.error("Complete todos los campos correctamente");
+    // Validar inputs
+    const isValid = validate({
+      component_product_id: selectedProduct,
+      quantity: quantity,
+    });
+
+    if (!isValid) {
+      toast.error("Por favor corrija los errores");
       return;
     }
+
     addComponentMutation.mutate({
       component_product_id: selectedProduct,
       quantity: parseFloat(quantity),
@@ -154,10 +161,13 @@ export function ComboComponentsDialog({ productId, productName, isOpen, onClose 
           <div className="space-y-4 p-4 border rounded-lg">
             <h3 className="font-medium">Agregar Componente</h3>
             <div className="grid grid-cols-[1fr,auto,auto] gap-2">
-              <div>
+              <div className="space-y-1.5">
                 <Label>Producto</Label>
-                <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                  <SelectTrigger>
+                <Select value={selectedProduct} onValueChange={(value) => {
+                  setSelectedProduct(value);
+                  clearError("component_product_id");
+                }}>
+                  <SelectTrigger className={errors.component_product_id ? "border-red-500" : ""}>
                     <SelectValue placeholder="Seleccionar producto" />
                   </SelectTrigger>
                   <SelectContent>
@@ -168,17 +178,32 @@ export function ComboComponentsDialog({ productId, productName, isOpen, onClose 
                     ))}
                   </SelectContent>
                 </Select>
+                {errors.component_product_id && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {errors.component_product_id}
+                  </p>
+                )}
               </div>
-              <div>
+              <div className="space-y-1.5">
                 <Label>Cantidad</Label>
                 <Input
                   type="number"
                   min="0.01"
                   step="0.01"
                   value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="w-24"
+                  onChange={(e) => {
+                    setQuantity(e.target.value);
+                    clearError("quantity");
+                  }}
+                  className={`w-24 ${errors.quantity ? "border-red-500" : ""}`}
                 />
+                {errors.quantity && (
+                  <p className="text-sm text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {errors.quantity}
+                  </p>
+                )}
               </div>
               <div className="flex items-end">
                 <Button

@@ -7,16 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { ShoppingCart } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 
 const authSchema = z.object({
-  email: z.string().trim().toLowerCase().email({ message: "Email inválido" }),
-  password: z.string()
-    .min(8, { message: "La contraseña debe tener al menos 8 caracteres" })
-    .regex(/[A-Z]/, { message: "La contraseña debe contener al menos una mayúscula" })
-    .regex(/[a-z]/, { message: "La contraseña debe contener al menos una minúscula" })
-    .regex(/[0-9]/, { message: "La contraseña debe contener al menos un número" }),
+  email: z.string().trim().toLowerCase().min(1, { message: "Email es requerido" }),
+  password: z.string().min(1, { message: "Contraseña es requerida" }),
 });
 
 export default function Auth() {
@@ -24,6 +20,7 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
@@ -66,11 +63,9 @@ export default function Auth() {
       try { localStorage.setItem("just_signed_in_at", String(Date.now())); } catch {}
       navigate("/app");
     } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-      } else {
-        toast.error(error.message || "Error al iniciar sesión");
-      }
+      // Never reveal if it's email or password that's wrong - always generic message
+      console.error("Login error:", error); // Log for debugging only
+      toast.error("Email o contraseña inválida");
     } finally {
       setIsLoading(false);
     }
@@ -106,21 +101,88 @@ export default function Auth() {
 
   return (
     <>
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md shadow-medium">
-        <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto w-12 h-12 rounded-xl bg-primary flex items-center justify-center shadow-soft">
-            <ShoppingCart className="w-7 h-7 text-primary-foreground" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-auto py-8 px-4">
+        {/* Advanced animated background effects */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          {/* Main breathing orbs */}
+          <div className="absolute top-1/4 -right-48 w-96 h-96 bg-primary/10 rounded-full blur-3xl" style={{animation: 'breathing 8s infinite'}}></div>
+          <div className="absolute -bottom-48 -left-48 w-96 h-96 bg-primary/5 rounded-full blur-3xl" style={{animation: 'breathing 10s infinite 2s'}}></div>
+          
+          {/* Floating particles */}
+          <div className="absolute top-1/3 left-1/4 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl" style={{animation: 'float 12s infinite ease-in-out'}}></div>
+          <div className="absolute bottom-1/3 right-1/4 w-40 h-40 bg-blue-500/5 rounded-full blur-2xl" style={{animation: 'float 15s infinite ease-in-out 3s'}}></div>
+          <div className="absolute top-2/3 left-1/3 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl" style={{animation: 'float 10s infinite ease-in-out 5s'}}></div>
+          
+          {/* Rotating gradient overlay */}
+          <div className="absolute inset-0 opacity-30" style={{animation: 'rotateGradient 20s infinite linear'}}>
+            <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-cyan-500/5"></div>
+          </div>
+          
+          {/* Pulsing rings */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] border border-primary/5 rounded-full" style={{animation: 'pulse 8s infinite ease-in-out'}}></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-cyan-500/5 rounded-full" style={{animation: 'pulse 12s infinite ease-in-out 2s'}}></div>
+        </div>
+
+        <div className="relative z-10 w-full max-w-md mx-auto">
+          <Card
+            className="w-full shadow-[0_28px_80px_rgba(0,0,0,0.55)] border-primary/40 bg-gradient-to-br from-slate-800/90 via-slate-700/90 to-slate-800/90 backdrop-blur-2xl p-5 md:p-8"
+            style={{animation: 'fadeInUp 0.6s ease-out'}}
+          >
+        <style>{`
+          @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+        <CardHeader className="pb-4 md:pb-8 flex flex-col items-center justify-center gap-3 md:gap-6 text-center px-0">
+          {/* Logo with elegant animation */}
+          <div className="relative flex items-center justify-center">
+            <div className="w-18 h-18 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-primary/10 via-transparent to-cyan-500/10 border border-primary/30 flex items-center justify-center overflow-visible" style={{animation: 'softGlow 4s infinite ease-in-out'}}>
+              <div className="absolute inset-2 rounded-full border border-white/10"></div>
+              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-primary/12 to-transparent opacity-80" style={{animation: 'shine 3s infinite'}}></div>
+              <img src="/landing/images/logo_transparente_hd.png" alt="Ventify" className="w-10 h-10 md:w-12 md:h-12 relative z-10 drop-shadow-[0_8px_18px_rgba(59,130,246,0.45)]" />
+            </div>
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold">Ventify.Space</CardTitle>
-            <CardDescription>Sistema de Punto de Venta</CardDescription>
+            <h1 className="text-xl md:text-2xl font-bold text-white">Bienvenido a Ventify</h1>
+            <p className="text-sm text-slate-400 mt-1">Ingresá a tu cuenta</p>
           </div>
+
+
+          {/* Custom animations */}
+          <style>{`
+            @keyframes breathing {
+              0%, 100% { opacity: 0.3; transform: scale(1); }
+              50% { opacity: 0.5; transform: scale(1.1); }
+            }
+            @keyframes softGlow {
+              0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.2), 0 0 40px rgba(59, 130, 246, 0.1); }
+              50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.3), 0 0 60px rgba(59, 130, 246, 0.15); }
+            }
+            @keyframes shine {
+              0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+              100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+            }
+            @keyframes float {
+              0%, 100% { transform: translate(0, 0) rotate(0deg); }
+              25% { transform: translate(20px, -30px) rotate(5deg); }
+              50% { transform: translate(-15px, -50px) rotate(-5deg); }
+              75% { transform: translate(-25px, -25px) rotate(3deg); }
+            }
+            @keyframes rotateGradient {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+            @keyframes pulse {
+              0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
+              50% { transform: translate(-50%, -50%) scale(1.05); opacity: 0.5; }
+            }
+          `}</style>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+        <CardContent className="pt-0 md:pt-2 px-0 md:px-6">
+          <form onSubmit={handleLogin} className="space-y-4 md:space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="login-email">Email</Label>
+              <Label htmlFor="login-email" className="text-white font-medium">Email</Label>
               <Input
                 id="login-email"
                 type="email"
@@ -128,27 +190,40 @@ export default function Auth() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="bg-slate-900/50 border-primary/30 text-white placeholder:text-slate-400 focus:border-primary focus:ring-primary/20"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="login-password">Contraseña</Label>
-              <Input
-                id="login-password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <Label htmlFor="login-password" className="text-white font-medium">Contraseña</Label>
+              <div className="relative">
+                <Input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-slate-900/50 border-primary/30 text-white placeholder:text-slate-400 focus:border-primary focus:ring-primary/20 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full mt-2 h-11 bg-primary hover:bg-primary/90 text-white font-semibold shadow-lg" disabled={isLoading}>
               {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
             </Button>
-            <div className="flex items-center justify-between mt-2">
+            <div className="flex flex-col items-center gap-2 mt-4 pt-2 border-t border-primary/30">
               <Button
                 type="button"
                 variant="link"
-                className="text-sm text-muted-foreground"
+                className="text-xs sm:text-sm text-slate-300 hover:text-white w-full sm:w-auto text-center"
                 onClick={() => setShowForgotPassword(true)}
               >
                 ¿Olvidaste tu contraseña?
@@ -156,7 +231,7 @@ export default function Auth() {
               <Button
                 type="button"
                 variant="link"
-                className="text-sm"
+                className="text-xs sm:text-sm text-primary hover:text-primary/80 font-medium w-full sm:w-auto text-center"
                 onClick={() => navigate("/signup")}
               >
                 ¿No tienes cuenta? Regístrate
@@ -165,10 +240,11 @@ export default function Auth() {
           </form>
         </CardContent>
       </Card>
-    </div>
+        </div>
+      </div>
 
-    {/* Forgot Password Dialog */}
-    <AlertDialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
+      {/* Forgot Password Dialog */}
+      <AlertDialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Recuperar Contraseña</AlertDialogTitle>
@@ -179,7 +255,7 @@ export default function Auth() {
         <form onSubmit={handleForgotPassword}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="reset-email">Email</Label>
+              <Label htmlFor="reset-email" className="text-foreground font-medium">Email</Label>
               <Input
                 id="reset-email"
                 type="email"
@@ -187,6 +263,7 @@ export default function Auth() {
                 value={resetEmail}
                 onChange={(e) => setResetEmail(e.target.value)}
                 required
+                className="border-primary/30 focus:border-primary focus:ring-primary/20"
               />
             </div>
           </div>

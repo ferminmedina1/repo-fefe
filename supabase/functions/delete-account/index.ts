@@ -46,14 +46,15 @@ Deno.serve(async (req: Request) => {
 
     if (companyErr) throw companyErr;
 
-    // Delete each company (cascades delete associated data)
-    for (const cu of companies || []) {
+    // Delete all companies in one query (instead of N individual DELETEs)
+    if (companies && companies.length > 0) {
+      const companyIds = companies.map((cu: any) => cu.company_id);
       const { error: delErr } = await admin
         .from("companies")
         .delete()
-        .eq("id", cu.company_id);
+        .in("id", companyIds);
       
-      if (delErr) console.error(`Error deleting company ${cu.company_id}:`, delErr);
+      if (delErr) console.error(`Error deleting companies:`, delErr);
     }
 
     // Delete user from auth

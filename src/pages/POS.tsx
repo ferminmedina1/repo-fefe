@@ -36,6 +36,7 @@ import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
 import { InvoicePDF } from "@/components/pos/InvoicePDF";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 
 interface CartItem {
   product_id: string;
@@ -124,16 +125,20 @@ export default function POS() {
   });
 
   const { data: companySettings } = useQuery({
-    queryKey: ["company-settings"],
+    queryKey: ["company-settings", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return null;
+      
       const { data, error } = await supabase
         .from("companies")
         .select("*")
+        .eq("id", currentCompany.id)
         .single();
       
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   // AFIP POS points
@@ -202,24 +207,29 @@ export default function POS() {
   };
 
   const { data: customers } = useQuery({
-    queryKey: ["customers-pos"],
+    queryKey: ["customers-pos", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return [];
       const { data, error } = await supabase
         .from("customer_pos_view")
         .select("*")
+        .eq("company_id", currentCompany.id)
         .order("name", { ascending: true });
       
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: warehouses } = useQuery({
-    queryKey: ["warehouses"],
+    queryKey: ["warehouses", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return [];
       const { data, error } = await supabase
         .from("warehouses")
         .select("id, name, code")
+        .eq("company_id", currentCompany.id)
         .eq("active", true)
         .order("is_main", { ascending: false });
       
@@ -230,6 +240,7 @@ export default function POS() {
       }
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const handleBarcodeScanner = (code: string) => {
@@ -334,10 +345,9 @@ export default function POS() {
   
   let potentialCardSurcharge = 0;
   if (currentPaymentMethod === 'card' && cardSurchargeRate > 0 && restante_base > 0) {
-    if (currentInstallments > 1) {
-      const tasa_recargo = cardSurchargeRate * currentInstallments / 100;
-      potentialCardSurcharge = restante_base * tasa_recargo;
-    }
+    // Aplicar recargo siempre que haya tasa configurada (no solo cuotas > 1)
+    const tasa_recargo = cardSurchargeRate * currentInstallments / 100;
+    potentialCardSurcharge = restante_base * tasa_recargo;
   }
   
   // 4. TOTAL A PAGAR (actual, sin potencial)
@@ -360,9 +370,9 @@ export default function POS() {
       return;
     }
     
-    // Calcular recargo solo si es tarjeta con cuotas > 1
+    // Calcular recargo siempre que sea tarjeta y haya tasa configurada
     let surcharge = 0;
-    if (currentPaymentMethod === 'card' && currentInstallments > 1) {
+    if (currentPaymentMethod === 'card' && cardSurchargeRate > 0) {
       const tasa_recargo = cardSurchargeRate * currentInstallments / 100;
       surcharge = baseAmountInARS * tasa_recargo;
     }
@@ -426,7 +436,7 @@ export default function POS() {
       setNewCustomerPhone("");
       setNewCustomerEmail("");
       setNewCustomerDocument("");
-      queryClient.invalidateQueries({ queryKey: ["customers-pos"] });
+      queryClient.invalidateQueries({ queryKey: ["customers-pos", currentCompany?.id] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al crear cliente");
@@ -514,40 +524,29 @@ export default function POS() {
 
       if (paymentsError) throw paymentsError;
 
-      // Update warehouse stock
+      // Atomic stock decrement via RPC (avoids race conditions and N+1)
       if (selectedWarehouse) {
-        for (const item of cart) {
-          const { data: warehouseStock } = await supabase
-            .from("warehouse_stock")
-            .select("stock")
-            .eq("warehouse_id", selectedWarehouse)
-            .eq("product_id", item.product_id)
-            .single();
-          
-          if (warehouseStock) {
-            await supabase
-              .from("warehouse_stock")
-              .update({ stock: warehouseStock.stock - item.quantity })
-              .eq("warehouse_id", selectedWarehouse)
-              .eq("product_id", item.product_id);
-          }
-        }
+        const warehouseAdjustments: Record<string, number> = {};
+        cart.forEach(item => {
+          warehouseAdjustments[item.product_id] = (warehouseAdjustments[item.product_id] || 0) - item.quantity;
+        });
+        const { error: whError } = await supabase.rpc('batch_update_warehouse_stock', {
+          p_warehouse_id: selectedWarehouse,
+          adjustments: warehouseAdjustments,
+        });
+        if (whError) throw whError;
       }
 
-      // Update product stock (total)
-      for (const item of cart) {
-        const { data: product } = await supabase
-          .from("products")
-          .select("stock")
-          .eq("id", item.product_id)
-          .single();
-        
-        if (product) {
-          await supabase
-            .from("products")
-            .update({ stock: product.stock - item.quantity })
-            .eq("id", item.product_id);
-        }
+      // Atomic product stock decrement via RPC
+      {
+        const productAdjustments: Record<string, number> = {};
+        cart.forEach(item => {
+          productAdjustments[item.product_id] = (productAdjustments[item.product_id] || 0) - item.quantity;
+        });
+        const { error: psError } = await supabase.rpc('batch_update_product_stock', {
+          adjustments: productAdjustments,
+        });
+        if (psError) throw psError;
       }
 
       // Process loyalty points
@@ -587,6 +586,7 @@ export default function POS() {
         const { data: cashRegister } = await supabase
           .from("cash_registers")
           .select("*")
+          .eq("company_id", currentCompany?.id)
           .eq("status", "open")
           .order("opening_date", { ascending: false })
           .limit(1)
@@ -595,27 +595,29 @@ export default function POS() {
         if (cashRegister && user) {
           const cashPayments = paymentMethods.filter(p => p.method === 'cash');
           
-          for (const payment of cashPayments) {
-            // Create detailed product list for description
+          // Batch insert all cash movements in one query instead of N individual inserts
+          if (cashPayments.length > 0) {
             const productDetails = cart.map(item => 
               `${item.product_name} (${item.quantity}x$${item.unit_price.toFixed(2)})`
             ).join(', ');
 
+            const cashMovements = cashPayments.map(payment => ({
+              cash_register_id: cashRegister.id,
+              user_id: user.id,
+              type: "income",
+              amount: payment.amount,
+              category: "Venta",
+              description: `Venta ${sale.sale_number} - Productos: ${productDetails}`,
+              reference: sale.sale_number,
+              company_id: currentCompany?.id,
+            }));
+
             await supabase
               .from("cash_movements")
-              .insert({
-                cash_register_id: cashRegister.id,
-                user_id: user.id,
-                type: "income",
-                amount: payment.amount,
-                category: "Venta",
-                description: `Venta ${sale.sale_number} - Productos: ${productDetails}`,
-                reference: sale.sale_number,
-                company_id: currentCompany?.id,
-              });
+              .insert(cashMovements);
           }
           
-          queryClient.invalidateQueries({ queryKey: ["cash-register"] });
+          queryClient.invalidateQueries({ queryKey: ["cash-register", currentCompany?.id] });
         }
       } catch (error) {
         console.error("Error registrando movimiento de caja:", error);
@@ -652,7 +654,7 @@ export default function POS() {
       // Refrescar datos
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["sales-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["customers-pos"] });
+      queryClient.invalidateQueries({ queryKey: ["customers-pos", currentCompany?.id] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al procesar la venta");
@@ -892,11 +894,6 @@ ${lastSaleData.customer ? `👤 Cliente: ${lastSaleData.customer.name}` : '👤 
     );
   }) || [];
 
-  // Función para sanitizar búsqueda
-  const sanitizeSearchQuery = (query: string) => {
-    return query.trim().toLowerCase();
-  };
-
   // Función para generar PDF como Blob
   const generatePDFBlob = async (saleData: any): Promise<Blob | null> => {
     try {
@@ -914,9 +911,14 @@ ${lastSaleData.customer ? `👤 Cliente: ${lastSaleData.customer.name}` : '👤 
       };
 
       try {
+        if (!currentCompany?.id) {
+          throw new Error('Empresa no seleccionada');
+        }
+
         const { data: ticketConfig, error } = await supabase
           .from('companies')
           .select('*')
+          .eq('id', currentCompany.id)
           .single();
 
         if (!error && ticketConfig) {
@@ -1074,7 +1076,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
 
   return (
     <Layout>
-      <div className="space-y-4 md:space-y-6">
+      <div className="space-y-4 md:space-y-6" data-tutorial="pos-interface">
         {/* Encabezado */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -1105,8 +1107,9 @@ Impuestos: $${saleData.tax.toFixed(2)}
                 ref={searchInputRef}
                 placeholder="Buscar productos..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(sanitizeSearchQuery(e.target.value))}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 h-10"
+                data-tutorial="pos-search"
               />
             </div>
 
@@ -1184,7 +1187,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
           </div>
 
           {/* Panel de carrito y checkout */}
-          <div className="space-y-4 order-1 lg:order-2">
+          <div className="space-y-4 order-1 lg:order-2" data-tutorial="pos-cart">
             <Card>
               <CardHeader className="p-3 md:p-6">
                 <CardTitle className="flex items-center gap-2 text-base md:text-lg">
@@ -1391,7 +1394,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
                           )}
                         </div>
                         
-                        <div className="space-y-2">
+                        <div className="space-y-2" data-tutorial="pos-payment">
                           <Label className="text-xs text-muted-foreground">Método de Pago</Label>
                           <Select value={currentPaymentMethod} onValueChange={setCurrentPaymentMethod}>
                             <SelectTrigger>
@@ -1576,6 +1579,7 @@ Impuestos: $${saleData.tax.toFixed(2)}
                           onClick={() => processSaleMutation.mutate()} 
                           disabled={processSaleMutation.isPending || remaining > 0.01} 
                           className="flex-1 hover:scale-105 transition-transform"
+                          data-tutorial="pos-checkout"
                         >
                           <Receipt className="mr-2 h-4 w-4" />
                           {processSaleMutation.isPending ? "Procesando..." : "Cobrar"}

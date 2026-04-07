@@ -151,23 +151,13 @@ const PurchaseReturns = () => {
 
       if (itemsError) throw itemsError;
 
-      // Update stock for each product
-      for (const item of returnData.items) {
-        const { data: product } = await supabase
-          .from("products")
-          .select("stock")
-          .eq("id", item.product_id)
-          .single();
-
-        if (product) {
-          const { error: stockError } = await supabase
-            .from("products")
-            .update({ stock: Math.max(0, product.stock - item.quantity) })
-            .eq("id", item.product_id);
-
-          if (stockError) throw stockError;
-        }
-      }
+      // Atomic stock decrement via RPC (no race conditions, single query)
+      const adjustments: Record<string, number> = {};
+      returnData.items.forEach((item: ReturnItem) => {
+        adjustments[item.product_id] = (adjustments[item.product_id] || 0) - item.quantity;
+      });
+      const { error: stockError } = await supabase.rpc('batch_update_product_stock', { adjustments });
+      if (stockError) throw stockError;
 
       return returnRecord;
     },
@@ -267,14 +257,14 @@ const PurchaseReturns = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Devoluciones a Proveedores</h1>
-            <p className="text-muted-foreground">Gestiona las devoluciones de productos a proveedores</p>
+            <h1 className="text-2xl sm:text-3xl font-bold">Devoluciones a Proveedores</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Gestiona las devoluciones de productos a proveedores</p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Devolución
               </Button>
@@ -429,16 +419,16 @@ const PurchaseReturns = () => {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <CardTitle>Listado de Devoluciones</CardTitle>
-              <div className="flex items-center gap-2">
-                <div className="relative">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Buscar por número..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-8 w-[300px]"
+                    className="pl-8 w-full sm:w-[300px]"
                   />
                 </div>
               </div>

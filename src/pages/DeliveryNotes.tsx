@@ -46,15 +46,19 @@ export default function DeliveryNotes() {
   });
 
   const { data: companySettings } = useQuery({
-    queryKey: ["company-settings"],
+    queryKey: ["company-settings", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return null;
+
       const { data, error } = await supabase
         .from("companies")
         .select("*")
+        .eq("id", currentCompany.id)
         .single();
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
   });
 
   const updateStatusMutation = useMutation({
@@ -139,22 +143,20 @@ export default function DeliveryNotes() {
 
       await supabase.from("sale_items").insert(saleItems);
 
-      // Actualizar stock de productos
-      for (const item of deliveryNote.delivery_note_items) {
-        if (item.product_id) {
-          const { data: product } = await supabase
-            .from("products")
-            .select("stock")
-            .eq("id", item.product_id)
-            .single();
-          
-          if (product) {
-            await supabase
-              .from("products")
-              .update({ stock: product.stock - item.quantity })
-              .eq("id", item.product_id);
+      // Atomic stock decrement via RPC (no race conditions, single query)
+      const itemProductIds = deliveryNote.delivery_note_items
+        .map((item: any) => item.product_id)
+        .filter(Boolean);
+
+      if (itemProductIds.length > 0) {
+        const adjustments: Record<string, number> = {};
+        deliveryNote.delivery_note_items.forEach((item: any) => {
+          if (item.product_id) {
+            adjustments[item.product_id] = (adjustments[item.product_id] || 0) - item.quantity;
           }
-        }
+        });
+        const { error: stockError } = await supabase.rpc('batch_update_product_stock', { adjustments });
+        if (stockError) throw stockError;
       }
 
       return sale;

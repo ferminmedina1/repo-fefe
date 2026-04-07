@@ -48,10 +48,13 @@ import {
   MessageCircle,
   LifeBuoy,
   Plus,
+  HelpCircle,
+  Network,
 } from "lucide-react";
 import { useActiveModules } from "@/hooks/useActiveModules";
-import { usePermissions } from "@/hooks/usePermissions";
+import { usePermissions, Module } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
+import { useCompany } from "@/contexts/CompanyContext";
 import { useState, useMemo } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -77,8 +80,9 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const activeModules = useActiveModules();
-  const { hasPermission, isAdmin } = usePermissions();
+  const { hasPermission, isAdmin, loading: permissionsLoading } = usePermissions();
   const { isPlatformAdmin } = usePlatformAdmin();
+  const { currentCompany } = useCompany();
   
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -159,7 +163,6 @@ export function Sidebar() {
           title: "Ventas",
           href: "/sales",
           icon: FileText,
-          module: "sales",
           children: [
             {
               title: "Todas las Ventas",
@@ -204,7 +207,6 @@ export function Sidebar() {
           title: "Clientes",
           href: "/customers",
           icon: Users,
-          module: "customers",
           children: [
             {
               title: "Lista de Clientes",
@@ -235,6 +237,51 @@ export function Sidebar() {
       ],
     },
 
+    // CRM
+    {
+      section: "CRM",
+      items: [
+        {
+          title: "CRM",
+          href: "/opportunities",
+          icon: Target,
+          children: [
+            {
+              title: "Oportunidades",
+              href: "/opportunities",
+              icon: Target,
+              module: "opportunities",
+            },
+            {
+              title: "Pipelines",
+              href: "/pipelines",
+              icon: TrendingUp,
+              module: "pipelines",
+            },
+            {
+              title: "Reportes CRM",
+              href: "/crm-reports",
+              icon: BarChart3,
+              module: "opportunities",
+            },
+            {
+              title: "Automatizaciones",
+              href: "/crm-automations",
+              icon: Zap,
+              module: "opportunities",
+            },
+            {
+              title: "Roles CRM",
+              href: "/settings/crm-roles",
+              icon: UserCheck,
+              module: "opportunities",
+              permission: "admin",
+            },
+          ],
+        },
+      ],
+    },
+
     // Inventario
     {
       section: "Inventario",
@@ -243,7 +290,7 @@ export function Sidebar() {
           title: "Inventario",
           href: "/products",
           icon: Package,
-          module: "products",
+
           children: [
             {
               title: "Productos",
@@ -295,7 +342,7 @@ export function Sidebar() {
           title: "Compras",
           href: "/purchases",
           icon: ShoppingBag,
-          module: "purchases",
+
           children: [
             {
               title: "Órdenes de Compra",
@@ -340,7 +387,7 @@ export function Sidebar() {
           title: "Finanzas",
           href: "/bank-accounts",
           icon: Building2,
-          module: "bank_accounts",
+
           children: [
             {
               title: "Cuentas Bancarias",
@@ -408,6 +455,19 @@ export function Sidebar() {
       ],
     },
 
+    // Alianzas & Negocios
+    {
+      section: "Alianzas",
+      items: [
+        {
+          title: "Alliance Market",
+          href: "/alliance-market",
+          icon: Network,
+          module: "alliance_market",
+        },
+      ],
+    },
+
     // RRHH
     {
       section: "RRHH",
@@ -441,7 +501,7 @@ export function Sidebar() {
           title: "Reportes",
           href: "/reports",
           icon: BarChart3,
-          module: "reports",
+
           children: [
             {
               title: "Reportes",
@@ -543,11 +603,31 @@ export function Sidebar() {
         },
       ],
     },
+
+    // Recursos y Ayuda
+    {
+      section: "Recursos",
+      items: [
+        {
+          title: "Centro de Aprendizaje",
+          href: "/learning-center",
+          icon: BookOpen,
+        },
+        {
+          title: "Centro de Ayuda",
+          href: "/help",
+          icon: HelpCircle,
+        },
+      ],
+    },
   ];
 
   const isNavItemVisible = (item: NavItem) => {
     // Platform admin ve todo
     if (isPlatformAdmin) return true;
+    
+    // Mientras cargan los permisos, no mostrar nada para evitar flash
+    if (permissionsLoading) return false;
     
     // Si tiene módulo, verificar que esté activo
     if (item.module && !hasModule(item.module)) return false;
@@ -555,7 +635,82 @@ export function Sidebar() {
     // Si requiere permiso admin y no lo tiene, ocultar
     if (item.permission === 'admin' && !isAdmin) return false;
     
+    // Verificar permisos de módulo si está definido
+    if (item.module) {
+      const permissionModule = mapSidebarModuleToPermission(item.module);
+      if (permissionModule && !hasPermission(permissionModule, "view")) {
+        return false;
+      }
+    }
+    
     return true;
+  };
+
+  // Verificar si un item es realmente visible (incluyendo si tiene children sin permisos)
+  const isItemReallyVisible = (item: NavItem): boolean => {
+    if (!isNavItemVisible(item)) return false;
+    
+    // Si tiene children, verificar que al menos uno sea visible
+    if (item.children && item.children.length > 0) {
+      return item.children.some(isItemReallyVisible);
+    }
+    
+    // Si no tiene children, es visible
+    return true;
+  };
+
+  // Función para mapear módulos del sidebar a módulos de permisos
+  const mapSidebarModuleToPermission = (sidebarModule: string): Module | null => {
+    const moduleMap: Record<string, Module> = {
+      'dashboard': 'dashboard',
+      'pos': 'pos',
+      'products': 'products',
+      'sales': 'sales',
+      'quotations': 'quotations',
+      'delivery_notes': 'delivery_notes',
+      'returns': 'returns',
+      'reservations': 'reservations',
+      'customers': 'customers',
+      'accounts_receivable': 'accounts_receivable',
+      'customer_support': 'customer_support',
+      'opportunities': 'opportunities',
+      'pipelines': 'pipelines',
+      'inventory_alerts': 'inventory_alerts',
+      'warehouses': 'warehouses',
+      'warehouse_stock': 'warehouse_stock',
+      'warehouse_transfers': 'warehouse_transfers',
+      'stock_reservations': 'stock_reservations',
+      'suppliers': 'suppliers',
+      'purchases': 'purchases',
+      'purchase_orders': 'purchase_orders',
+      'purchase_reception': 'purchase_reception',
+      'purchase_returns': 'purchase_returns',
+      'expenses': 'expenses',
+      'reports': 'reports',
+      'accountant_reports': 'accountant_reports',
+      'employees': 'employees',
+      'payroll': 'payroll',
+      'commissions': 'commissions',
+      'settings': 'settings',
+      'cash_register': 'cash_register',
+      'bank_accounts': 'bank_accounts',
+      'bank_movements': 'bank_movements',
+      'card_movements': 'card_movements',
+      'retentions': 'retentions',
+      'checks': 'checks',
+      'technical_services': 'technical_services',
+      'promotions': 'promotions',
+      'audit_logs': 'audit_logs',
+      'access_logs': 'access_logs',
+      'monthly_closing': 'monthly_closing',
+      'bulk_operations': 'bulk_operations',
+      'notifications': 'notifications',
+      'integrations': 'integrations',
+      'afip': 'afip',
+      'pos_afip': 'pos_afip',
+      'alliance_market': 'alliance_market',
+    };
+    return moduleMap[sidebarModule] || null;
   };
 
   const renderNavItem = (item: NavItem, isChild = false, isFavoritesList = false) => {
@@ -704,17 +859,47 @@ export function Sidebar() {
   return (
     <UISidebar collapsible="offcanvas" className="border-r border-sidebar-border w-64">
       <div className="flex flex-col h-full bg-gradient-to-b from-sidebar to-sidebar/95">
-        {/* Header - Más compacto */}
-        <div className="px-4 py-3 border-b bg-gradient-to-r from-primary/10 to-primary/5">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <ShoppingCart className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <span className="text-lg font-bold text-foreground">RetailSnap</span>
-              <p className="text-[10px] text-muted-foreground">Sistema POS</p>
+        {/* Header - Premium */}
+        <div className="px-5 py-5 border-b border-primary/20 relative overflow-hidden group" style={{animation: 'gradientShift 8s infinite ease-in-out'}}>
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 -z-10"></div>
+          
+          {/* Efecto de fondo Premium con animación minimalista */}
+          <div className="absolute inset-0 opacity-50 pointer-events-none">
+            <div className="absolute -top-12 -right-12 w-56 h-56 bg-primary/15 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+            <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-primary/10 rounded-full blur-3xl" style={{animation: 'breathing 6s infinite'}}></div>
+          </div>
+          
+          <div className="flex items-center gap-4 relative z-10">
+            <button
+              className="p-3 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 border border-primary/40 shadow-lg shadow-primary/20 backdrop-blur-sm transition-all duration-1000 hover:scale-110 hover:shadow-lg hover:shadow-primary/40 cursor-pointer active:scale-95"
+              style={{animation: 'softGlow 4s infinite ease-in-out'}}
+            >
+              <img 
+                src={currentCompany?.logo_url || "/landing/images/logo_transparente_hd.png"} 
+                alt={currentCompany?.name || "Ventify Space"} 
+                className="w-10 h-10 drop-shadow-lg object-contain" 
+              />
+            </button>
+            <div className="flex-1 min-w-0">
+              <span className="text-base font-bold text-white block truncate">{currentCompany?.name || 'Tienda.Space'}</span>
+              <p className="text-xs text-primary/80 font-medium">Ventify Space</p>
             </div>
           </div>
+          
+          <style>{`
+            @keyframes breathing {
+              0%, 100% { opacity: 0.4; }
+              50% { opacity: 0.6; }
+            }
+            @keyframes softGlow {
+              0%, 100% { box-shadow: 0 0 12px rgba(var(--primary-rgb), 0.15); }
+              50% { box-shadow: 0 0 24px rgba(var(--primary-rgb), 0.25); }
+            }
+            @keyframes gradientShift {
+              0%, 100% { background: linear-gradient(to right, rgb(15, 23, 42), rgb(30, 41, 59), rgb(15, 23, 42)); }
+              50% { background: linear-gradient(to right, rgb(20, 28, 47), rgb(35, 46, 64), rgb(20, 28, 47)); }
+            }
+          `}</style>
         </div>
 
         {/* Search Bar - Más compacto */}
@@ -726,6 +911,14 @@ export function Sidebar() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 h-8 text-sm bg-sidebar-accent/50 border-sidebar-accent"
+              autoFocus={false}
+              readOnly={false}
+              onFocus={(e) => {
+                // Prevenir que se abra el teclado automáticamente en mobile
+                if (window.innerWidth < 768) {
+                  e.target.blur();
+                }
+              }}
             />
           </div>
         </div>
@@ -747,7 +940,8 @@ export function Sidebar() {
         <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-4 sidebar-scroll">
           {filteredNavItems.map((section) => {
             if ("section" in section) {
-              const visibleItems = section.items.filter(isNavItemVisible);
+              // Filtrar items que sean realmente visibles (incluyendo verificar children)
+              const visibleItems = section.items.filter(isItemReallyVisible);
               if (visibleItems.length === 0) return null;
 
               return (
@@ -755,7 +949,7 @@ export function Sidebar() {
                   <h3 className="px-2 mb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                     {section.section}
                   </h3>
-                  <div className="space-y-0.5">{section.items.map((item) => renderNavItem(item))}</div>
+                  <div className="space-y-0.5">{visibleItems.map((item) => renderNavItem(item))}</div>
                 </div>
               );
             }
@@ -778,28 +972,41 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Footer - Más compacto */}
-        <div className="px-3 py-2 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-1.5">
+        {/* Footer - Touch-friendly */}
+        <div className="px-3 py-3 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-2">
           <Link
             to="/ai-assistant"
-            className="flex items-center gap-2 px-3 py-2 text-xs rounded-md transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-md hover:shadow-lg"
+            className="flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-md hover:shadow-lg active:scale-[0.98]"
           >
             <Sparkles className="w-4 h-4" />
             <span className="font-semibold">Asistente IA</span>
           </Link>
 
-          <div className="flex gap-1.5">
+          <div className="flex gap-2">
             <Link to="/platform-support" className="flex-1">
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all"
+                className="w-full h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all active:scale-[0.98]"
               >
                 <LifeBuoy className="w-3.5 h-3.5" />
                 <span>Soporte</span>
               </Button>
             </Link>
 
+            <Link to="/bot-requests" className="flex-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-purple-500/50 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 transition-all active:scale-[0.98]"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Contáctanos</span>
+              </Button>
+            </Link>
+          </div>
+
+          <div className="flex gap-2">
             <Button
               onClick={async () => {
                 const { error } = await supabase.auth.signOut();
@@ -813,7 +1020,7 @@ export function Sidebar() {
               }}
               variant="outline"
               size="sm"
-              className="flex-1 flex items-center gap-2 px-2 py-1.5 text-xs rounded-md border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all"
+              className="flex-1 h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all active:scale-[0.98]"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Salir</span>
@@ -827,7 +1034,14 @@ export function Sidebar() {
           onOpenChange={setShowModulesDialog}
           activeModules={activeModules.data || []}
         />
+
+
       </div>
     </UISidebar>
   );
 }
+
+
+
+
+

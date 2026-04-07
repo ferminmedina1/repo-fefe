@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,8 +16,15 @@ import { useCompany } from "@/contexts/CompanyContext";
 
 export default function CustomerAccount() {
   const { currentCompany } = useCompany();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (location.state?.customerId) {
+      setSelectedCustomer(location.state.customerId);
+    }
+  }, []);
 
   const { data: customers } = useQuery({
     queryKey: ["customers-with-balance", currentCompany?.id],

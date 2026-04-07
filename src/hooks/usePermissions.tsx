@@ -3,25 +3,66 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 
 export type Permission = "view" | "create" | "edit" | "delete" | "export";
-export type Module = 
-  | "products" 
-  | "sales" 
-  | "customers" 
-  | "suppliers" 
-  | "purchases" 
-  | "reports" 
-  | "employees" 
-  | "settings" 
-  | "cash_register" 
-  | "technical_services"
+export type Module =
+  | "dashboard"
+  | "pos"
+  | "sales"
   | "quotations"
   | "delivery_notes"
-  | "promotions"
   | "returns"
-  | "credit_notes"
+  | "reservations"
+  | "customers"
+  | "accounts_receivable"
+  | "customer_support"
+  | "opportunities"
+  | "pipelines"
+  | "products"
+  | "inventory_alerts"
+  | "warehouses"
+  | "warehouse_stock"
+  | "warehouse_transfers"
+  | "stock_reservations"
+  | "purchases"
+  | "purchase_orders"
+  | "purchase_reception"
+  | "purchase_returns"
+  | "suppliers"
   | "expenses"
-  | "bulk_operations"
-  | "pos_afip";
+  | "cash_register"
+  | "bank_accounts"
+  | "bank_movements"
+  | "card_movements"
+  | "retentions"
+  | "checks"
+  | "reports"
+  | "accountant_reports"
+  | "employees"
+  | "payroll"
+  | "commissions"
+  | "audit_logs"
+  | "access_logs"
+  | "monthly_closing"
+  | "notifications"
+  | "settings"
+  | "technical_services"
+  | "promotions"
+  | "integrations"
+  | "afip"
+  | "pos_afip"
+  | "bulk_operations";
+
+export type AppRole =
+  | "admin"
+  | "manager"
+  | "cashier"
+  | "accountant"
+  | "viewer"
+  | "warehouse"
+  | "technician"
+  | "auditor"
+  | "employee";
+
+type RolePermissionDefaults = Record<Module, Record<Permission, boolean>>;
 
 interface RolePermission {
   role: string;
@@ -32,6 +73,246 @@ interface RolePermission {
   can_delete: boolean;
   can_export: boolean;
 }
+
+const ALL_MODULES: Module[] = [
+  "dashboard",
+  "pos",
+  "sales",
+  "quotations",
+  "delivery_notes",
+  "returns",
+  "reservations",
+  "customers",
+  "accounts_receivable",
+  "customer_support",
+  "opportunities",
+  "pipelines",
+  "products",
+  "inventory_alerts",
+  "warehouses",
+  "warehouse_stock",
+  "warehouse_transfers",
+  "stock_reservations",
+  "purchases",
+  "purchase_orders",
+  "purchase_reception",
+  "purchase_returns",
+  "suppliers",
+  "expenses",
+  "cash_register",
+  "bank_accounts",
+  "bank_movements",
+  "card_movements",
+  "retentions",
+  "checks",
+  "reports",
+  "accountant_reports",
+  "employees",
+  "payroll",
+  "commissions",
+  "audit_logs",
+  "access_logs",
+  "monthly_closing",
+  "notifications",
+  "settings",
+  "technical_services",
+  "promotions",
+  "integrations",
+  "afip",
+  "pos_afip",
+  "bulk_operations",
+];
+
+const allowAll = (modules: Module[], perms: Record<Permission, boolean>) =>
+  modules.reduce((acc, module) => {
+    acc[module] = perms;
+    return acc;
+  }, {} as RolePermissionDefaults);
+
+const DEFAULT_VIEW_ONLY = {
+  view: true,
+  create: false,
+  edit: false,
+  delete: false,
+  export: false,
+};
+
+const DEFAULT_VIEW_EXPORT = {
+  view: true,
+  create: false,
+  edit: false,
+  delete: false,
+  export: true,
+};
+
+const DEFAULT_NO_DELETE = {
+  view: true,
+  create: true,
+  edit: true,
+  delete: false,
+  export: true,
+};
+
+const DEFAULT_FULL = {
+  view: true,
+  create: true,
+  edit: true,
+  delete: true,
+  export: true,
+};
+
+export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, Partial<RolePermissionDefaults>> = {
+  admin: allowAll(ALL_MODULES, DEFAULT_FULL),
+  manager: {
+    ...allowAll(
+      [
+        "dashboard",
+        "sales",
+        "quotations",
+        "delivery_notes",
+        "returns",
+        "reservations",
+        "customers",
+        "accounts_receivable",
+        "opportunities",
+        "pipelines",
+        "products",
+        "inventory_alerts",
+        "warehouses",
+        "warehouse_stock",
+        "warehouse_transfers",
+        "stock_reservations",
+        "employees",
+        "reports",
+        "accountant_reports",
+        "expenses",
+      ],
+      DEFAULT_NO_DELETE
+    ),
+  },
+  cashier: {
+    ...allowAll(
+      ["pos", "sales", "returns", "cash_register", "customers"],
+      {
+        view: true,
+        create: true,
+        edit: true,
+        delete: false,
+        export: false,
+      }
+    ),
+    products: DEFAULT_VIEW_ONLY,
+    inventory_alerts: DEFAULT_VIEW_ONLY,
+  },
+  warehouse: {
+    ...allowAll(
+      [
+        "products",
+        "inventory_alerts",
+        "warehouses",
+        "warehouse_stock",
+        "warehouse_transfers",
+        "stock_reservations",
+        "purchases",
+        "purchase_orders",
+        "purchase_reception",
+        "purchase_returns",
+        "suppliers",
+        "reports",
+      ],
+      {
+        view: true,
+        create: true,
+        edit: true,
+        delete: false,
+        export: false,
+      }
+    ),
+  },
+  technician: {
+    ...allowAll(["technical_services", "quotations", "customers"], {
+      view: true,
+      create: true,
+      edit: true,
+      delete: false,
+      export: false,
+    }),
+    products: DEFAULT_VIEW_ONLY,
+  },
+  accountant: {
+    ...allowAll(
+      [
+        "reports",
+        "accountant_reports",
+        "expenses",
+        "cash_register",
+        "bank_accounts",
+        "bank_movements",
+        "card_movements",
+        "retentions",
+        "checks",
+        "accounts_receivable",
+        "customers",
+        "sales",
+        "purchases",
+        "purchase_orders",
+        "suppliers",
+      ],
+      DEFAULT_VIEW_EXPORT
+    ),
+  },
+  auditor: {
+    ...allowAll(
+      [
+        "audit_logs",
+        "access_logs",
+        "reports",
+        "accountant_reports",
+        "sales",
+        "cash_register",
+        "bank_accounts",
+        "bank_movements",
+        "card_movements",
+        "retentions",
+        "checks",
+        "inventory_alerts",
+        "warehouse_stock",
+        "warehouse_transfers",
+        "products",
+        "employees",
+      ],
+      DEFAULT_VIEW_EXPORT
+    ),
+  },
+  viewer: {
+    ...allowAll(["dashboard", "reports", "sales", "products", "customers"], DEFAULT_VIEW_ONLY),
+  },
+  employee: {
+
+    ...allowAll(["employees"], DEFAULT_VIEW_ONLY),
+
+  },
+};
+
+const PLATFORM_ROLES: AppRole[] = [
+  "admin",
+  "manager",
+  "cashier",
+  "accountant",
+  "viewer",
+  "warehouse",
+  "technician",
+  "auditor",
+  "employee",
+];
+
+const normalizePlatformRole = (role?: string | null): AppRole | null => {
+  if (!role) return null;
+  const normalized = role.trim();
+  if (PLATFORM_ROLES.includes(normalized as AppRole)) return normalized as AppRole;
+  if (normalized === "owner" || normalized === "team") return "employee";
+  return "employee";
+};
 
 export function usePermissions() {
   const { currentCompany } = useCompany();
@@ -51,60 +332,92 @@ export function usePermissions() {
       
       const { data, error } = await supabase
         .from("company_users")
-        .select("role")
+        .select("role, platform_admin")
         .eq("user_id", user.id)
         .eq("company_id", currentCompany.id)
-        .eq("active", true);
+        .or("active.eq.true,active.is.null");
       
       if (error) throw error;
-      return data.map(r => r.role);
+      return data
+        .map(r => ({
+          role: normalizePlatformRole(r.role),
+          platform_admin: r.platform_admin || false,
+        }))
+        .filter((r): r is { role: AppRole; platform_admin: boolean } => !!r.role);
     },
     enabled: !!user?.id && !!currentCompany?.id,
   });
 
+  const roleNames = userRoles?.map(r => r.role) || [];
+
   const { data: permissions, isLoading: permissionsLoading } = useQuery({
-    queryKey: ["role-permissions", userRoles, currentCompany?.id],
+    queryKey: ["role-permissions", roleNames, currentCompany?.id],
     queryFn: async () => {
-      if (!userRoles || userRoles.length === 0 || !currentCompany?.id) return [];
+      if (roleNames.length === 0 || !currentCompany?.id) return [];
       
       const { data, error } = await supabase
         .from("role_permissions")
         .select("*")
-        .in("role", userRoles)
+        .in("role", roleNames)
         .eq("company_id", currentCompany.id);  // Added company filter
       
       if (error) throw error;
       return data as RolePermission[];
     },
-    enabled: !!userRoles && userRoles.length > 0 && !!currentCompany?.id,
+    enabled: roleNames.length > 0 && !!currentCompany?.id,
   });
 
   const hasPermission = (module: Module, permission: Permission): boolean => {
-    // Admin fallback: if user has admin role, grant all permissions
     if (hasRole("admin")) return true;
 
-    if (!permissions || permissions.length === 0) return false;
+    const roles = roleNames;
+    if (roles.length === 0) return false;
 
-    const modulePermissions = permissions.filter(p => p.module === module);
-    if (modulePermissions.length === 0) return false;
+    const modulePermissions = (permissions || []).filter((p) => p.module === module);
 
-    return modulePermissions.some(p => {
-      switch (permission) {
-        case "view": return p.can_view;
-        case "create": return p.can_create;
-        case "edit": return p.can_edit;
-        case "delete": return p.can_delete;
-        case "export": return p.can_export;
-        default: return false;
+
+    const hasCustomPermission = (role: string) =>
+      modulePermissions.some((p) => {
+        if (p.role !== role) return false;
+        switch (permission) {
+          case "view":
+            return p.can_view;
+          case "create":
+            return p.can_create;
+          case "edit":
+            return p.can_edit;
+          case "delete":
+            return p.can_delete;
+          case "export":
+            return p.can_export;
+          default:
+            return false;
+        }
+      });
+
+    const hasDefaultPermission = (role: string) => {
+      const defaults = DEFAULT_ROLE_PERMISSIONS[role as AppRole];
+      const moduleDefaults = defaults?.[module];
+      if (!moduleDefaults) return false;
+      return moduleDefaults[permission] || false;
+    };
+
+    return roles.some((role) => {
+      const hasCustomForRole = modulePermissions.some((p) => p.role === role);
+      if (hasCustomForRole) {
+        return hasCustomPermission(role);
       }
+      return hasDefaultPermission(role);
     });
   };
 
   const hasRole = (role: string): boolean => {
-    return userRoles?.some(r => r === role) || false;
+    return userRoles?.some(r => r.role === role) || false;
   };
 
-  const isAdmin = hasRole("admin");
+  const isPlatformAdmin = userRoles?.some(r => r.platform_admin) || false;
+  const isAdmin = hasRole("admin") || isPlatformAdmin;
+
   const isManager = hasRole("manager");
   const isCashier = hasRole("cashier");
   const isAccountant = hasRole("accountant");
@@ -112,10 +425,13 @@ export function usePermissions() {
   const isWarehouse = hasRole("warehouse");
   const isTechnician = hasRole("technician");
   const isAuditor = hasRole("auditor");
+  const isEmployee = hasRole("employee");
+  const canManageEmployees = isAdmin || isManager;
+  const canManageTimeTracking = isAdmin || isManager;
 
   return {
     permissions,
-    userRoles,
+    userRoles: userRoles?.map(r => r.role) || [],
     hasPermission,
     loading: userLoading || rolesLoading || permissionsLoading,  // Fixed to use actual loading states
     currentCompany,
@@ -127,5 +443,8 @@ export function usePermissions() {
     isWarehouse,
     isTechnician,
     isAuditor,
+    isEmployee,
+    canManageEmployees,
+    canManageTimeTracking,
   };
 };

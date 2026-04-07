@@ -32,6 +32,7 @@ export default function AccountsReceivable() {
   // Query para obtener clientes con saldo
   const { data: customers } = useQuery({
     queryKey: ["customers-with-balance", searchQuery, currentCompany?.id],
+    enabled: !!currentCompany?.id,
     queryFn: async () => {
       let query = supabase
         .from("customers")
@@ -96,8 +97,8 @@ export default function AccountsReceivable() {
     },
     onSuccess: () => {
       toast.success("Pago registrado exitosamente");
-      queryClient.invalidateQueries({ queryKey: ["customers-with-balance"] });
-      queryClient.invalidateQueries({ queryKey: ["customer-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["customers-with-balance", undefined, currentCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["customer-movements", selectedCustomer?.id] });
       setIsPaymentDialogOpen(false);
       setPaymentData({ amount: "", payment_method: "cash", notes: "" });
     },

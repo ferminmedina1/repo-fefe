@@ -6,23 +6,30 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Activity, User, Calendar, CheckCircle, XCircle } from "lucide-react";
+import { Search, Activity, User, Calendar, CheckCircle, XCircle, Minus } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
+import { useDebounce } from "@/hooks/useDebounce";
 
 export default function AccessLogs() {
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const { isAdmin, isManager } = usePermissions();
 
+  // ACL-004: debounce — una query cada 300ms, no por cada tecla
+  const searchQuery = useDebounce(searchInput, 300);
+
+  // ACL-001: enabled guard — query no dispara sin permisos
   const { data: accessLogs, isLoading } = useQuery({
     queryKey: ["access-logs", searchQuery],
+    enabled: isAdmin || isManager,
     queryFn: async () => {
+      // ACL-003: solo columnas necesarias — excluimos ip_address y user_agent (PII no mostrada)
       let query = supabase
         .from("access_logs")
-        .select("*")
+        .select("id, created_at, user_name, user_email, action, page_url, success, error_message")
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -61,6 +68,38 @@ export default function AccessLogs() {
     return <Badge variant="outline">{labels[action] || action}</Badge>;
   };
 
+  // ACL-005: éxito puede ser true | false | null (estado desconocido)
+  const getSuccessIndicator = (success: boolean | null, errorMessage: string | null) => {
+    if (success === true) {
+      return (
+        <div className="flex items-center gap-1 text-green-600">
+          <CheckCircle className="h-4 w-4" />
+          <span className="text-sm">Exitoso</span>
+        </div>
+      );
+    }
+    if (success === false) {
+      return (
+        <div>
+          <div className="flex items-center gap-1 text-red-600">
+            <XCircle className="h-4 w-4" />
+            <span className="text-sm">Fallido</span>
+          </div>
+          {errorMessage && (
+            <p className="text-xs text-muted-foreground mt-1">{errorMessage}</p>
+          )}
+        </div>
+      );
+    }
+    // null — estado no aplicable (ej. page_view)
+    return (
+      <div className="flex items-center gap-1 text-muted-foreground">
+        <Minus className="h-4 w-4" />
+        <span className="text-sm">-</span>
+      </div>
+    );
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -87,8 +126,8 @@ export default function AccessLogs() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por acción, usuario o email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   className="pl-10"
                 />
               </div>
@@ -118,8 +157,11 @@ export default function AccessLogs() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-muted-foreground" />
+                            {/* ACL-006: guard contra created_at null */}
                             <span className="text-sm">
-                              {format(new Date(log.created_at), "dd/MM/yyyy HH:mm:ss", { locale: es })}
+                              {log.created_at
+                                ? format(new Date(log.created_at), "dd/MM/yyyy HH:mm:ss", { locale: es })
+                                : "-"}
                             </span>
                           </div>
                         </TableCell>
@@ -134,25 +176,16 @@ export default function AccessLogs() {
                         </TableCell>
                         <TableCell>{getActionBadge(log.action)}</TableCell>
                         <TableCell>
-                          <span className="text-sm text-muted-foreground">
+                          {/* ACL-007: truncado para evitar que URLs largas rompan el layout */}
+                          <span
+                            className="text-sm text-muted-foreground block max-w-[200px] truncate"
+                            title={log.page_url ?? undefined}
+                          >
                             {log.page_url || "-"}
                           </span>
                         </TableCell>
                         <TableCell>
-                          {log.success ? (
-                            <div className="flex items-center gap-1 text-green-600">
-                              <CheckCircle className="h-4 w-4" />
-                              <span className="text-sm">Exitoso</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1 text-red-600">
-                              <XCircle className="h-4 w-4" />
-                              <span className="text-sm">Fallido</span>
-                            </div>
-                          )}
-                          {log.error_message && (
-                            <p className="text-xs text-muted-foreground mt-1">{log.error_message}</p>
-                          )}
+                          {getSuccessIndicator(log.success, log.error_message)}
                         </TableCell>
                       </TableRow>
                     ))

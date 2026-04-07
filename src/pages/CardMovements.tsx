@@ -10,7 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -85,7 +84,7 @@ export default function CardMovements() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["card-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["card-movements", currentCompany?.id] });
       toast.success("Movimiento de tarjeta registrado");
       setIsDialogOpen(false);
       setFormData({
@@ -113,12 +112,13 @@ export default function CardMovements() {
           status: "accredited",
           accredited_at: new Date().toISOString(),
         })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("company_id", currentCompany?.id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["card-movements"] });
+      queryClient.invalidateQueries({ queryKey: ["card-movements", currentCompany?.id] });
       toast.success("Movimiento marcado como acreditado");
     },
   });
@@ -140,18 +140,10 @@ export default function CardMovements() {
           </div>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Movimiento
-              </Button>
-            </DialogTrigger>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Movimiento
-              </Button>
-            </DialogTrigger>
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Movimiento
+            </Button>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Nuevo Movimiento de Tarjeta</DialogTitle>

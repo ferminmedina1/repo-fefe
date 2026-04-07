@@ -80,7 +80,7 @@ export default function Retentions() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["retentions"] });
+      queryClient.invalidateQueries({ queryKey: ["retentions", currentCompany?.id] });
       toast.success("Retención registrada");
       setIsDialogOpen(false);
       setFormData({

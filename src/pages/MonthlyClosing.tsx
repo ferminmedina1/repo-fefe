@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Check, Calendar as CalendarIcon, Download, FileText, ShoppingCart, Receipt, CheckCircle2 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
@@ -24,8 +27,24 @@ type Step = {
   component: React.ComponentType;
 };
 
+// MC-002 + MC-006: sanitiza valores para CSV
+// - previene formula injection (=, +, -, @, TAB, CR al inicio)
+// - envuelve en comillas si contiene comas, comillas o saltos de línea
+const escapeCsvValue = (value: string | number | null | undefined): string => {
+  const str = value === null || value === undefined ? "" : String(value);
+  const sanitized = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+  if (sanitized.includes(",") || sanitized.includes('"') || sanitized.includes("\n")) {
+    return `"${sanitized.replace(/"/g, '""')}"`;
+  }
+  return sanitized;
+};
+
 const MonthlyClosing = () => {
   const { currentCompany } = useCompany();
+
+  // MC-001: verificación de autorización
+  const { isAdmin, isManager } = usePermissions();
+
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   const [currentStep, setCurrentStep] = useState(1);
@@ -33,33 +52,38 @@ const MonthlyClosing = () => {
   const monthStart = startOfMonth(selectedMonth);
   const monthEnd = endOfMonth(selectedMonth);
 
-  // Fetch monthly data
-  const { data: salesData } = useQuery({
+  // MC-005: resetear progreso al cambiar de mes — evita cierre "fantasma"
+  useEffect(() => {
+    setCompletedSteps(new Set());
+    setCurrentStep(1);
+  }, [selectedMonth]);
+
+  // MC-003: join con customers para nombre real en CSV
+  const { data: salesData, isLoading: salesLoading } = useQuery({
     queryKey: ["monthly-sales", currentCompany?.id, monthStart, monthEnd],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sales")
-        .select("*, sale_items(*)")
+        .select("id, created_at, sale_number, customer_id, subtotal, tax, total, payment_method, sale_items(*), customers:customer_id(name)")
         .eq("company_id", currentCompany?.id)
         .gte("created_at", monthStart.toISOString())
         .lte("created_at", monthEnd.toISOString());
-      
       if (error) throw error;
       return data;
     },
     enabled: !!currentCompany?.id,
   });
 
-  const { data: purchasesData } = useQuery({
+  // MC-003: join con suppliers para nombre real en CSV
+  const { data: purchasesData, isLoading: purchasesLoading } = useQuery({
     queryKey: ["monthly-purchases", currentCompany?.id, monthStart, monthEnd],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("purchases")
-        .select("*, purchase_items(*)")
+        .select("id, created_at, purchase_number, supplier_id, subtotal, tax, total, purchase_items(*), suppliers:supplier_id(name)")
         .eq("company_id", currentCompany?.id)
         .gte("created_at", monthStart.toISOString())
         .lte("created_at", monthEnd.toISOString());
-      
       if (error) throw error;
       return data;
     },
@@ -71,11 +95,10 @@ const MonthlyClosing = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("expenses")
-        .select("*")
+        .select("id, created_at, expense_number, description, category_id, amount, payment_method")
         .eq("company_id", currentCompany?.id)
         .gte("created_at", monthStart.toISOString())
         .lte("created_at", monthEnd.toISOString());
-      
       if (error) throw error;
       return data;
     },
@@ -87,59 +110,57 @@ const MonthlyClosing = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("cash_movements")
-        .select("*")
+        .select("id, created_at, type, category, description, amount")
         .eq("company_id", currentCompany?.id)
         .gte("created_at", monthStart.toISOString())
         .lte("created_at", monthEnd.toISOString());
-      
       if (error) throw error;
       return data;
     },
     enabled: !!currentCompany?.id,
   });
 
+  // MC-007: liberar blob URL tras la descarga para evitar memory leak
   const downloadCSV = (filename: string, data: string) => {
     const blob = new Blob([data], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
+    link.href = url;
     link.download = filename;
     link.click();
+    URL.revokeObjectURL(url);
   };
 
   const downloadIVASales = () => {
     if (!salesData) return;
-    
     const csv = [
       ["Fecha", "Número", "Cliente", "Subtotal", "IVA", "Total"].join(","),
       ...salesData.map(sale => [
-        format(new Date(sale.created_at), "dd/MM/yyyy"),
-        sale.sale_number,
-        sale.customer_id,
-        sale.subtotal.toFixed(2),
-        (sale.tax || 0).toFixed(2),
-        sale.total.toFixed(2)
+        escapeCsvValue(sale.created_at ? format(new Date(sale.created_at), "dd/MM/yyyy") : "-"),
+        escapeCsvValue(sale.sale_number),
+        escapeCsvValue((sale.customers as any)?.name || sale.customer_id), // MC-003
+        escapeCsvValue((sale.subtotal ?? 0).toFixed(2)),                   // MC-008
+        escapeCsvValue((sale.tax ?? 0).toFixed(2)),
+        escapeCsvValue((sale.total ?? 0).toFixed(2)),
       ].join(","))
     ].join("\n");
-    
     downloadCSV(`libro-iva-ventas-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
     toast.success("Libro IVA Ventas descargado");
   };
 
   const downloadIVAPurchases = () => {
     if (!purchasesData) return;
-    
     const csv = [
       ["Fecha", "Número", "Proveedor", "Subtotal", "IVA", "Total"].join(","),
       ...purchasesData.map(purchase => [
-        format(new Date(purchase.created_at), "dd/MM/yyyy"),
-        purchase.purchase_number,
-        purchase.supplier_id,
-        purchase.subtotal.toFixed(2),
-        (purchase.tax || 0).toFixed(2),
-        purchase.total.toFixed(2)
+        escapeCsvValue(purchase.created_at ? format(new Date(purchase.created_at), "dd/MM/yyyy") : "-"),
+        escapeCsvValue(purchase.purchase_number),
+        escapeCsvValue((purchase.suppliers as any)?.name || purchase.supplier_id), // MC-003
+        escapeCsvValue((purchase.subtotal ?? 0).toFixed(2)),                       // MC-008
+        escapeCsvValue((purchase.tax ?? 0).toFixed(2)),
+        escapeCsvValue((purchase.total ?? 0).toFixed(2)),
       ].join(","))
     ].join("\n");
-    
     downloadCSV(`libro-iva-compras-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
     toast.success("Libro IVA Compras descargado");
   };
@@ -147,93 +168,108 @@ const MonthlyClosing = () => {
   const downloadMonthlySummary = () => {
     const csv = [
       ["Concepto", "Cantidad", "Monto"].join(","),
-      ["Ventas", salesData?.length || 0, totalSales.toFixed(2)].join(","),
-      ["Compras", purchasesData?.length || 0, totalPurchases.toFixed(2)].join(","),
-      ["IVA Débito Fiscal", "", salesTax.toFixed(2)].join(","),
-      ["IVA Crédito Fiscal", "", purchasesTax.toFixed(2)].join(","),
-      ["IVA a Pagar", "", (salesTax - purchasesTax).toFixed(2)].join(",")
+      [escapeCsvValue("Ventas"), salesData?.length || 0, escapeCsvValue(totalSales.toFixed(2))].join(","),
+      [escapeCsvValue("Compras"), purchasesData?.length || 0, escapeCsvValue(totalPurchases.toFixed(2))].join(","),
+      [escapeCsvValue("IVA Débito Fiscal"), "", escapeCsvValue(salesTax.toFixed(2))].join(","),
+      [escapeCsvValue("IVA Crédito Fiscal"), "", escapeCsvValue(purchasesTax.toFixed(2))].join(","),
+      [escapeCsvValue("IVA a Pagar"), "", escapeCsvValue((salesTax - purchasesTax).toFixed(2))].join(","),
     ].join("\n");
-    
     downloadCSV(`resumen-mensual-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
     toast.success("Resumen mensual descargado");
   };
 
   const downloadSalesDetail = () => {
     if (!salesData) return;
-    
     const csv = [
       ["Fecha", "Número", "Cliente", "Items", "Subtotal", "IVA", "Total", "Método Pago"].join(","),
       ...salesData.map(sale => [
-        format(new Date(sale.created_at), "dd/MM/yyyy"),
-        sale.sale_number,
-        sale.customer_id,
+        escapeCsvValue(sale.created_at ? format(new Date(sale.created_at), "dd/MM/yyyy") : "-"),
+        escapeCsvValue(sale.sale_number),
+        escapeCsvValue((sale.customers as any)?.name || sale.customer_id),
         sale.sale_items?.length || 0,
-        sale.subtotal.toFixed(2),
-        (sale.tax || 0).toFixed(2),
-        sale.total.toFixed(2),
-        sale.payment_method
+        escapeCsvValue((sale.subtotal ?? 0).toFixed(2)),  // MC-008
+        escapeCsvValue((sale.tax ?? 0).toFixed(2)),
+        escapeCsvValue((sale.total ?? 0).toFixed(2)),
+        escapeCsvValue(sale.payment_method),
       ].join(","))
     ].join("\n");
-    
     downloadCSV(`detalle-ventas-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
     toast.success("Detalle de ventas descargado");
   };
 
   const downloadPurchasesDetail = () => {
     if (!purchasesData) return;
-    
     const csv = [
       ["Fecha", "Número", "Proveedor", "Items", "Subtotal", "IVA", "Total"].join(","),
       ...purchasesData.map(purchase => [
-        format(new Date(purchase.created_at), "dd/MM/yyyy"),
-        purchase.purchase_number,
-        purchase.supplier_id,
+        escapeCsvValue(purchase.created_at ? format(new Date(purchase.created_at), "dd/MM/yyyy") : "-"),
+        escapeCsvValue(purchase.purchase_number),
+        escapeCsvValue((purchase.suppliers as any)?.name || purchase.supplier_id),
         purchase.purchase_items?.length || 0,
-        purchase.subtotal.toFixed(2),
-        (purchase.tax || 0).toFixed(2),
-        purchase.total.toFixed(2)
+        escapeCsvValue((purchase.subtotal ?? 0).toFixed(2)),  // MC-008
+        escapeCsvValue((purchase.tax ?? 0).toFixed(2)),
+        escapeCsvValue((purchase.total ?? 0).toFixed(2)),
       ].join(","))
     ].join("\n");
-    
     downloadCSV(`detalle-compras-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
     toast.success("Detalle de compras descargado");
   };
 
   const downloadCashMovements = () => {
     if (!cashMovementsData) return;
-    
     const csv = [
       ["Fecha", "Tipo", "Categoría", "Descripción", "Monto"].join(","),
       ...cashMovementsData.map(movement => [
-        format(new Date(movement.created_at), "dd/MM/yyyy"),
-        movement.type,
-        movement.category,
-        movement.description || "",
-        movement.amount.toFixed(2)
+        escapeCsvValue(movement.created_at ? format(new Date(movement.created_at), "dd/MM/yyyy") : "-"),
+        escapeCsvValue(movement.type),
+        escapeCsvValue(movement.category),
+        escapeCsvValue(movement.description || ""),
+        escapeCsvValue((movement.amount ?? 0).toFixed(2)),  // MC-008
       ].join(","))
     ].join("\n");
-    
     downloadCSV(`movimientos-caja-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
     toast.success("Movimientos de caja descargados");
   };
 
   const downloadExpenses = () => {
     if (!expensesData) return;
-    
     const csv = [
       ["Fecha", "Número", "Descripción", "Categoría", "Monto", "Método Pago"].join(","),
       ...expensesData.map(expense => [
-        format(new Date(expense.created_at), "dd/MM/yyyy"),
-        expense.expense_number,
-        expense.description,
-        expense.category_id || "",
-        expense.amount.toFixed(2),
-        expense.payment_method
+        escapeCsvValue(expense.created_at ? format(new Date(expense.created_at), "dd/MM/yyyy") : "-"),
+        escapeCsvValue(expense.expense_number),
+        escapeCsvValue(expense.description),
+        escapeCsvValue(expense.category_id || ""),
+        escapeCsvValue((expense.amount ?? 0).toFixed(2)),  // MC-008
+        escapeCsvValue(expense.payment_method),
       ].join(","))
     ].join("\n");
-    
     downloadCSV(`gastos-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
     toast.success("Gastos descargados");
+  };
+
+  // MC-004: función correcta para cuentas corrientes — agrupa ventas por cliente
+  const downloadAccountsReceivable = () => {
+    if (!salesData) return;
+    const customerMap = new Map<string, { name: string; count: number; total: number }>();
+    for (const sale of salesData) {
+      const key = sale.customer_id;
+      const name = (sale.customers as any)?.name || sale.customer_id;
+      const existing = customerMap.get(key) ?? { name, count: 0, total: 0 };
+      existing.count += 1;
+      existing.total += sale.total ?? 0;
+      customerMap.set(key, existing);
+    }
+    const csv = [
+      ["Cliente", "Cantidad de Ventas", "Total Facturado"].join(","),
+      ...Array.from(customerMap.values()).map(c => [
+        escapeCsvValue(c.name),
+        c.count,
+        escapeCsvValue(c.total.toFixed(2)),
+      ].join(","))
+    ].join("\n");
+    downloadCSV(`cuentas-corrientes-${format(selectedMonth, "yyyy-MM")}.csv`, csv);
+    toast.success("Cuentas corrientes descargadas");
   };
 
   const toggleStep = (stepId: number) => {
@@ -248,10 +284,14 @@ const MonthlyClosing = () => {
     });
   };
 
-  const totalSales = salesData?.reduce((sum, sale) => sum + sale.total, 0) || 0;
-  const totalPurchases = purchasesData?.reduce((sum, purchase) => sum + purchase.total, 0) || 0;
-  const salesTax = salesData?.reduce((sum, sale) => sum + (sale.tax || 0), 0) || 0;
-  const purchasesTax = purchasesData?.reduce((sum, purchase) => sum + (purchase.tax || 0), 0) || 0;
+  // MC-008: null guards en todos los acumuladores
+  const totalSales = salesData?.reduce((sum, sale) => sum + (sale.total ?? 0), 0) || 0;
+  const totalPurchases = purchasesData?.reduce((sum, purchase) => sum + (purchase.total ?? 0), 0) || 0;
+  const salesTax = salesData?.reduce((sum, sale) => sum + (sale.tax ?? 0), 0) || 0;
+  const purchasesTax = purchasesData?.reduce((sum, purchase) => sum + (purchase.tax ?? 0), 0) || 0;
+
+  // MC-009: skeleton mientras cargan las stats
+  const StatSkeleton = () => <Skeleton className="h-8 w-24 mt-1" />;
 
   const SalesReviewStep = () => (
     <Card>
@@ -268,35 +308,28 @@ const MonthlyClosing = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 border rounded-lg">
             <div className="text-sm text-muted-foreground">Total Ventas</div>
-            <div className="text-2xl font-bold">{salesData?.length || 0}</div>
+            {salesLoading ? <StatSkeleton /> : <div className="text-2xl font-bold">{salesData?.length || 0}</div>}
           </div>
           <div className="p-4 border rounded-lg">
             <div className="text-sm text-muted-foreground">Monto Total</div>
-            <div className="text-2xl font-bold">${totalSales.toFixed(2)}</div>
+            {salesLoading ? <StatSkeleton /> : <div className="text-2xl font-bold">${totalSales.toFixed(2)}</div>}
           </div>
           <div className="p-4 border rounded-lg">
             <div className="text-sm text-muted-foreground">IVA Ventas</div>
-            <div className="text-2xl font-bold">${salesTax.toFixed(2)}</div>
+            {salesLoading ? <StatSkeleton /> : <div className="text-2xl font-bold">${salesTax.toFixed(2)}</div>}
           </div>
         </div>
-        
-        <div className="flex items-center justify-between pt-4">
-          <Button variant="outline" onClick={() => window.open('/sales', '_blank')}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-4">
+          <Button variant="outline" onClick={() => window.open('/sales', '_blank')} className="w-full sm:w-auto">
             <FileText className="h-4 w-4 mr-2" />
             Ver Ventas Completas
           </Button>
           <Button
             onClick={() => toggleStep(1)}
             variant={completedSteps.has(1) ? "secondary" : "default"}
+            className="w-full sm:w-auto"
           >
-            {completedSteps.has(1) ? (
-              <>
-                <Check className="h-4 w-4 mr-2" />
-                Completado
-              </>
-            ) : (
-              "Marcar como Revisado"
-            )}
+            {completedSteps.has(1) ? <><Check className="h-4 w-4 mr-2" />Completado</> : "Marcar como Revisado"}
           </Button>
         </div>
       </CardContent>
@@ -318,35 +351,28 @@ const MonthlyClosing = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 border rounded-lg">
             <div className="text-sm text-muted-foreground">Total Compras</div>
-            <div className="text-2xl font-bold">{purchasesData?.length || 0}</div>
+            {purchasesLoading ? <StatSkeleton /> : <div className="text-2xl font-bold">{purchasesData?.length || 0}</div>}
           </div>
           <div className="p-4 border rounded-lg">
             <div className="text-sm text-muted-foreground">Monto Total</div>
-            <div className="text-2xl font-bold">${totalPurchases.toFixed(2)}</div>
+            {purchasesLoading ? <StatSkeleton /> : <div className="text-2xl font-bold">${totalPurchases.toFixed(2)}</div>}
           </div>
           <div className="p-4 border rounded-lg">
             <div className="text-sm text-muted-foreground">IVA Compras</div>
-            <div className="text-2xl font-bold">${purchasesTax.toFixed(2)}</div>
+            {purchasesLoading ? <StatSkeleton /> : <div className="text-2xl font-bold">${purchasesTax.toFixed(2)}</div>}
           </div>
         </div>
-        
-        <div className="flex items-center justify-between pt-4">
-          <Button variant="outline" onClick={() => window.open('/purchases', '_blank')}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-4">
+          <Button variant="outline" onClick={() => window.open('/purchases', '_blank')} className="w-full sm:w-auto">
             <FileText className="h-4 w-4 mr-2" />
             Ver Compras Completas
           </Button>
           <Button
             onClick={() => toggleStep(2)}
             variant={completedSteps.has(2) ? "secondary" : "default"}
+            className="w-full sm:w-auto"
           >
-            {completedSteps.has(2) ? (
-              <>
-                <Check className="h-4 w-4 mr-2" />
-                Completado
-              </>
-            ) : (
-              "Marcar como Revisado"
-            )}
+            {completedSteps.has(2) ? <><Check className="h-4 w-4 mr-2" />Completado</> : "Marcar como Revisado"}
           </Button>
         </div>
       </CardContent>
@@ -355,7 +381,6 @@ const MonthlyClosing = () => {
 
   const IVABooksStep = () => {
     const netIVA = salesTax - purchasesTax;
-    
     return (
       <Card>
         <CardHeader>
@@ -371,52 +396,40 @@ const MonthlyClosing = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-950">
               <div className="text-sm text-muted-foreground">IVA Débito Fiscal (Ventas)</div>
-              <div className="text-2xl font-bold text-green-700 dark:text-green-300">
-                ${salesTax.toFixed(2)}
-              </div>
+              {salesLoading ? <StatSkeleton /> : (
+                <div className="text-2xl font-bold text-green-700 dark:text-green-300">${salesTax.toFixed(2)}</div>
+              )}
             </div>
             <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950">
               <div className="text-sm text-muted-foreground">IVA Crédito Fiscal (Compras)</div>
-              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                ${purchasesTax.toFixed(2)}
-              </div>
+              {purchasesLoading ? <StatSkeleton /> : (
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">${purchasesTax.toFixed(2)}</div>
+              )}
             </div>
           </div>
-
           <Separator />
-
           <div className="p-4 border-2 rounded-lg bg-primary/5">
             <div className="text-sm text-muted-foreground">IVA a Pagar / (Saldo a Favor)</div>
-            <div className={cn("text-3xl font-bold", netIVA >= 0 ? "text-red-600" : "text-green-600")}>
-              ${Math.abs(netIVA).toFixed(2)}
-              {netIVA < 0 && " (Saldo a favor)"}
-            </div>
+            {salesLoading || purchasesLoading ? <StatSkeleton /> : (
+              <div className={cn("text-3xl font-bold", netIVA >= 0 ? "text-red-600" : "text-green-600")}>
+                ${Math.abs(netIVA).toFixed(2)}
+                {netIVA < 0 && " (Saldo a favor)"}
+              </div>
+            )}
           </div>
-
-          <div className="flex items-center justify-between pt-4">
-            <Button variant="outline" onClick={downloadIVASales}>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-4">
+            <Button variant="outline" onClick={downloadIVASales} className="w-full sm:w-auto">
               <Download className="h-4 w-4 mr-2" />
               Descargar Libro IVA Ventas
             </Button>
-            <Button variant="outline" onClick={downloadIVAPurchases}>
+            <Button variant="outline" onClick={downloadIVAPurchases} className="w-full sm:w-auto">
               <Download className="h-4 w-4 mr-2" />
               Descargar Libro IVA Compras
             </Button>
           </div>
-
           <div className="flex justify-end pt-2">
-            <Button
-              onClick={() => toggleStep(3)}
-              variant={completedSteps.has(3) ? "secondary" : "default"}
-            >
-              {completedSteps.has(3) ? (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Completado
-                </>
-              ) : (
-                "Marcar como Generado"
-              )}
+            <Button onClick={() => toggleStep(3)} variant={completedSteps.has(3) ? "secondary" : "default"}>
+              {completedSteps.has(3) ? <><Check className="h-4 w-4 mr-2" />Completado</> : "Marcar como Generado"}
             </Button>
           </div>
         </CardContent>
@@ -453,7 +466,8 @@ const MonthlyClosing = () => {
             <Download className="h-4 w-4 mr-2" />
             Movimientos de Caja
           </Button>
-          <Button variant="outline" className="w-full justify-start" onClick={downloadSalesDetail}>
+          {/* MC-004: handler correcto — ya no llama a downloadSalesDetail */}
+          <Button variant="outline" className="w-full justify-start" onClick={downloadAccountsReceivable}>
             <Download className="h-4 w-4 mr-2" />
             Cuentas Corrientes Clientes
           </Button>
@@ -462,20 +476,9 @@ const MonthlyClosing = () => {
             Gastos del Período
           </Button>
         </div>
-
         <div className="flex justify-end pt-4">
-          <Button
-            onClick={() => toggleStep(4)}
-            variant={completedSteps.has(4) ? "secondary" : "default"}
-          >
-            {completedSteps.has(4) ? (
-              <>
-                <Check className="h-4 w-4 mr-2" />
-                Completado
-              </>
-            ) : (
-              "Marcar como Descargado"
-            )}
+          <Button onClick={() => toggleStep(4)} variant={completedSteps.has(4) ? "secondary" : "default"}>
+            {completedSteps.has(4) ? <><Check className="h-4 w-4 mr-2" />Completado</> : "Marcar como Descargado"}
           </Button>
         </div>
       </CardContent>
@@ -483,38 +486,27 @@ const MonthlyClosing = () => {
   );
 
   const steps: Step[] = [
-    {
-      id: 1,
-      title: "Revisar Ventas",
-      description: "Verificar ventas del período",
-      icon: Receipt,
-      component: SalesReviewStep,
-    },
-    {
-      id: 2,
-      title: "Revisar Compras",
-      description: "Verificar compras del período",
-      icon: ShoppingCart,
-      component: PurchasesReviewStep,
-    },
-    {
-      id: 3,
-      title: "Libros de IVA",
-      description: "Generar libros de IVA",
-      icon: FileText,
-      component: IVABooksStep,
-    },
-    {
-      id: 4,
-      title: "Reportes Contador",
-      description: "Descargar reportes",
-      icon: Download,
-      component: ReportsStep,
-    },
+    { id: 1, title: "Revisar Ventas", description: "Verificar ventas del período", icon: Receipt, component: SalesReviewStep },
+    { id: 2, title: "Revisar Compras", description: "Verificar compras del período", icon: ShoppingCart, component: PurchasesReviewStep },
+    { id: 3, title: "Libros de IVA", description: "Generar libros de IVA", icon: FileText, component: IVABooksStep },
+    { id: 4, title: "Reportes Contador", description: "Descargar reportes", icon: Download, component: ReportsStep },
   ];
 
   const progress = (completedSteps.size / steps.length) * 100;
   const CurrentStepComponent = steps[currentStep - 1].component;
+
+  // MC-001: guard de autorización — solo admin y manager
+  if (!isAdmin && !isManager) {
+    return (
+      <Layout>
+        <Alert variant="destructive">
+          <AlertDescription>
+            No tienes permisos para acceder al cierre mensual. Solo administradores y gerentes pueden acceder.
+          </AlertDescription>
+        </Alert>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -526,7 +518,6 @@ const MonthlyClosing = () => {
               Proceso de cierre contable
             </p>
           </div>
-
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="w-full sm:w-auto">
@@ -572,7 +563,6 @@ const MonthlyClosing = () => {
             const Icon = step.icon;
             const isCompleted = completedSteps.has(step.id);
             const isCurrent = currentStep === step.id;
-
             return (
               <Card
                 key={step.id}

@@ -4,7 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/layout/Layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { z } from "zod";
 import { Plus, Search, Building2, CreditCard, Wallet } from "lucide-react";
+
+const bankAccountSchema = z.object({
+  bank_name: z.string().trim().min(1, "El nombre del banco es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
+  account_number: z.string().trim().min(1, "El número de cuenta es requerido").max(50, "El número de cuenta debe tener máximo 50 caracteres"),
+  balance: z.number({ invalid_type_error: "El saldo debe ser un número" })
+    .nonnegative("El saldo no puede ser negativo")
+    .optional(),
+});
 import {
   Dialog,
   DialogContent,
@@ -47,6 +57,7 @@ export default function BankAccounts() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     bank_name: "",
     account_number: "",
@@ -83,9 +94,10 @@ export default function BankAccounts() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", currentCompany?.id] });
       toast.success("Cuenta bancaria creada");
       setIsDialogOpen(false);
+      setFormErrors({});
       setFormData({
         bank_name: "",
         account_number: "",
@@ -105,12 +117,13 @@ export default function BankAccounts() {
       const { error } = await supabase
         .from("bank_accounts")
         .update({ active })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("company_id", currentCompany?.id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["bank-accounts", currentCompany?.id] });
       toast.success("Estado actualizado");
     },
   });
@@ -146,17 +159,17 @@ export default function BankAccounts() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Cuentas Bancarias</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">Cuentas Bancarias</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
               Gestiona las cuentas bancarias de tu empresa
             </p>
           </div>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
                 Nueva Cuenta
               </Button>
@@ -166,26 +179,27 @@ export default function BankAccounts() {
                 <DialogTitle>Nueva Cuenta Bancaria</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                <p className="text-xs text-muted-foreground">Los campos con <span className="text-destructive">*</span> son obligatorios.</p>
                 <div>
-                  <label className="text-sm font-medium">Banco</label>
+                  <Label className="text-sm font-medium">Banco <span className="text-destructive">*</span></Label>
                   <Input
                     value={formData.bank_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, bank_name: e.target.value })
-                    }
+                    onChange={(e) => { setFormData({ ...formData, bank_name: e.target.value }); if (formErrors.bank_name) setFormErrors((p) => ({ ...p, bank_name: "" })); }}
                     placeholder="Nombre del banco"
+                    className={formErrors.bank_name ? "border-destructive" : ""}
                   />
+                  {formErrors.bank_name && <p className="text-sm text-destructive mt-1">{formErrors.bank_name}</p>}
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">Número de Cuenta</label>
+                  <Label className="text-sm font-medium">Número de Cuenta <span className="text-destructive">*</span></Label>
                   <Input
                     value={formData.account_number}
-                    onChange={(e) =>
-                      setFormData({ ...formData, account_number: e.target.value })
-                    }
+                    onChange={(e) => { setFormData({ ...formData, account_number: e.target.value }); if (formErrors.account_number) setFormErrors((p) => ({ ...p, account_number: "" })); }}
                     placeholder="Número de cuenta"
+                    className={formErrors.account_number ? "border-destructive" : ""}
                   />
+                  {formErrors.account_number && <p className="text-sm text-destructive mt-1">{formErrors.account_number}</p>}
                 </div>
 
                 <div>
@@ -227,20 +241,38 @@ export default function BankAccounts() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">Saldo Inicial</label>
+                  <Label className="text-sm font-medium">Saldo Inicial</Label>
                   <Input
                     type="number"
                     step="0.01"
                     value={formData.balance}
-                    onChange={(e) =>
-                      setFormData({ ...formData, balance: e.target.value })
-                    }
+                    onChange={(e) => { setFormData({ ...formData, balance: e.target.value }); if (formErrors.balance) setFormErrors((p) => ({ ...p, balance: "" })); }}
                     placeholder="0.00"
+                    className={formErrors.balance ? "border-destructive" : ""}
                   />
+                  {formErrors.balance && <p className="text-sm text-destructive mt-1">{formErrors.balance}</p>}
                 </div>
 
                 <Button
-                  onClick={() => createAccount.mutate(formData)}
+                  onClick={() => {
+                    try {
+                      bankAccountSchema.parse({
+                        bank_name: formData.bank_name,
+                        account_number: formData.account_number,
+                        balance: formData.balance ? parseFloat(formData.balance) : undefined,
+                      });
+                      setFormErrors({});
+                      createAccount.mutate(formData);
+                    } catch (error) {
+                      if (error instanceof z.ZodError) {
+                        const newErrors: Record<string, string> = {};
+                        error.errors.forEach((err) => {
+                          if (err.path[0]) newErrors[err.path[0] as string] = err.message;
+                        });
+                        setFormErrors(newErrors);
+                      }
+                    }
+                  }}
                   disabled={createAccount.isPending}
                   className="w-full"
                 >

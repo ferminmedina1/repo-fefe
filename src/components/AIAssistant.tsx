@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useSSEStream } from "@/hooks/useSSEStream";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,18 +18,31 @@ import {
   Users, 
   DollarSign,
   AlertTriangle,
-  Target
+  Target,
+  StopCircle,
+  Briefcase,
+  Landmark,
+  CreditCard,
+  ShoppingCart,
+  Headphones
 } from "lucide-react";
 import { toast } from "sonner";
 
-type AnalysisType = "search" | "suggestion" | "report" | "stock-analysis" | "sales-prediction" | "customer-insights" | "financial-summary";
+type AnalysisType = "search" | "suggestion" | "report" | "stock-analysis" | "sales-prediction" | "customer-insights" | "financial-summary" | "hr-analysis" | "treasury" | "crm-pipeline" | "accounts-analysis" | "procurement" | "support-analysis";
 
 export const AIAssistant = () => {
   const { currentCompany } = useCompany();
   const [query, setQuery] = useState("");
-  const [response, setResponse] = useState("");
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<AnalysisType>("search");
+
+  const { text: response, isStreaming, error: streamError, startStream, stopStream } = useSSEStream({
+    onComplete: (fullText) => {
+      console.log("Streaming completado:", fullText.length, "caracteres");
+    },
+    onError: (error) => {
+      toast.error(error || "Error al procesar tu consulta");
+    },
+  });
 
   const handleQuery = async (customQuery?: string, customType?: AnalysisType) => {
     const finalQuery = customQuery || query;
@@ -40,28 +53,17 @@ export const AIAssistant = () => {
       return;
     }
 
-    setLoading(true);
-    setResponse("");
-
-    try {
-      const { data, error } = await supabase.functions.invoke("ai-assistant", {
-        body: {
-          query: finalQuery,
-          type: finalType,
-          companyId: currentCompany?.id,
-          context: finalType === "report" ? finalQuery : undefined,
-        },
-      });
-
-      if (error) throw error;
-
-      setResponse(data.response);
-    } catch (error) {
-      console.error("Error al consultar IA:", error);
-      toast.error("Error al procesar tu consulta");
-    } finally {
-      setLoading(false);
+    if (isStreaming) {
+      stopStream();
+      return;
     }
+
+    await startStream("ai-assistant-stream", {
+      query: finalQuery,
+      type: finalType,
+      companyId: currentCompany?.id,
+      context: finalType === "report" ? finalQuery : undefined,
+    });
   };
 
   const quickActions = [
@@ -113,6 +115,54 @@ export const AIAssistant = () => {
       query: "Dame 5 oportunidades concretas para aumentar las ventas esta semana",
       color: "text-emerald-500",
     },
+    {
+      icon: Briefcase,
+      label: "RRHH",
+      description: "Empleados y comisiones",
+      type: "hr-analysis" as AnalysisType,
+      query: "Analiza mi equipo: dotación, comisiones, horas y costo laboral",
+      color: "text-indigo-500",
+    },
+    {
+      icon: Landmark,
+      label: "Tesorería",
+      description: "Bancos, cheques, tarjetas",
+      type: "treasury" as AnalysisType,
+      query: "Dame el estado de tesorería: saldos, cheques pendientes y tarjetas por acreditar",
+      color: "text-cyan-500",
+    },
+    {
+      icon: Target,
+      label: "CRM Pipeline",
+      description: "Oportunidades y conversión",
+      type: "crm-pipeline" as AnalysisType,
+      query: "Analiza mi pipeline comercial: oportunidades abiertas, valor ponderado y tasa de conversión",
+      color: "text-pink-500",
+    },
+    {
+      icon: CreditCard,
+      label: "Cuenta Cte",
+      description: "Cobros y vencimientos",
+      type: "accounts-analysis" as AnalysisType,
+      query: "Analiza mi cuenta corriente: cobros, vencimientos pendientes y notas de crédito",
+      color: "text-amber-500",
+    },
+    {
+      icon: ShoppingCart,
+      label: "Compras",
+      description: "Órdenes y costos detalle",
+      type: "procurement" as AnalysisType,
+      query: "Analiza mis compras: órdenes abiertas, productos más comprados y costos",
+      color: "text-teal-500",
+    },
+    {
+      icon: Headphones,
+      label: "Soporte",
+      description: "Tickets y SLA",
+      type: "support-analysis" as AnalysisType,
+      query: "Analiza mis tickets de soporte: abiertos, SLA y prioridades",
+      color: "text-rose-500",
+    },
   ];
 
   const exampleQueries: Record<AnalysisType, string[]> = {
@@ -151,6 +201,36 @@ export const AIAssistant = () => {
       "¿Cuál es mi margen de ganancia?",
       "Análisis de cuentas por cobrar",
     ],
+    "hr-analysis": [
+      "¿Cuántos empleados activos tengo?",
+      "¿Cuánto pagué en comisiones?",
+      "Resumen de horas trabajadas y productividad",
+    ],
+    "treasury": [
+      "¿Cuánto tengo en cuentas bancarias?",
+      "¿Qué cheques tengo pendientes?",
+      "¿Cuánto espero cobrar por tarjetas?",
+    ],
+    "crm-pipeline": [
+      "¿Cuántas oportunidades abiertas tengo?",
+      "¿Cuál es el valor ponderado del pipeline?",
+      "Tasa de conversión de oportunidades",
+    ],
+    "accounts-analysis": [
+      "¿Cuántos movimientos vencidos tengo?",
+      "Notas de crédito activas con saldo",
+      "Principales deudores de cuenta corriente",
+    ],
+    "procurement": [
+      "¿Cuántas órdenes de compra abiertas tengo?",
+      "Productos más comprados por costo",
+      "Costo total de compras del trimestre",
+    ],
+    "support-analysis": [
+      "¿Cuántos tickets abiertos tengo?",
+      "¿Se cumplen los SLA de respuesta?",
+      "Tickets de alta prioridad pendientes",
+    ],
   };
 
   const tabConfig = [
@@ -161,6 +241,12 @@ export const AIAssistant = () => {
     { value: "sales-prediction", icon: TrendingUp, label: "Predicción" },
     { value: "customer-insights", icon: Users, label: "Clientes" },
     { value: "financial-summary", icon: DollarSign, label: "Finanzas" },
+    { value: "hr-analysis", icon: Briefcase, label: "RRHH" },
+    { value: "treasury", icon: Landmark, label: "Tesorería" },
+    { value: "crm-pipeline", icon: Target, label: "CRM" },
+    { value: "accounts-analysis", icon: CreditCard, label: "Cta Cte" },
+    { value: "procurement", icon: ShoppingCart, label: "Compras" },
+    { value: "support-analysis", icon: Headphones, label: "Soporte" },
   ];
 
   return (
@@ -178,7 +264,7 @@ export const AIAssistant = () => {
         {/* Quick Actions Grid */}
         <div>
           <label className="text-sm font-medium mb-3 block">Análisis Rápidos</label>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
             {quickActions.map((action) => (
               <Button
                 key={action.label}
@@ -189,7 +275,7 @@ export const AIAssistant = () => {
                   setActiveTab(action.type);
                   handleQuery(action.query, action.type);
                 }}
-                disabled={loading}
+                disabled={isStreaming}
               >
                 <action.icon className={`h-5 w-5 ${action.color}`} />
                 <span className="text-xs font-medium">{action.label}</span>
@@ -203,11 +289,11 @@ export const AIAssistant = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as AnalysisType)}>
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full" style={{ gridTemplateColumns: 'repeat(13, 1fr)' }}>
             {tabConfig.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value} className="gap-1 text-xs px-2">
+              <TabsTrigger key={tab.value} value={tab.value} className="gap-1 text-xs px-1">
                 <tab.icon className="h-3 w-3" />
-                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="hidden lg:inline">{tab.label}</span>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -223,9 +309,12 @@ export const AIAssistant = () => {
                   onKeyDown={(e) => e.key === "Enter" && handleQuery()}
                   className="flex-1"
                 />
-                <Button onClick={() => handleQuery()} disabled={loading}>
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                <Button onClick={() => handleQuery()} disabled={isStreaming}>
+                  {isStreaming ? (
+                    <>
+                      <StopCircle className="h-4 w-4 mr-2" />
+                      Detener
+                    </>
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
@@ -249,20 +338,36 @@ export const AIAssistant = () => {
               </div>
             </div>
 
-            {response && (
+            {(response || isStreaming) && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-medium">Respuesta:</label>
-                  <Badge variant="outline" className="text-xs">
-                    <Sparkles className="h-3 w-3 mr-1" />
-                    IA
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {isStreaming && (
+                      <Badge variant="outline" className="text-xs animate-pulse">
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Generando...
+                      </Badge>
+                    )}
+                    {!isStreaming && response && (
+                      <Badge variant="outline" className="text-xs">
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        IA
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-                <div className="bg-muted rounded-lg p-4 prose prose-sm max-w-none dark:prose-invert">
-                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
-                    {response}
-                  </pre>
+                <div className="bg-muted rounded-lg p-4 prose prose-sm max-w-none dark:prose-invert min-h-[100px]">
+                  <div className="whitespace-pre-wrap font-sans text-sm leading-relaxed">
+                    {response || ""}
+                    {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
+                  </div>
                 </div>
+                {streamError && (
+                  <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
+                    ⚠️ {streamError}
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>

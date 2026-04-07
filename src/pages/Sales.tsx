@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, Receipt, Eye, Printer, Truck, AlertCircle, CheckCircle2, Info, CreditCard, Wallet, User, FileText, RotateCcw, BarChart3 } from "lucide-react";
+import { Search, Receipt, Eye, Printer, Truck, AlertCircle, CheckCircle2, Info, CreditCard, Wallet, User, FileText, RotateCcw, BarChart3, Package } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
@@ -19,24 +19,36 @@ import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useCompany } from "@/contexts/CompanyContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Sales() {
   const { currentCompany } = useCompany();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [productFilter, setProductFilter] = useState("ALL");
   const [selectedSale, setSelectedSale] = useState<any>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const createDeliveryNoteMutation = useMutation({
     mutationFn: async (saleId: string) => {
+      if (!currentCompany?.id) {
+        throw new Error("Empresa no seleccionada");
+      }
+
       const { data: sale, error: saleError } = await supabase
         .from("sales")
         .select("*, sale_items(*), customer:customers(name)")
         .eq("id", saleId)
+        .eq("company_id", currentCompany.id)
         .single();
       
       if (saleError) throw saleError;
+
+      // Check if customer_id exists
+      if (!sale.customer_id) {
+        throw new Error("No se puede generar un remito sin cliente asignado");
+      }
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autenticado");
@@ -85,15 +97,40 @@ export default function Sales() {
     },
   });
 
-  const { data: sales } = useQuery({
-    queryKey: ["sales", searchQuery, currentCompany?.id],
+  // Query for products to filter
+  const { data: products } = useQuery({
+    queryKey: ["products-filter", currentCompany?.id],
     queryFn: async () => {
-      let query = supabase
+      if (!currentCompany?.id) return [];
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name")
+        .eq("company_id", currentCompany.id)
+        .eq("active", true)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: sales } = useQuery({
+    queryKey: ["sales", searchQuery, productFilter, currentCompany?.id],
+    queryFn: async () => {
+      let query: any = supabase
         .from("sales")
         .select(`
-          *,
-          customer:customers(name, email, phone, document, address),
-          sale_items(*)
+          id,
+          sale_number,
+          created_at,
+          total,
+          status,
+          payment_method,
+          paid_method,
+          company_id,
+          customer_id,
+          customer:customers(id, name, email, phone, document),
+          sale_items(id, quantity, unit_price, product_id, product:products(name)),
+          returns(id, return_number, status)
         `)
         .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });
@@ -107,12 +144,20 @@ export default function Sales() {
       
       const { data, error } = await query;
       if (error) throw error;
+
+      // Filter by product on client side since we need to check sale_items
+      if (productFilter && productFilter !== "ALL") {
+        return data?.filter(sale => 
+          sale.sale_items?.some((item: any) => item.product_id === productFilter)
+        );
+      }
+      
       return data;
     },
   });
 
   const { data: saleDetails } = useQuery({
-    queryKey: ["sale-details", selectedSale?.id],
+    queryKey: ["sale-details", selectedSale?.id, currentCompany?.id],
     queryFn: async () => {
       if (!selectedSale?.id) return null;
       
@@ -124,6 +169,7 @@ export default function Sales() {
           sale_items(*)
         `)
         .eq("id", selectedSale.id)
+        .eq("company_id", currentCompany?.id)
         .single();
       
       if (error) throw error;
@@ -213,12 +259,12 @@ export default function Sales() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Ventas</h1>
-            <p className="text-muted-foreground">Historial de transacciones</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Ventas</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Historial de transacciones</p>
           </div>
-          <Button variant="outline" onClick={() => navigate("/reports?tab=sales")}>
+          <Button variant="outline" onClick={() => navigate("/reports?tab=sales")} className="w-full sm:w-auto">
             <BarChart3 className="h-4 w-4 mr-2" />
             Ver Reportes
           </Button>
@@ -226,23 +272,43 @@ export default function Sales() {
 
         <Card className="shadow-soft">
           <CardHeader>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por número de venta..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por número de venta..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                  data-tutorial="sales-filters"
+                />
+              </div>
+              <div className="relative">
+                <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+                <Select value={productFilter} onValueChange={setProductFilter}>
+                  <SelectTrigger className="pl-10">
+                    <SelectValue placeholder="Filtrar por producto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos los productos</SelectItem>
+                    {products?.map((product) => (
+                      <SelectItem key={product.id} value={product.id}>
+                        {product.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table data-tutorial="sales-table">
               <TableHeader>
                 <TableRow>
                   <TableHead>Número</TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Cliente</TableHead>
+                  <TableHead>Productos</TableHead>
                   <TableHead>Método de Pago</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Estado</TableHead>
@@ -250,8 +316,25 @@ export default function Sales() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sales?.map((sale) => (
-                  <TableRow key={sale.id}>
+                {sales && sales.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <Receipt className="h-12 w-12 text-muted-foreground/40" />
+                        <div>
+                          <h3 className="text-lg font-semibold">Sin ventas registradas</h3>
+                          <p className="text-sm text-muted-foreground mb-4">Comienza registrando tu primera venta</p>
+                          <Button onClick={() => navigate('/pos')} className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Crear Primera Venta
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  sales?.map((sale) => (
+                    <TableRow key={sale.id}>
                     <TableCell className="font-medium flex items-center gap-2">
                       <Receipt className="h-4 w-4 text-muted-foreground" />
                       {sale.sale_number}
@@ -260,6 +343,20 @@ export default function Sales() {
                       {format(new Date(sale.created_at), "dd/MM/yyyy HH:mm", { locale: es })}
                     </TableCell>
                     <TableCell>{sale.customer?.name || "Cliente general"}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1 max-w-xs">
+                        {sale.sale_items?.slice(0, 2).map((item: any, idx: number) => (
+                          <Badge key={idx} variant="secondary" className="text-xs">
+                            {item.product_name} ({item.quantity})
+                          </Badge>
+                        ))}
+                        {sale.sale_items && sale.sale_items.length > 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{sale.sale_items.length - 2} más
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`flex items-center gap-1 font-medium ${getPaymentBadgeClasses(sale.payment_method)} whitespace-nowrap`}>
                         {sale.payment_method === 'cash' && <Wallet className="h-3 w-3" />}
@@ -273,7 +370,15 @@ export default function Sales() {
                       ${Number(sale.total).toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      {getStatusBadge(sale.status)}
+                      <div className="flex flex-col gap-1">
+                        {getStatusBadge(sale.status)}
+                        {sale.returns && sale.returns.length > 0 && (
+                          <Badge variant="outline" className="bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30 flex items-center gap-1">
+                            <RotateCcw className="h-3 w-3" />
+                            {sale.returns[0].refund_method === 'credit_note' ? 'Nota de Crédito' : 'Devuelto'}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
@@ -355,7 +460,8 @@ export default function Sales() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                ))
+                )}
               </TableBody>
             </Table>
           </CardContent>

@@ -5,8 +5,8 @@ export interface SignupFormData {
   full_name: string;
   company_name: string;
   password: string;
+  country?: string;
   plan_id: string;
-  modules: string[];
   // Payment method (unified schema)
   payment_provider?: "stripe" | "mercadopago";
   payment_method_ref?: string; // PM ID for Stripe, token for MP
@@ -31,7 +31,6 @@ export function useSignupWizard() {
     company_name: "",
     password: "",
     plan_id: "",
-    modules: [],
   });
   const [intentId, setIntentId] = useState<string | null>(null);
 
@@ -69,7 +68,7 @@ export function useSignupWizard() {
   };
 
   const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, 4));
-  const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 0));
+  const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 3));
   const goToStep = (step: number) => setCurrentStep(step);
 
   const saveIntent = (id: string) => {
@@ -85,7 +84,6 @@ export function useSignupWizard() {
       company_name: "",
       password: "",
       plan_id: "",
-      modules: [],
     });
     setIntentId(null);
     setCurrentStep(0);

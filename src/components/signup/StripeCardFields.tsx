@@ -71,7 +71,7 @@ export function StripeCardFields({ onSuccess, isLoading }: StripeCardFieldsProps
       // Successfully created payment method
       onSuccess(paymentMethod.id, metadata);
     } catch (e: any) {
-      console.error(e);
+      console.error("[Stripe] Error:", e);
       const errorMsg = e?.message ?? "Error al guardar la tarjeta";
       setErrors({ general: errorMsg });
       toast.error(errorMsg);

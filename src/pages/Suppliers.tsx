@@ -33,6 +33,22 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
+import { z } from "zod";
+
+const supplierSchema = z.object({
+  name: z.string().trim().min(1, "El nombre del proveedor es requerido").max(200, "El nombre debe tener máximo 200 caracteres"),
+  contact_name: z.string().max(200, "El contacto debe tener máximo 200 caracteres").optional(),
+  email: z.string().trim().max(255, "El email debe tener máximo 255 caracteres")
+    .refine((val) => val === "" || z.string().email().safeParse(val).success, "Email inválido")
+    .optional(),
+  phone: z.string().max(20, "El teléfono debe tener máximo 20 caracteres").optional(),
+  address: z.string().max(500, "La dirección debe tener máximo 500 caracteres").optional(),
+  tax_id: z.string().max(50, "El RUC/DNI debe tener máximo 50 caracteres").optional(),
+  payment_terms: z.string().max(100, "Los términos de pago deben tener máximo 100 caracteres").optional(),
+  credit_limit: z.number({ invalid_type_error: "El límite de crédito debe ser un número" })
+    .nonnegative("El límite de crédito no puede ser negativo")
+    .optional(),
+});
 
 interface Supplier {
   id: string;
@@ -59,6 +75,7 @@ export default function Suppliers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
@@ -239,14 +256,40 @@ export default function Suppliers() {
       notes: "",
     });
     setEditingSupplier(null);
+    setFormErrors({});
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingSupplier) {
-      updateSupplierMutation.mutate({ ...formData, id: editingSupplier.id });
-    } else {
-      createSupplierMutation.mutate(formData);
+    try {
+      supplierSchema.parse({
+        name: formData.name,
+        contact_name: formData.contact_name || undefined,
+        email: formData.email || undefined,
+        phone: formData.phone || undefined,
+        address: formData.address || undefined,
+        tax_id: formData.tax_id || undefined,
+        payment_terms: formData.payment_terms || undefined,
+        credit_limit: formData.credit_limit ? parseFloat(formData.credit_limit) : undefined,
+      });
+      setFormErrors({});
+      if (editingSupplier) {
+        updateSupplierMutation.mutate({ ...formData, id: editingSupplier.id });
+      } else {
+        createSupplierMutation.mutate(formData);
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const newErrors: Record<string, string> = {};
+        error.errors.forEach((err) => {
+          if (err.path[0]) {
+            newErrors[err.path[0] as string] = err.message;
+          }
+        });
+        setFormErrors(newErrors);
+      } else {
+        toast.error("Error al validar los datos del proveedor");
+      }
     }
   };
 
@@ -292,10 +335,10 @@ export default function Suppliers() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Proveedores</h1>
-            <p className="text-muted-foreground">Gestión de proveedores y crédito</p>
+            <h1 className="text-2xl sm:text-3xl font-bold">Proveedores</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Gestión de proveedores y crédito</p>
           </div>
           {canCreate && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -303,7 +346,7 @@ export default function Suppliers() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DialogTrigger asChild>
-                      <Button onClick={resetForm} className="gap-2">
+                      <Button onClick={resetForm} className="gap-2 w-full sm:w-auto">
                         <Plus className="h-4 w-4" />
                         Nuevo Proveedor
                       </Button>
@@ -320,6 +363,7 @@ export default function Suppliers() {
                   </DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  <p className="text-xs text-muted-foreground">Los campos con <span className="text-destructive">*</span> son obligatorios.</p>
                 {/* Sección Identidad */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 pb-2 border-b">
@@ -330,13 +374,14 @@ export default function Suppliers() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Nombre del Proveedor *</Label>
+                    <Label htmlFor="name">Nombre del Proveedor <span className="text-destructive">*</span></Label>
                     <Input
                       id="name"
                       value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      required
+                      onChange={(e) => { setFormData({ ...formData, name: e.target.value }); if (formErrors.name) setFormErrors((p) => ({ ...p, name: "" })); }}
+                      className={formErrors.name ? "border-destructive" : ""}
                     />
+                    {formErrors.name && <p className="text-sm text-destructive mt-1">{formErrors.name}</p>}
                   </div>
 
                   <div className="space-y-2">
@@ -367,8 +412,10 @@ export default function Suppliers() {
                       id="email"
                       type="email"
                       value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      onChange={(e) => { setFormData({ ...formData, email: e.target.value }); if (formErrors.email) setFormErrors((p) => ({ ...p, email: "" })); }}
+                      className={formErrors.email ? "border-destructive" : ""}
                     />
+                    {formErrors.email && <p className="text-sm text-destructive mt-1">{formErrors.email}</p>}
                   </div>
 
                   <div className="space-y-2">
@@ -438,8 +485,10 @@ export default function Suppliers() {
                         type="number"
                         step="0.01"
                         value={formData.credit_limit}
-                        onChange={(e) => setFormData({ ...formData, credit_limit: e.target.value })}
+                        onChange={(e) => { setFormData({ ...formData, credit_limit: e.target.value }); if (formErrors.credit_limit) setFormErrors((p) => ({ ...p, credit_limit: "" })); }}
+                        className={formErrors.credit_limit ? "border-destructive" : ""}
                       />
+                      {formErrors.credit_limit && <p className="text-sm text-destructive mt-1">{formErrors.credit_limit}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label>Estado</Label>
