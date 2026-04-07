@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/layout/Layout";
@@ -39,6 +40,7 @@ import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useTutorial } from "@/hooks/useTutorial";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
+import { getUserErrorMessage } from "@/lib/errorUtils";
 import { useCompany } from "@/contexts/CompanyContext";
 
 interface QuotationItem {
@@ -63,18 +65,24 @@ export default function Quotations() {
   const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
   const [selectedQuotation, setSelectedQuotation] = useState<any>(null);
   const [deliveryItems, setDeliveryItems] = useState<any[]>([]);
+  const [convertConfirmId, setConvertConfirmId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
   const { isRunning } = useTutorial();
 
-  const { data: quotations, isLoading } = useQuery({
-    queryKey: ["quotations", searchQuery, currentCompany?.id],
+  const { data: quotationResult, isLoading } = useQuery({
+    queryKey: ["quotations", searchQuery, currentCompany?.id, page, pageSize],
     queryFn: async () => {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
       let query = supabase
         .from("quotations")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("company_id", currentCompany?.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -83,11 +91,15 @@ export default function Quotations() {
         }
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data;
+      return { data: data || [], count: count || 0 };
     },
   });
+
+  const quotations = quotationResult?.data || [];
+  const totalItems = quotationResult?.count || 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
 
   const { data: customers } = useQuery({
     queryKey: ["customers-list", currentCompany?.id],
@@ -147,7 +159,7 @@ export default function Quotations() {
     enabled: !!currentCompany?.id,
   });
 
-  const { data: quotationItems } = useQuery({
+  const { data: quotationItems, isLoading: isLoadingQuotationItems } = useQuery({
     queryKey: ["quotation-items", selectedQuotation?.id],
     queryFn: async () => {
       if (!selectedQuotation?.id) return [];
@@ -183,7 +195,8 @@ export default function Quotations() {
 
       const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
       const discount = subtotal * (discountRate / 100);
-      const taxRate = 0;
+      // LOW-03: Use company tax rate instead of hardcoded 0
+      const taxRate = companySettings?.default_tax_rate || 0;
       const tax = (subtotal - discount) * (taxRate / 100);
       const total = subtotal - discount + tax;
 
@@ -241,7 +254,7 @@ export default function Quotations() {
       resetForm();
     },
     onError: (error: Error) => {
-      toast.error("Error al crear presupuesto: " + error.message);
+      toast.error(getUserErrorMessage(error, "Error al crear presupuesto"));
     },
   });
 
@@ -258,12 +271,23 @@ export default function Quotations() {
       queryClient.invalidateQueries({ queryKey: ["quotations"] });
     },
     onError: (error: Error) => {
-      toast.error("Error: " + error.message);
+      toast.error(getUserErrorMessage(error, "Error al actualizar estado"));
     },
   });
 
   const convertToSaleMutation = useMutation({
     mutationFn: async (quotationId: string) => {
+      // CRIT-3: Verificar que no existan remitos para este presupuesto (evita doble facturación)
+      const { data: existingNotes } = await supabase
+        .from("delivery_notes")
+        .select("id")
+        .eq("quotation_id", quotationId)
+        .limit(1)
+        .maybeSingle();
+      if (existingNotes) {
+        throw new Error("Este presupuesto ya tiene remitos generados. Facture los remitos desde la sección de Remitos.");
+      }
+
       // Obtener presupuesto con items
       const { data: quotation, error: quotationError } = await supabase
         .from("quotations")
@@ -283,17 +307,10 @@ export default function Quotations() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      // Generar número de venta
-      const { data: salesData } = await supabase
-        .from("sales")
-        .select("sale_number")
-        .order("created_at", { ascending: false })
-        .limit(1);
-
-      const lastNumber = salesData?.[0]?.sale_number || "VENTA-00000000-0000";
-      const parts = lastNumber.split("-");
-      const counter = parseInt(parts[2]) + 1;
-      const saleNumber = `VENTA-${new Date().toISOString().split("T")[0].replace(/-/g, "")}-${counter.toString().padStart(4, "0")}`;
+      // Atomic sale number — no race conditions
+      const { data: saleNumberData, error: saleNumberError } = await supabase.rpc("generate_sale_number");
+      if (saleNumberError) throw saleNumberError;
+      const saleNumber = saleNumberData as string;
 
       // Crear venta
       const { data: sale, error: saleError } = await supabase
@@ -371,7 +388,7 @@ export default function Quotations() {
       queryClient.invalidateQueries({ queryKey: ["sales"] });
     },
     onError: (error: Error) => {
-      toast.error("Error al convertir: " + error.message);
+      toast.error(getUserErrorMessage(error, "Error al convertir presupuesto"));
     },
   });
 
@@ -392,13 +409,14 @@ export default function Quotations() {
 
   const handleDownloadPDF = async (quotationId: string) => {
     try {
-      // Obtener presupuesto con items
+      // HIGH-4: Filtrar por company_id para prevenir IDOR
       const { data: quotation, error: quotationError } = await supabase
         .from("quotations")
         .select("*")
         .eq("id", quotationId)
+        .eq("company_id", currentCompany?.id)
         .single();
-      
+
       if (quotationError) throw quotationError;
 
       const { data: items, error: itemsError } = await supabase
@@ -418,7 +436,7 @@ export default function Quotations() {
 
       toast.success("PDF generado exitosamente");
     } catch (error: any) {
-      toast.error("Error al generar PDF: " + error.message);
+      toast.error(getUserErrorMessage(error, "Error al generar PDF"));
     }
   };
 
@@ -512,11 +530,11 @@ export default function Quotations() {
       const allDelivered = allItems.data?.every(i => (i.total_delivered || 0) >= i.quantity);
       const someDelivered = allItems.data?.some(i => (i.total_delivered || 0) > 0);
 
+      // MED-2: No sobreescribir total_delivered con el batch actual — se deriva de los items
       await supabase
         .from("quotations")
         .update({
           delivery_status: allDelivered ? "completed" : someDelivered ? "partial" : "pending",
-          total_delivered: deliveryItems.reduce((sum, i) => sum + (i.quantity_to_deliver * i.unit_price), 0),
         })
         .eq("id", selectedQuotation.id);
 
@@ -530,7 +548,7 @@ export default function Quotations() {
       setDeliveryItems([]);
     },
     onError: (error: Error) => {
-      toast.error("Error: " + error.message);
+      toast.error(getUserErrorMessage(error, "Error al generar remito"));
     },
   });
 
@@ -738,7 +756,7 @@ export default function Quotations() {
                 <Input
                   placeholder="Buscar por número o cliente..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
                   className="pl-10"
                 />
               </div>
@@ -764,7 +782,7 @@ export default function Quotations() {
                   <TableRow>
                     <TableCell colSpan={9} className="text-center">Cargando...</TableCell>
                   </TableRow>
-                ) : quotations && quotations.length > 0 ? (
+                ) : quotations.length > 0 ? (
                   quotations.map((quotation) => (
                     <TableRow key={quotation.id}>
                       <TableCell className="font-medium">{quotation.quotation_number}</TableCell>
@@ -842,7 +860,7 @@ export default function Quotations() {
                             <Button
                               size="sm"
                               variant="default"
-                              onClick={() => convertToSaleMutation.mutate(quotation.id)}
+                              onClick={() => setConvertConfirmId(quotation.id)}
                               title="Convertir a venta"
                             >
                               <ShoppingCart className="h-4 w-4 mr-1" />
@@ -862,8 +880,49 @@ export default function Quotations() {
                 )}
               </TableBody>
             </Table>
+            <PaginationControls
+              currentPage={page + 1}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              startIndex={totalItems === 0 ? 0 : page * pageSize + 1}
+              endIndex={Math.min((page + 1) * pageSize, totalItems)}
+              pageSize={pageSize}
+              canGoNext={page + 1 < totalPages}
+              canGoPrevious={page > 0}
+              onPageChange={(p) => setPage(p - 1)}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(0); }}
+              onNextPage={() => setPage(prev => prev + 1)}
+              onPreviousPage={() => setPage(prev => prev - 1)}
+              onFirstPage={() => setPage(0)}
+              onLastPage={() => setPage(totalPages - 1)}
+            />
           </CardContent>
         </Card>
+
+        {/* LOW-2: Confirmación antes de convertir presupuesto a venta (acción irreversible) */}
+        <Dialog open={!!convertConfirmId} onOpenChange={(open) => { if (!open) setConvertConfirmId(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirmar conversión a venta</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Esta acción es irreversible. Se generará una venta con método de pago "crédito" y el presupuesto quedará marcado como "convertido". ¿Desea continuar?
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConvertConfirmId(null)}>Cancelar</Button>
+              <Button
+                onClick={() => {
+                  if (convertConfirmId) convertToSaleMutation.mutate(convertConfirmId);
+                  setConvertConfirmId(null);
+                }}
+                disabled={convertToSaleMutation.isPending}
+              >
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Confirmar conversión
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Diálogo para generar remito con entregas parciales */}
         <Dialog open={isDeliveryDialogOpen} onOpenChange={(open) => {
@@ -874,7 +933,9 @@ export default function Quotations() {
             <DialogHeader>
               <DialogTitle>Generar Remito - {selectedQuotation?.quotation_number}</DialogTitle>
             </DialogHeader>
-            {quotationItems && (
+            {isLoadingQuotationItems ? (
+              <div className="text-center py-6 text-muted-foreground">Cargando productos...</div>
+            ) : quotationItems && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
                   Seleccione las cantidades a entregar. Puede generar múltiples remitos para entregas parciales.

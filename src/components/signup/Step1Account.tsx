@@ -2,8 +2,10 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { SignupFormData } from "@/hooks/useSignupWizard";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { z } from "zod";
 import { validateEmail, validateString } from "@/lib/validators";
 import { AlertCircle, Loader2, CheckCircle2, Eye, EyeOff } from "lucide-react";
@@ -401,6 +403,31 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
           </Select>
           {errors.country && <p className="text-sm text-destructive mt-1 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" />{errors.country}</p>}
         </div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id="terms"
+            checked={acceptedTerms}
+            onCheckedChange={(checked) => {
+              setAcceptedTerms(checked === true);
+              if (checked) setErrors((prev) => { const { terms: _, ...rest } = prev; return rest; });
+            }}
+            className="mt-0.5 border-white/30 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+          />
+          <Label htmlFor="terms" className="text-sm text-slate-200 leading-relaxed cursor-pointer">
+            Acepto los{" "}
+            <Link to="/terms" target="_blank" className="underline underline-offset-2 hover:text-white">
+              Términos y Condiciones
+            </Link>{" "}
+            y la{" "}
+            <Link to="/privacy" target="_blank" className="underline underline-offset-2 hover:text-white">
+              Política de Privacidad
+            </Link>
+          </Label>
+        </div>
+        {errors.terms && <p className="text-sm text-destructive">{errors.terms}</p>}
       </div>
 
       <div className="flex justify-end">

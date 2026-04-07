@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/layout/Layout";
@@ -14,22 +15,48 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { usePermissions } from "@/hooks/usePermissions";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
+import { getUserErrorMessage } from "@/lib/errorUtils";
 import { useCompany } from "@/contexts/CompanyContext";
 
 export default function DeliveryNotes() {
   const { currentCompany } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
 
-  const { data: deliveryNotes, isLoading } = useQuery({
-    queryKey: ["delivery-notes", searchQuery, currentCompany?.id],
+  // LOW-04: Use count queries instead of fetching all rows
+  const { data: deliveryNoteStats } = useQuery({
+    queryKey: ["delivery-notes-stats", currentCompany?.id],
     queryFn: async () => {
+      const [total, pending, inTransit, delivered] = await Promise.all([
+        supabase.from("delivery_notes").select("*", { count: "exact", head: true }).eq("company_id", currentCompany?.id),
+        supabase.from("delivery_notes").select("*", { count: "exact", head: true }).eq("company_id", currentCompany?.id).eq("status", "pending"),
+        supabase.from("delivery_notes").select("*", { count: "exact", head: true }).eq("company_id", currentCompany?.id).eq("status", "in_transit"),
+        supabase.from("delivery_notes").select("*", { count: "exact", head: true }).eq("company_id", currentCompany?.id).eq("status", "delivered"),
+      ]);
+      return {
+        total: total.count || 0,
+        pending: pending.count || 0,
+        inTransit: inTransit.count || 0,
+        delivered: delivered.count || 0,
+      };
+    },
+    enabled: !!currentCompany?.id,
+  });
+
+  const { data: deliveryNoteResult, isLoading } = useQuery({
+    queryKey: ["delivery-notes", searchQuery, currentCompany?.id, page, pageSize],
+    queryFn: async () => {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
       let query = supabase
         .from("delivery_notes")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("company_id", currentCompany?.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -38,12 +65,16 @@ export default function DeliveryNotes() {
         }
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data;
+      return { data: data || [], count: count || 0 };
     },
     enabled: !!currentCompany?.id,
   });
+
+  const deliveryNotes = deliveryNoteResult?.data || [];
+  const deliveryNotesTotal = deliveryNoteResult?.count || 0;
+  const deliveryNotesTotalPages = Math.max(1, Math.ceil(deliveryNotesTotal / pageSize));
 
   const { data: companySettings } = useQuery({
     queryKey: ["company-settings", currentCompany?.id],
@@ -79,14 +110,26 @@ export default function DeliveryNotes() {
     onSuccess: () => {
       toast.success("Estado actualizado");
       queryClient.invalidateQueries({ queryKey: ["delivery-notes"] });
+      // HIGH-6: Actualizar también los contadores de estadísticas
+      queryClient.invalidateQueries({ queryKey: ["delivery-notes-stats"] });
     },
     onError: (error: Error) => {
-      toast.error("Error: " + error.message);
+      toast.error(getUserErrorMessage(error, "Error al actualizar estado"));
     },
   });
 
   const convertToSaleMutation = useMutation({
     mutationFn: async (deliveryNoteId: string) => {
+      // HIGH-5: Verificar desde el servidor que el remito no haya sido facturado ya (previene doble clic / carrera)
+      const { data: checkNote, error: checkError } = await supabase
+        .from("delivery_notes")
+        .select("id, sale_id")
+        .eq("id", deliveryNoteId)
+        .eq("company_id", currentCompany?.id)
+        .single();
+      if (checkError) throw checkError;
+      if (checkNote.sale_id) throw new Error("Este remito ya fue facturado");
+
       const { data: deliveryNote, error: noteError } = await supabase
         .from("delivery_notes")
         .select("*, delivery_note_items(*)")
@@ -98,17 +141,10 @@ export default function DeliveryNotes() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
-      // Generar número de venta
-      const { data: salesData } = await supabase
-        .from("sales")
-        .select("sale_number")
-        .order("created_at", { ascending: false })
-        .limit(1);
-
-      const lastNumber = salesData?.[0]?.sale_number || "VENTA-00000000-0000";
-      const parts = lastNumber.split("-");
-      const counter = parseInt(parts[2]) + 1;
-      const saleNumber = `VENTA-${new Date().toISOString().split("T")[0].replace(/-/g, "")}-${counter.toString().padStart(4, "0")}`;
+      // Atomic sale number — no race conditions
+      const { data: saleNumberData, error: saleNumberError } = await supabase.rpc("generate_sale_number");
+      if (saleNumberError) throw saleNumberError;
+      const saleNumber = saleNumberData as string;
 
       // Crear venta
       const { data: sale, error: saleError } = await supabase
@@ -143,6 +179,12 @@ export default function DeliveryNotes() {
 
       await supabase.from("sale_items").insert(saleItems);
 
+      // MED-02: Link delivery note to the generated sale so it can't be billed twice
+      await supabase
+        .from("delivery_notes")
+        .update({ sale_id: sale.id })
+        .eq("id", deliveryNoteId);
+
       // Atomic stock decrement via RPC (no race conditions, single query)
       const itemProductIds = deliveryNote.delivery_note_items
         .map((item: any) => item.product_id)
@@ -164,9 +206,12 @@ export default function DeliveryNotes() {
     onSuccess: () => {
       toast.success("Remito facturado exitosamente");
       queryClient.invalidateQueries({ queryKey: ["sales"] });
+      // HIGH-5: Refrescar lista y estadísticas de remitos tras facturar
+      queryClient.invalidateQueries({ queryKey: ["delivery-notes"] });
+      queryClient.invalidateQueries({ queryKey: ["delivery-notes-stats"] });
     },
     onError: (error: Error) => {
-      toast.error("Error al facturar: " + error.message);
+      toast.error(getUserErrorMessage(error, "Error al facturar remito"));
     },
   });
 
@@ -189,12 +234,14 @@ export default function DeliveryNotes() {
 
   const handleDownloadPDF = async (deliveryNoteId: string) => {
     try {
+      // HIGH-4: Filtrar por company_id para prevenir IDOR
       const { data: deliveryNote, error: noteError } = await supabase
         .from("delivery_notes")
         .select("*")
         .eq("id", deliveryNoteId)
+        .eq("company_id", currentCompany?.id)
         .single();
-      
+
       if (noteError) throw noteError;
 
       const { data: items, error: itemsError } = await supabase
@@ -214,7 +261,7 @@ export default function DeliveryNotes() {
 
       toast.success("PDF generado exitosamente");
     } catch (error: any) {
-      toast.error("Error al generar PDF: " + error.message);
+      toast.error(getUserErrorMessage(error, "Error al generar PDF"));
     }
   };
 
@@ -237,7 +284,7 @@ export default function DeliveryNotes() {
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{deliveryNotes?.length || 0}</div>
+              <div className="text-2xl font-bold">{deliveryNoteStats?.total || 0}</div>
             </CardContent>
           </Card>
 
@@ -248,7 +295,7 @@ export default function DeliveryNotes() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {deliveryNotes?.filter(d => d.status === "pending").length || 0}
+                {deliveryNoteStats?.pending || 0}
               </div>
             </CardContent>
           </Card>
@@ -260,7 +307,7 @@ export default function DeliveryNotes() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {deliveryNotes?.filter(d => d.status === "in_transit").length || 0}
+                {deliveryNoteStats?.inTransit || 0}
               </div>
             </CardContent>
           </Card>
@@ -272,7 +319,7 @@ export default function DeliveryNotes() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {deliveryNotes?.filter(d => d.status === "delivered").length || 0}
+                {deliveryNoteStats?.delivered || 0}
               </div>
             </CardContent>
           </Card>
@@ -286,7 +333,7 @@ export default function DeliveryNotes() {
                 <Input
                   placeholder="Buscar por número o cliente..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
                   className="pl-10"
                 />
               </div>
@@ -311,7 +358,7 @@ export default function DeliveryNotes() {
                   <TableRow>
                     <TableCell colSpan={8} className="text-center">Cargando...</TableCell>
                   </TableRow>
-                ) : deliveryNotes && deliveryNotes.length > 0 ? (
+                ) : deliveryNotes.length > 0 ? (
                   deliveryNotes.map((note) => (
                     <TableRow key={note.id}>
                       <TableCell className="font-medium">{note.delivery_number}</TableCell>
@@ -339,7 +386,7 @@ export default function DeliveryNotes() {
                           >
                             <Download className="h-4 w-4" />
                           </Button>
-                          {canEdit && note.status === "delivered" && (
+                          {canEdit && note.status === "delivered" && !note.sale_id && (
                             <Button
                               size="sm"
                               variant="default"
@@ -394,6 +441,22 @@ export default function DeliveryNotes() {
                 )}
               </TableBody>
             </Table>
+            <PaginationControls
+              currentPage={page + 1}
+              totalPages={deliveryNotesTotalPages}
+              totalItems={deliveryNotesTotal}
+              startIndex={deliveryNotesTotal === 0 ? 0 : page * pageSize + 1}
+              endIndex={Math.min((page + 1) * pageSize, deliveryNotesTotal)}
+              pageSize={pageSize}
+              canGoNext={page + 1 < deliveryNotesTotalPages}
+              canGoPrevious={page > 0}
+              onPageChange={(p) => setPage(p - 1)}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(0); }}
+              onNextPage={() => setPage(prev => prev + 1)}
+              onPreviousPage={() => setPage(prev => prev - 1)}
+              onFirstPage={() => setPage(0)}
+              onLastPage={() => setPage(deliveryNotesTotalPages - 1)}
+            />
           </CardContent>
         </Card>
       </div>

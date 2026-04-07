@@ -43,7 +43,6 @@ import {
   BadgePercent,
   Search,
   Star,
-  PackageCheck,
   LogOut,
   MessageCircle,
   LifeBuoy,
@@ -61,6 +60,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sidebar as UISidebar } from "@/components/ui/sidebar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSidebar } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AvailableModulesDialog } from "./AvailableModulesDialog";
@@ -345,22 +346,10 @@ export function Sidebar() {
 
           children: [
             {
-              title: "Órdenes de Compra",
-              href: "/purchase-orders",
-              icon: FileCheck,
-              module: "purchase_orders",
-            },
-            {
               title: "Historial de Compras",
               href: "/purchases",
               icon: ShoppingBag,
               module: "purchases",
-            },
-            {
-              title: "Recepción de Mercadería",
-              href: "/purchase-reception",
-              icon: PackageCheck,
-              module: "purchase_reception",
             },
             {
               title: "Devoluciones a Proveedores",
@@ -955,11 +944,10 @@ export function Sidebar() {
             }
             return null;
           })}
-        </nav>
 
-        {/* Botón + Funcionalidades - Solo visible si no es platform admin */}
+        {/* Botón + Funcionalidades dentro del nav scroll */}
         {!isPlatformAdmin && (
-          <div className="px-3 py-2 border-t">
+          <div className="px-3 py-2">
             <Button
               onClick={() => setShowModulesDialog(true)}
               variant="ghost"
@@ -971,61 +959,80 @@ export function Sidebar() {
             </Button>
           </div>
         )}
+        </nav>
 
-        {/* Footer - Touch-friendly */}
-        <div className="px-3 py-3 border-t bg-gradient-to-r from-sidebar to-sidebar/95 space-y-2">
-          <Link
-            to="/ai-assistant"
-            className="flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-md hover:shadow-lg active:scale-[0.98]"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span className="font-semibold">Asistente IA</span>
-          </Link>
+        {/* Footer compacto - fila de iconos con tooltip */}
+        <div className="px-3 py-2 border-t bg-gradient-to-r from-sidebar to-sidebar/95">
+          <TooltipProvider delayDuration={200}>
+            <div className="flex items-center justify-center gap-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    to="/ai-assistant"
+                    className="flex items-center justify-center w-9 h-9 rounded-lg transition-all bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-600 hover:to-pink-600 shadow-sm hover:shadow-md active:scale-[0.95]"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="top"><p>Asistente IA</p></TooltipContent>
+              </Tooltip>
 
-          <div className="flex gap-2">
-            <Link to="/platform-support" className="flex-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-blue-500/50 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all active:scale-[0.98]"
-              >
-                <LifeBuoy className="w-3.5 h-3.5" />
-                <span>Soporte</span>
-              </Button>
-            </Link>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link to="/platform-support">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-9 h-9 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-all active:scale-[0.95]"
+                    >
+                      <LifeBuoy className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="top"><p>Soporte</p></TooltipContent>
+              </Tooltip>
 
-            <Link to="/bot-requests" className="flex-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-purple-500/50 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 transition-all active:scale-[0.98]"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span>Contáctanos</span>
-              </Button>
-            </Link>
-          </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link to="/bot-requests">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-9 h-9 text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 transition-all active:scale-[0.95]"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="top"><p>Contáctanos</p></TooltipContent>
+              </Tooltip>
 
-          <div className="flex gap-2">
-            <Button
-              onClick={async () => {
-                const { error } = await supabase.auth.signOut();
-                if (error) {
-                  toast.error("Error al cerrar sesión");
-                  console.error(error);
-                } else {
-                  toast.success("Sesión cerrada correctamente");
-                  navigate("/auth");
-                }
-              }}
-              variant="outline"
-              size="sm"
-              className="flex-1 h-9 flex items-center gap-2 px-2 text-xs rounded-lg border-destructive/50 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all active:scale-[0.98]"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Salir</span>
-            </Button>
-          </div>
+              <div className="w-px h-5 bg-border mx-0.5" />
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={async () => {
+                      const { error } = await supabase.auth.signOut();
+                      if (error) {
+                        toast.error("Error al cerrar sesión");
+                        console.error(error);
+                      } else {
+                        toast.success("Sesión cerrada correctamente");
+                        navigate("/auth");
+                      }
+                    }}
+                    variant="ghost"
+                    size="icon"
+                    className="w-9 h-9 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-all active:scale-[0.95]"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top"><p>Cerrar sesión</p></TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </div>
 
         {/* Dialog de módulos disponibles */}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,17 +17,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Separator } from "@/components/ui/separator";
 import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
+import { getUserErrorMessage } from "@/lib/errorUtils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export default function Sales() {
   const { currentCompany } = useCompany();
+  const { hasPermission } = usePermissions();
+  const canEdit = hasPermission("sales", "edit");
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [productFilter, setProductFilter] = useState("ALL");
-  const [selectedSale, setSelectedSale] = useState<any>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [selectedSale, setSelectedSale] = useState<{ id: string; sale_number: string } | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -48,6 +55,18 @@ export default function Sales() {
       // Check if customer_id exists
       if (!sale.customer_id) {
         throw new Error("No se puede generar un remito sin cliente asignado");
+      }
+
+      // MED-02: Prevent duplicate delivery notes for the same sale
+      const { data: existingNote } = await supabase
+        .from("delivery_notes")
+        .select("id")
+        .eq("sale_id", saleId)
+        .eq("company_id", currentCompany?.id)
+        .limit(1)
+        .maybeSingle();
+      if (existingNote) {
+        throw new Error("Ya existe un remito para esta venta");
       }
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -93,7 +112,7 @@ export default function Sales() {
       queryClient.invalidateQueries({ queryKey: ["delivery-notes"] });
     },
     onError: (error: Error) => {
-      toast.error("Error: " + error.message);
+      toast.error(getUserErrorMessage(error, "Error al crear remito"));
     },
   });
 
@@ -113,60 +132,70 @@ export default function Sales() {
     },
   });
 
-  const { data: sales } = useQuery({
-    queryKey: ["sales", searchQuery, productFilter, currentCompany?.id],
+  const isProductFiltered = productFilter !== "ALL";
+
+  const { data: salesResult } = useQuery({
+    queryKey: ["sales", searchQuery, productFilter, currentCompany?.id, page, pageSize],
     queryFn: async () => {
-      let query: any = supabase
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+      let query = supabase
         .from("sales")
         .select(`
-          id,
-          sale_number,
-          created_at,
-          total,
-          status,
-          payment_method,
-          paid_method,
-          company_id,
-          customer_id,
-          customer:customers(id, name, email, phone, document),
-          sale_items(id, quantity, unit_price, product_id, product:products(name)),
-          returns(id, return_number, status)
-        `)
+          *,
+          customer:customers(name, email, phone, document, address),
+          sale_items(*, product:products(name)),
+          returns(id, return_number, status, refund_method, total)
+        `, { count: "exact" })
         .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false });
-      
+
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
         if (sanitized) {
           query = query.or(`sale_number.ilike.%${sanitized}%`);
         }
       }
-      
-      const { data, error } = await query;
+
+      // Only paginate when no product filter (product filter requires client-side scan)
+      if (!isProductFiltered) {
+        query = query.range(from, to);
+      } else {
+        // MED-5: Cap para evitar full table scan en filtro por producto
+        query = query.limit(500);
+      }
+
+      const { data, error, count } = await query;
       if (error) throw error;
 
       // Filter by product on client side since we need to check sale_items
-      if (productFilter && productFilter !== "ALL") {
-        return data?.filter(sale => 
+      if (isProductFiltered && data) {
+        const filtered = data.filter(sale =>
           sale.sale_items?.some((item: any) => item.product_id === productFilter)
         );
+        return { data: filtered, count: filtered.length };
       }
-      
-      return data;
+
+      return { data: data || [], count: count || 0 };
     },
   });
+
+  const sales = salesResult?.data || [];
+  const salesTotalItems = salesResult?.count || 0;
+  const salesTotalPages = Math.max(1, Math.ceil(salesTotalItems / pageSize));
 
   const { data: saleDetails } = useQuery({
     queryKey: ["sale-details", selectedSale?.id, currentCompany?.id],
     queryFn: async () => {
       if (!selectedSale?.id) return null;
-      
+
       const { data, error } = await supabase
         .from("sales")
         .select(`
           *,
           customer:customers(*),
-          sale_items(*)
+          sale_items(*),
+          returns(id, return_number, status, refund_method, total)
         `)
         .eq("id", selectedSale.id)
         .eq("company_id", currentCompany?.id)
@@ -182,10 +211,10 @@ export default function Sales() {
           .eq("id", data.user_id)
           .single();
         
-        return { ...data, profile };
+        return { ...data, profile: profile as { full_name: string } | null };
       }
       
-      return data;
+      return { ...data, profile: null as { full_name: string } | null };
     },
     enabled: !!selectedSale?.id,
   });
@@ -243,7 +272,7 @@ export default function Sales() {
     );
   };
 
-  const handleViewDetails = (sale: any) => {
+  const handleViewDetails = (sale: { id: string; sale_number: string }) => {
     setSelectedSale(sale);
     setIsDetailOpen(true);
   };
@@ -278,14 +307,14 @@ export default function Sales() {
                 <Input
                   placeholder="Buscar por número de venta..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
                   className="pl-10"
                   data-tutorial="sales-filters"
                 />
               </div>
               <div className="relative">
                 <Package className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
-                <Select value={productFilter} onValueChange={setProductFilter}>
+                <Select value={productFilter} onValueChange={(v) => { setProductFilter(v); setPage(0); }}>
                   <SelectTrigger className="pl-10">
                     <SelectValue placeholder="Filtrar por producto" />
                   </SelectTrigger>
@@ -316,25 +345,15 @@ export default function Sales() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sales && sales.length === 0 ? (
+                {sales.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12">
-                      <div className="flex flex-col items-center gap-3">
-                        <Receipt className="h-12 w-12 text-muted-foreground/40" />
-                        <div>
-                          <h3 className="text-lg font-semibold">Sin ventas registradas</h3>
-                          <p className="text-sm text-muted-foreground mb-4">Comienza registrando tu primera venta</p>
-                          <Button onClick={() => navigate('/pos')} className="gap-2">
-                            <Plus className="h-4 w-4" />
-                            Crear Primera Venta
-                          </Button>
-                        </div>
-                      </div>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No hay ventas registradas
                     </TableCell>
                   </TableRow>
-                ) : (
-                  sales?.map((sale) => (
-                    <TableRow key={sale.id}>
+                )}
+                {sales.map((sale) => (
+                  <TableRow key={sale.id}>
                     <TableCell className="font-medium flex items-center gap-2">
                       <Receipt className="h-4 w-4 text-muted-foreground" />
                       {sale.sale_number}
@@ -442,21 +461,23 @@ export default function Sales() {
                             <TooltipContent>Imprimir ticket</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                size="icon" 
-                                variant="ghost"
-                                onClick={(e) => { e.stopPropagation(); createDeliveryNoteMutation.mutate(sale.id); }}
-                                disabled={createDeliveryNoteMutation.isPending}
-                              >
-                                <Truck className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Generar remito</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        {canEdit && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={(e) => { e.stopPropagation(); createDeliveryNoteMutation.mutate(sale.id); }}
+                                  disabled={createDeliveryNoteMutation.isPending}
+                                >
+                                  <Truck className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Generar remito</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -464,6 +485,24 @@ export default function Sales() {
                 )}
               </TableBody>
             </Table>
+            {!isProductFiltered && (
+              <PaginationControls
+                currentPage={page + 1}
+                totalPages={salesTotalPages}
+                totalItems={salesTotalItems}
+                startIndex={salesTotalItems === 0 ? 0 : page * pageSize + 1}
+                endIndex={Math.min((page + 1) * pageSize, salesTotalItems)}
+                pageSize={pageSize}
+                canGoNext={page + 1 < salesTotalPages}
+                canGoPrevious={page > 0}
+                onPageChange={(p) => setPage(p - 1)}
+                onPageSizeChange={(size) => { setPageSize(size); setPage(0); }}
+                onNextPage={() => setPage(prev => prev + 1)}
+                onPreviousPage={() => setPage(prev => prev - 1)}
+                onFirstPage={() => setPage(0)}
+                onLastPage={() => setPage(salesTotalPages - 1)}
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -494,7 +533,7 @@ export default function Sales() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Vendedor:</span>
                         <span className="font-medium">
-                          {(saleDetails as any).profile?.full_name || "-"}
+                          {saleDetails.profile?.full_name || "-"}
                         </span>
                       </div>
                       <div className="flex justify-between">
@@ -614,6 +653,29 @@ export default function Sales() {
                   </Card>
                 )}
 
+                {saleDetails.returns && saleDetails.returns.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <RotateCcw className="h-4 w-4 text-orange-500" />
+                        Devoluciones asociadas
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {saleDetails.returns.map((ret: any) => (
+                          <div key={ret.id} className="flex items-center justify-between text-sm border rounded p-2">
+                            <span className="font-medium">{ret.return_number}</span>
+                            <span className="text-muted-foreground">{ret.refund_method === "credit_note" ? "Nota de Crédito" : ret.refund_method}</span>
+                            <span className="font-bold text-destructive">${Number(ret.total).toFixed(2)}</span>
+                            <Badge variant="outline" className="text-xs">{ret.status}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <div className="flex justify-end gap-2 flex-wrap">
                   {saleDetails.customer_id && (
                     <>
@@ -640,17 +702,19 @@ export default function Sales() {
                     <RotateCcw className="mr-2 h-4 w-4" />
                     Crear Nota de Crédito
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      createDeliveryNoteMutation.mutate(saleDetails.id);
-                      setIsDetailOpen(false);
-                    }}
-                    disabled={createDeliveryNoteMutation.isPending}
-                  >
-                    <Truck className="mr-2 h-4 w-4" />
-                    Generar Remito
-                  </Button>
+                  {canEdit && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        createDeliveryNoteMutation.mutate(saleDetails.id);
+                        setIsDetailOpen(false);
+                      }}
+                      disabled={createDeliveryNoteMutation.isPending}
+                    >
+                      <Truck className="mr-2 h-4 w-4" />
+                      Generar Remito
+                    </Button>
+                  )}
                   <Button onClick={() => handlePrintReceipt(saleDetails)}>
                     <Printer className="mr-2 h-4 w-4" />
                     Imprimir Ticket

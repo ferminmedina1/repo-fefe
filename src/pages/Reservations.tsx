@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useCompany } from "@/contexts/CompanyContext";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
+import { getUserErrorMessage } from "@/lib/errorUtils";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface CartItem {
   product_id: string;
@@ -31,11 +34,16 @@ interface CartItem {
 export default function Reservations() {
   const { currentCompany } = useCompany();
   const navigate = useNavigate();
+  const { hasPermission } = usePermissions();
+
+  const canCreate = hasPermission("reservations", "create");
+  const canEdit = hasPermission("reservations", "edit");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const [isNewReservationOpen, setIsNewReservationOpen] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<any>(null);
-  const [isGeneratingDocument, setIsGeneratingDocument] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
@@ -48,17 +56,17 @@ export default function Reservations() {
   });
   const queryClient = useQueryClient();
 
-  const { data: reservations } = useQuery({
-    queryKey: ["reservations", searchQuery, currentCompany?.id],
+  const { data: reservationResult } = useQuery({
+    queryKey: ["reservations", searchQuery, currentCompany?.id, page, pageSize],
     queryFn: async () => {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
       let query = supabase
         .from("reservations")
-        .select(`
-          *,
-          reservation_items(*)
-        `)
+        .select(`*, reservation_items(*)`, { count: "exact" })
         .eq("company_id", currentCompany?.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -67,11 +75,15 @@ export default function Reservations() {
         }
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data;
+      return { data: data || [], count: count || 0 };
     },
   });
+
+  const reservations = reservationResult?.data || [];
+  const reservationsTotal = reservationResult?.count || 0;
+  const reservationsTotalPages = Math.max(1, Math.ceil(reservationsTotal / pageSize));
 
   const { data: customers } = useQuery({
     queryKey: ["customers-list", currentCompany?.id],
@@ -84,6 +96,21 @@ export default function Reservations() {
       if (error) throw error;
       return data;
     },
+  });
+
+  const { data: companySettings } = useQuery({
+    queryKey: ["company-settings", currentCompany?.id],
+    queryFn: async () => {
+      if (!currentCompany?.id) return null;
+      const { data, error } = await supabase
+        .from("companies")
+        .select("default_tax_rate")
+        .eq("id", currentCompany.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: products } = useQuery({
@@ -134,7 +161,7 @@ export default function Reservations() {
       const { data: settings } = await supabase
         .from("companies")
         .select("default_tax_rate")
-        .eq("id", currentCompany.id)
+        .eq("id", currentCompany?.id)
         .single();
       const taxRate = settings?.default_tax_rate || 0;
       const tax = subtotal * (taxRate / 100);
@@ -188,7 +215,7 @@ export default function Reservations() {
       resetReservationForm();
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al crear reserva");
+      toast.error(getUserErrorMessage(error, "Error al crear reserva"));
     },
   });
 
@@ -197,13 +224,21 @@ export default function Reservations() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
 
+      // MED-05: Validate payment does not exceed remaining amount
+      const payAmount = parseFloat(data.amount);
+      if (!payAmount || payAmount <= 0) throw new Error("Ingrese un monto válido");
+      const remainingAmount = Number(selectedReservation.remaining_amount) || 0;
+      if (payAmount > remainingAmount + 0.01) {
+        throw new Error(`El monto ($${payAmount.toFixed(2)}) excede el restante ($${remainingAmount.toFixed(2)})`);
+      }
+
       const { error } = await supabase.from("reservation_payments").insert({
         reservation_id: selectedReservation.id,
         payment_method: data.payment_method,
-        amount: parseFloat(data.amount),
+        amount: payAmount,
         notes: data.notes || null,
         user_id: user.id,
-        company_id: currentCompany?.id!
+        company_id: currentCompany?.id
       });
 
       if (error) throw error;
@@ -215,7 +250,7 @@ export default function Reservations() {
       setPaymentData({ amount: "", payment_method: "cash", notes: "" });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al registrar pago");
+      toast.error(getUserErrorMessage(error, "Error al registrar pago"));
     },
   });
 
@@ -236,7 +271,7 @@ export default function Reservations() {
       queryClient.invalidateQueries({ queryKey: ["reservations"] });
     },
     onError: (error: any) => {
-      toast.error(error.message || "Error al actualizar estado");
+      toast.error(getUserErrorMessage(error, "Error al actualizar estado"));
     },
   });
 
@@ -308,34 +343,60 @@ export default function Reservations() {
     }
   };
 
-  const handleGenerateSale = async (reservation: any) => {
-    try {
-      setIsGeneratingDocument(true);
-      
+  const generateSaleMutation = useMutation({
+    mutationFn: async (reservation: any) => {
+      // CRIT-2: Server-side status check — previene condición de carrera (doble clic / dos pestañas)
+      const { data: currentRes, error: currentResError } = await supabase
+        .from("reservations")
+        .select("status, remaining_amount")
+        .eq("id", reservation.id)
+        .eq("company_id", currentCompany?.id)
+        .single();
+      if (currentResError) throw currentResError;
+      if (currentRes.status !== "active") {
+        throw new Error(`La reserva ya no está activa (estado: ${currentRes.status})`);
+      }
+
+      // Validate payment is complete
+      const remainingAmount = Number(currentRes.remaining_amount) || 0;
+      if (remainingAmount > 0.01) {
+        throw new Error(
+          `No se puede generar la factura. Faltan $${remainingAmount.toFixed(2)} por pagar.`
+        );
+      }
+
       // Get reservation items with product names
       const { data: items, error: itemsError } = await supabase
         .from("reservation_items")
-        .select(`
-          *,
-          products(name)
-        `)
+        .select(`*, products(name)`)
         .eq("reservation_id", reservation.id);
-      
       if (itemsError) throw itemsError;
       if (!items || items.length === 0) throw new Error("No hay items en la reserva");
-      
+
       // Get user ID
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
-      
+
+      // MED-6: Determine primary payment method from reservation payments
+      const { data: payments } = await supabase
+        .from("reservation_payments")
+        .select("payment_method, amount")
+        .eq("reservation_id", reservation.id)
+        .order("amount", { ascending: false });
+      const primaryPaymentMethod = payments?.[0]?.payment_method || "cash";
+
       // Calculate subtotal (before discount)
       const subtotal = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
-      
-      // Create sale with required fields matching schema
+
+      // Atomic sale number generation (no race conditions)
+      const { data: saleNumberData, error: saleNumberError } = await supabase.rpc("generate_sale_number");
+      if (saleNumberError) throw saleNumberError;
+
+      // CRIT-1: Create sale and items BEFORE decrementing stock
       const { data: sale, error: saleError } = await supabase
         .from("sales")
         .insert({
-          sale_number: `SALE-${Date.now()}`,
+          sale_number: saleNumberData as string,
           customer_id: reservation.customer_id,
           user_id: user.id,
           company_id: currentCompany?.id,
@@ -343,16 +404,14 @@ export default function Reservations() {
           discount: 0,
           tax: 0,
           total: reservation.total,
-          payment_method: "cash",
+          payment_method: primaryPaymentMethod,
           status: "completed",
           notes: `Generada desde reserva ${reservation.reservation_number || reservation.id}`,
         })
         .select()
         .single();
-      
       if (saleError) throw saleError;
-      
-      // Create sale items with product names and company_id
+
       const saleItems = items.map((item: any) => ({
         sale_id: sale.id,
         product_id: item.product_id,
@@ -362,66 +421,86 @@ export default function Reservations() {
         subtotal: item.subtotal,
         company_id: currentCompany?.id,
       }));
-      
-      const { error: itemsInsertError } = await supabase
-        .from("sale_items")
-        .insert(saleItems);
-      
+      const { error: itemsInsertError } = await supabase.from("sale_items").insert(saleItems);
       if (itemsInsertError) throw itemsInsertError;
+
+      // CRIT-1: Decrement stock AFTER sale and items are persisted
+      const productAdjustments: Record<string, number> = {};
+      items.forEach((item: any) => {
+        if (item.product_id) {
+          productAdjustments[item.product_id] = (productAdjustments[item.product_id] || 0) - item.quantity;
+        }
+      });
+      if (Object.keys(productAdjustments).length > 0) {
+        const { error: stockError } = await supabase.rpc("batch_update_product_stock", {
+          adjustments: productAdjustments,
+        });
+        if (stockError) throw stockError;
+      }
 
       // Update reservation status to completed
       const { error: updateError } = await supabase
         .from("reservations")
         .update({ status: "completed" })
         .eq("id", reservation.id);
-
       if (updateError) throw updateError;
-      
-      toast.success(`Factura generada exitosamente`);
-      navigate(`/sales`);
-    } catch (error: any) {
+    },
+    onSuccess: () => {
+      toast.success("Factura generada exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["reservations"] });
+      navigate("/sales");
+    },
+    onError: (error: any) => {
       console.error("Error generating sale:", error);
-      toast.error(error.message || "Error al generar factura");
-    } finally {
-      setIsGeneratingDocument(false);
-    }
-  };
+      toast.error(getUserErrorMessage(error, "Error al generar factura"));
+    },
+  });
 
-  const handleGenerateDeliveryNote = async (reservation: any) => {
-    try {
-      setIsGeneratingDocument(true);
-      
+  const generateDeliveryNoteMutation = useMutation({
+    mutationFn: async (reservation: any) => {
+      // CRIT-2: Server-side status check — previene condición de carrera
+      const { data: currentRes, error: currentResError } = await supabase
+        .from("reservations")
+        .select("status")
+        .eq("id", reservation.id)
+        .eq("company_id", currentCompany?.id)
+        .single();
+      if (currentResError) throw currentResError;
+      if (currentRes.status !== "active") {
+        throw new Error(`La reserva ya no está activa (estado: ${currentRes.status})`);
+      }
+
       // Get reservation items with product names
       const { data: items, error: itemsError } = await supabase
         .from("reservation_items")
-        .select(`
-          *,
-          products(name)
-        `)
+        .select(`*, products(name)`)
         .eq("reservation_id", reservation.id);
-      
       if (itemsError) throw itemsError;
       if (!items || items.length === 0) throw new Error("No hay items en la reserva");
-      
+
       // Get customer info
       const { data: customer } = await supabase
         .from("customers")
         .select("name")
         .eq("id", reservation.customer_id)
         .single();
-      
+
       // Get user ID
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
-      
+
       // Calculate subtotal
       const subtotal = items.reduce((sum, item) => sum + Number(item.subtotal), 0);
-      
-      // Create delivery note with correct fields matching schema
+
+      // Atomic delivery note number generation
+      const { data: deliveryNumberData, error: deliveryNumberError } = await supabase.rpc("generate_delivery_number");
+      if (deliveryNumberError) throw deliveryNumberError;
+
+      // Create delivery note
       const { data: deliveryNote, error: deliveryError } = await supabase
         .from("delivery_notes")
         .insert({
-          delivery_number: `DN-${Date.now()}`,
+          delivery_number: deliveryNumberData as string,
           customer_id: reservation.customer_id,
           customer_name: customer?.name || "Cliente",
           user_id: user.id,
@@ -433,10 +512,9 @@ export default function Reservations() {
         })
         .select()
         .single();
-      
       if (deliveryError) throw deliveryError;
-      
-      // Create delivery note items with product names and company_id
+
+      // Create delivery note items
       const deliveryItems = items.map((item: any) => ({
         delivery_note_id: deliveryNote.id,
         product_id: item.product_id,
@@ -446,32 +524,27 @@ export default function Reservations() {
         subtotal: item.subtotal,
         company_id: currentCompany?.id,
       }));
-      
-      const { error: itemsInsertError } = await supabase
-        .from("delivery_note_items")
-        .insert(deliveryItems);
-      
+      const { error: itemsInsertError } = await supabase.from("delivery_note_items").insert(deliveryItems);
       if (itemsInsertError) throw itemsInsertError;
 
-      // Update reservation status to completed
-      const { error: updateError } = await supabase
-        .from("reservations")
-        .update({ status: "completed" })
-        .eq("id", reservation.id);
-
-      if (updateError) throw updateError;
-      
-      toast.success(`Remito generado exitosamente`);
-      navigate(`/delivery-notes`);
-    } catch (error: any) {
+      // MED-1: La reserva permanece "active" — el remito aún no implica entrega confirmada.
+      // El usuario debe completarla manualmente cuando los productos sean entregados.
+    },
+    onSuccess: () => {
+      toast.success("Remito generado exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["reservations"] });
+      navigate("/delivery-notes");
+    },
+    onError: (error: any) => {
       console.error("Error generating delivery note:", error);
-      toast.error(error.message || "Error al generar remito");
-    } finally {
-      setIsGeneratingDocument(false);
-    }
-  };
+      toast.error(getUserErrorMessage(error, "Error al generar remito"));
+    },
+  });
 
   const subtotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+  const taxRate = companySettings?.default_tax_rate || 0;
+  const taxAmountDisplay = subtotal * (taxRate / 100);
+  const totalWithTax = subtotal + taxAmountDisplay;
 
   return (
     <Layout>
@@ -483,7 +556,7 @@ export default function Reservations() {
           </div>
           <Dialog open={isNewReservationOpen} onOpenChange={setIsNewReservationOpen}>
             <DialogTrigger asChild>
-              <Button onClick={resetReservationForm} className="w-full sm:w-auto">
+              <Button onClick={resetReservationForm} className="w-full sm:w-auto" disabled={!canCreate}>
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Reserva
               </Button>
@@ -530,9 +603,9 @@ export default function Reservations() {
                       className="pl-10"
                     />
                   </div>
-                  {productSearch && products && products.length > 0 && (
+                  {productSearch && productSearchResults && productSearchResults.length > 0 && (
                     <div className="border rounded-md max-h-48 overflow-y-auto">
-                      {products.map((product) => (
+                      {productSearchResults.map((product) => (
                         <div
                           key={product.id}
                           className="p-3 hover:bg-accent cursor-pointer border-b last:border-0"
@@ -586,8 +659,18 @@ export default function Reservations() {
                     </Table>
                   </div>
                   {cart.length > 0 && (
-                    <div className="text-right font-bold text-lg pt-2">
-                      Total: ${Number(subtotal).toFixed(2)}
+                    <div className="text-right space-y-1 pt-2">
+                      <div className="text-sm text-muted-foreground">
+                        Subtotal: ${Number(subtotal).toFixed(2)}
+                      </div>
+                      {taxRate > 0 && (
+                        <div className="text-sm text-muted-foreground">
+                          IVA ({taxRate}%): ${Number(taxAmountDisplay).toFixed(2)}
+                        </div>
+                      )}
+                      <div className="font-bold text-lg">
+                        Total: ${Number(totalWithTax).toFixed(2)}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -622,7 +705,7 @@ export default function Reservations() {
               <Input
                 placeholder="Buscar reservas..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
                 className="pl-10"
               />
             </div>
@@ -642,7 +725,7 @@ export default function Reservations() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {reservations?.map((reservation) => (
+                {reservations.map((reservation) => (
                   <TableRow key={reservation.id}>
                     <TableCell className="font-medium">{reservation.reservation_number}</TableCell>
                     <TableCell>{reservation.customer_name}</TableCell>
@@ -672,8 +755,8 @@ export default function Reservations() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleGenerateSale(reservation)}
-                            disabled={isGeneratingDocument}
+                            onClick={() => generateSaleMutation.mutate(reservation)}
+                            disabled={generateSaleMutation.isPending || !canEdit}
                             title="Generar factura"
                           >
                             <FileText className="h-4 w-4 mr-1" />
@@ -682,8 +765,8 @@ export default function Reservations() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleGenerateDeliveryNote(reservation)}
-                            disabled={isGeneratingDocument}
+                            onClick={() => generateDeliveryNoteMutation.mutate(reservation)}
+                            disabled={generateDeliveryNoteMutation.isPending || !canEdit}
                             title="Generar remito"
                           >
                             <Truck className="h-4 w-4 mr-1" />
@@ -692,6 +775,7 @@ export default function Reservations() {
                           <Button
                             size="sm"
                             variant="outline"
+                            disabled={!canEdit}
                             onClick={() => updateStatusMutation.mutate({ id: reservation.id, status: "completed" })}
                           >
                             <CheckCircle className="h-4 w-4 mr-1" />
@@ -700,6 +784,7 @@ export default function Reservations() {
                           <Button
                             size="sm"
                             variant="destructive"
+                            disabled={!canEdit}
                             onClick={() => updateStatusMutation.mutate({ id: reservation.id, status: "cancelled" })}
                           >
                             <XCircle className="h-4 w-4 mr-1" />
@@ -712,6 +797,22 @@ export default function Reservations() {
                 ))}
               </TableBody>
             </Table>
+            <PaginationControls
+              currentPage={page + 1}
+              totalPages={reservationsTotalPages}
+              totalItems={reservationsTotal}
+              startIndex={reservationsTotal === 0 ? 0 : page * pageSize + 1}
+              endIndex={Math.min((page + 1) * pageSize, reservationsTotal)}
+              pageSize={pageSize}
+              canGoNext={page + 1 < reservationsTotalPages}
+              canGoPrevious={page > 0}
+              onPageChange={(p) => setPage(p - 1)}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(0); }}
+              onNextPage={() => setPage(prev => prev + 1)}
+              onPreviousPage={() => setPage(prev => prev - 1)}
+              onFirstPage={() => setPage(0)}
+              onLastPage={() => setPage(reservationsTotalPages - 1)}
+            />
           </CardContent>
         </Card>
 
