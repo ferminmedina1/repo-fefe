@@ -12,8 +12,8 @@ import { TUTORIAL_MODULES } from '@/lib/tutorial/config';
 
 export default function LearningCenterPage() {
   const { isRunning, startTutorial } = useTutorial();
-  // Mostrar onboarding siempre para testing
-  const [showWelcome, setShowWelcome] = useState(true);
+  // No mostrar onboarding automáticamente
+  const [showWelcome, setShowWelcome] = useState(false);
 
   const handleWelcomeComplete = () => {
     setShowWelcome(false);
