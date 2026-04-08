@@ -93,6 +93,8 @@ export default function Products() {
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [isDeleteCategoryDialogOpen, setIsDeleteCategoryDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<any>(null);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const customFieldsSectionRef = useRef<HTMLDivElement>(null);
   const [digitalPriceTier, setDigitalPriceTier] = useState({name: "", price: ""});
@@ -229,6 +231,48 @@ export default function Products() {
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al crear la categoría");
+    },
+  });
+
+  // Delete category mutation
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (categoryId: string) => {
+      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
+      try {
+        // Primero verificar si hay productos con esta categoría
+        const { data: productsWithCategory } = await supabase
+          .from("products")
+          .select("id")
+          .eq("category_id", categoryId)
+          .eq("company_id", currentCompany.id);
+
+        if (productsWithCategory && productsWithCategory.length > 0) {
+          throw new Error(`No se puede eliminar esta categoría porque tiene ${productsWithCategory.length} producto(s) asociado(s)`);
+        }
+
+        const { error } = await supabase
+          .from("product_categories" as any)
+          .delete()
+          .eq("id", categoryId)
+          .eq("company_id", currentCompany.id);
+
+        if (error) throw error;
+        return categoryId;
+      } catch (err: any) {
+        if (err.message?.includes("404") || err.message?.includes("not found")) {
+          throw new Error("La categoría no existe o ya fue eliminada.");
+        }
+        throw err;
+      }
+    },
+    onSuccess: () => {
+      toast.success("Categoría eliminada exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["product-categories"] });
+      setIsDeleteCategoryDialogOpen(false);
+      setCategoryToDelete(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar la categoría");
     },
   });
 
@@ -1949,11 +1993,27 @@ export default function Products() {
                         <SelectTrigger className="flex-1">
                           <SelectValue placeholder="Selecciona una categoría" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-w-xs">
                           {categories?.map((category: any) => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>
+                            <div
+                              key={category.id}
+                              className="flex items-center justify-between px-2 py-2 text-sm hover:bg-accent rounded cursor-pointer group"
+                              onClick={() => setFormData({ ...formData, category_id: category.id })}
+                            >
+                              <span className="flex-1">{category.name}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCategoryToDelete(category);
+                                  setIsDeleteCategoryDialogOpen(true);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded transition-all text-destructive hover:text-destructive ml-2"
+                                title="Eliminar categoría"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
                           ))}
                         </SelectContent>
                       </Select>
@@ -3902,6 +3962,54 @@ export default function Products() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Category AlertDialog */}
+        <AlertDialog open={isDeleteCategoryDialogOpen} onOpenChange={setIsDeleteCategoryDialogOpen}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-600" />
+                Eliminar Categoría
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3 pt-2">
+                <p>
+                  Se eliminará la categoría <span className="font-semibold text-foreground">"{categoryToDelete?.name}"</span>
+                </p>
+                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded p-3 text-sm">
+                  <p className="text-amber-900 dark:text-amber-100">
+                    <strong>Precaución:</strong> Esta acción no se puede deshacer. Asegúrate de que no hay productos asociados a esta categoría.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel disabled={deleteCategoryMutation.isPending}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (categoryToDelete?.id) {
+                    deleteCategoryMutation.mutate(categoryToDelete.id);
+                  }
+                }}
+                disabled={deleteCategoryMutation.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteCategoryMutation.isPending ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
