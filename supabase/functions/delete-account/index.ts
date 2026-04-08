@@ -2,6 +2,7 @@
 // Manually delete an account and all associated data
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { checkRateLimitByUser } from "../_shared/rateLimitMiddleware.ts";
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -20,6 +21,15 @@ Deno.serve(async (req: Request) => {
     
     if (!user_id) {
       return json({ error: "user_id requerido" }, 400);
+    }
+
+    // 🔒 RATE LIMITING: Proteger operación destructiva (delete account - 1/hora)
+    const rateLimitCheck = await checkRateLimitByUser(user_id, "delete-account", "admin");
+    if (!rateLimitCheck.allowed) {
+      return json(
+        { error: rateLimitCheck.message || "Demasiadas solicitudes de eliminación", code: "RATE_LIMIT_EXCEEDED" },
+        429
+      );
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");

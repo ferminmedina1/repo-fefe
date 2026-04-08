@@ -7,12 +7,24 @@ const corsHeaders = {
 };
 import { corsHeaders as sharedCors } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { checkRateLimitByIP, extractIP } from "../_shared/rateLimitMiddleware.ts";
 type Provider = "mercadopago";
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function errorWithRateLimitHeaders(
+  message: string,
+  status: number,
+  headers: Record<string, string>
+) {
+  return new Response(JSON.stringify({ error: message, code: "RATE_LIMIT_EXCEEDED" }), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json", ...headers },
   });
 }
 
@@ -27,6 +39,18 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // 🔒 RATE LIMITING: Prevenir múltiples checkouts simultáneos (fraude, DoS)
+    const ip = extractIP(req);
+    const rateLimitCheck = await checkRateLimitByIP(ip, "start-checkout", "payment");
+
+    if (!rateLimitCheck.allowed) {
+      return errorWithRateLimitHeaders(
+        rateLimitCheck.message || "Demasiados intentos de checkout",
+        429,
+        rateLimitCheck.headers
+      );
+    }
+
     const { intent_id, success_url, cancel_url } = await req.json();
 
     if (!intent_id || !success_url || !cancel_url) {

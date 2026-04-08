@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { checkRateLimitByIP, extractIP } from "../_shared/rateLimitMiddleware.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,6 +19,17 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: corsHeaders });
 
   try {
+    // 🔒 RATE LIMITING: Prevenir payment method spam durante signup
+    const ip = extractIP(req);
+    const rateLimitCheck = await checkRateLimitByIP(ip, "signup-save-payment-method", "auth");
+    
+    if (!rateLimitCheck.allowed) {
+      return json(
+        { error: rateLimitCheck.message || "Demasiadas solicitudes", code: "RATE_LIMIT_EXCEEDED" },
+        429
+      );
+    }
+
     const {
       email,
       name,

@@ -6,6 +6,7 @@ const corsHeaders = {
 };
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { checkRateLimitByIP, extractIP } from "../_shared/rateLimitMiddleware.ts";
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -14,6 +15,17 @@ function json(payload: unknown, status = 200) {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: corsHeaders });
   try {
+    // 🔒 RATE LIMITING: Prevenir preapproval spam/enumeration
+    const ip = extractIP(req);
+    const rateLimitCheck = await checkRateLimitByIP(ip, "create-mp-preapproval", "payment");
+    
+    if (!rateLimitCheck.allowed) {
+      return json(
+        { error: rateLimitCheck.message || "Demasiadas solicitudes", code: "RATE_LIMIT_EXCEEDED" },
+        429
+      );
+    }
+
     const { company_id } = await req.json();
     if (!company_id) return json({ error: "company_id requerido" }, 400);
 

@@ -1,5 +1,6 @@
 // supabase/functions/mp-create-token/index.ts
 import { corsHeaders } from "../_shared/cors.ts";
+import { checkRateLimitByIP, extractIP } from "../_shared/rateLimitMiddleware.ts";
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -16,6 +17,17 @@ Deno.serve(async (req: Request) => {
   try {
     if (req.method !== "POST") {
       return json({ error: "Only POST allowed" }, 405);
+    }
+
+    // 🔒 RATE LIMITING: Prevenir token creation spam/card testing
+    const ip = extractIP(req);
+    const rateLimitCheck = await checkRateLimitByIP(ip, "mp-create-token", "payment");
+    
+    if (!rateLimitCheck.allowed) {
+      return json(
+        { error: rateLimitCheck.message || "Demasiadas solicitudes", code: "RATE_LIMIT_EXCEEDED" },
+        429
+      );
     }
 
     const body = await req.json();
