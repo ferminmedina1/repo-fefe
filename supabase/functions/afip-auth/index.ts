@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimitByUser } from "../_shared/rateLimitMiddleware.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -51,6 +52,12 @@ serve(async (req: Request) => {
 
     if (userError || !user) {
       throw new Error('Unauthorized');
+    }
+
+    // 🔒 RATE LIMITING: Prevenir abuso de autenticación AFIP
+    const rateLimitCheck = await checkRateLimitByUser(user.id, "afip-auth", "financial");
+    if (!rateLimitCheck.allowed) {
+      throw new Error(`RATE_LIMIT_EXCEEDED: ${rateLimitCheck.message}`);
     }
 
     const { companyId, service, ambiente }: AuthRequest = await req.json();

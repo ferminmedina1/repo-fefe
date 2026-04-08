@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimitByUser } from "../_shared/rateLimitMiddleware.ts";
 
 interface UserRole {
   role: string;
@@ -61,6 +62,12 @@ serve(async (req) => {
     const isAdmin = (roles as UserRole[] | null)?.some((r: UserRole) => r.role === "admin");
     if (!isAdmin) {
       throw new Error("Only admins can reset the database");
+    }
+
+    // 🔒 RATE LIMITING: Proteger operación destructiva (reset database - 1/hora)
+    const rateLimitCheck = await checkRateLimitByUser(user.id, "reset-database", "admin");
+    if (!rateLimitCheck.allowed) {
+      throw new Error(`RATE_LIMIT_EXCEEDED: ${rateLimitCheck.message}`);
     }
 
     // Delete all data from tables (in correct order to respect foreign keys)

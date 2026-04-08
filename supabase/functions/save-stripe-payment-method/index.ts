@@ -1,6 +1,7 @@
 // supabase/functions/save-stripe-payment-method/index.ts
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import Stripe from "https://esm.sh/stripe@14.21.0?target=deno";
+import { checkRateLimitByUser } from "../_shared/rateLimitMiddleware.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +35,15 @@ Deno.serve(async (req: Request) => {
     // Get current user
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
     if (userError || !user) return json({ error: "No autorizado" }, 401);
+
+    // 🔒 RATE LIMITING: Prevenir ataques de card testing (validación de tarjetas)
+    const rateLimitCheck = await checkRateLimitByUser(user.id, "save-stripe-payment-method", "payment");
+    if (!rateLimitCheck.allowed) {
+      return json(
+        { error: rateLimitCheck.message || "Demasiadas solicitudes", code: "RATE_LIMIT_EXCEEDED" },
+        429
+      );
+    }
 
     // Get payment method details from Stripe
     const pm = await stripe.paymentMethods.retrieve(payment_method_id);

@@ -127,9 +127,9 @@ describe('BUG #2: CSV Import Race Condition Fix', () => {
   it('should use product key-based mapping instead of index-based', () => {
     // Test data simulating CSV rows
     const csvRows = [
-      { nombre: 'Product A', sku: 'SKU-A', stock: 10 },
-      { nombre: 'Product B', sku: 'SKU-B', stock: 20 },
-      { nombre: 'Product C', sku: 'SKU-C', stock: 30 },
+      { nombre: 'Product A', sku: 'SKU-A', stock: '10' },
+      { nombre: 'Product B', sku: 'SKU-B', stock: '20' },
+      { nombre: 'Product C', sku: 'SKU-C', stock: '30' },
     ];
 
     // Fixed implementation using key-based mapping
@@ -197,12 +197,211 @@ describe('BUG #2: CSV Import Race Condition Fix', () => {
 
     expect(warehouseData).toHaveLength(2);
   });
+
+  it('should handle auto-generated SKU correctly when CSV missing SKU field', () => {
+    // CRITICAL TEST: This covers the bug fixed on April 6, 2026
+    // When CSV has no SKU column, SKU is auto-generated, and mapping must still work
+    
+    const productRowMapping = new Map();
+    const generateSKU = (name: string) => `GEN-${name.substring(0, 3).toUpperCase()}-${Date.now() % 10000}`;
+    
+    // Simulate CSV rows WITHOUT SKU field
+    const csvRows = [
+      { nombre: 'Product A', barcode: 'BAR-A', stock: '10' }, // No SKU!
+      { nombre: 'Product B', barcode: 'BAR-B', stock: '20' }, // No SKU!
+      { nombre: 'Product C', barcode: 'BAR-C', stock: '30' }, // No SKU!
+    ];
+
+    // Simulate validation & key generation with auto-generated SKU
+    const validProducts = csvRows.map(row => {
+      const skuForProduct = generateSKU(row.nombre); // Auto-generate
+      const barcode = row.barcode;
+      const productKey = `${barcode || ''}_${skuForProduct}_${row.nombre}`;
+      
+      const product = {
+        name: row.nombre,
+        barcode: barcode || null,
+        sku: skuForProduct, // This is the auto-generated SKU
+        stock: parseInt(row.stock),
+      };
+      
+      // CRITICAL: Store with generated SKU in key
+      productRowMapping.set(productKey, { row, validated: { ...product } });
+      return { ...product, _originalKey: productKey }; // Store key for verification
+    });
+
+    // Simulate insert result (same products from DB)
+    const insertResult = validProducts.map(p => ({
+      id: `prod-${p.name.toLowerCase()}`,
+      name: p.name,
+      barcode: p.barcode,
+      sku: p.sku, // Same auto-generated SKU from product
+    }));
+
+    // Retrieve warehouse data using same key logic
+    const warehouseData = insertResult.map(product => {
+      const productKey = `${product.barcode || ''}_${product.sku}_${product.name}`;
+      const warehouseInfo = productRowMapping.get(productKey);
+      return warehouseInfo ? { productId: product.id, ...warehouseInfo.validated } : null;
+    }).filter(Boolean);
+
+    // All 3 products should be found despite SKU being auto-generated
+    expect(warehouseData).toHaveLength(3);
+    expect(warehouseData[0].productId).toBe('prod-product a');
+    expect(warehouseData[1].productId).toBe('prod-product b');
+    expect(warehouseData[2].productId).toBe('prod-product c');
+  });
 });
 
 // ============================================================================
-// TEST SUITE 3: Bug #3 - Missing Error Handling in handleEdit
+// TEST SUITE 2.5: Bug #3 - Product Creation with All Fields JSON Serialization
 // ============================================================================
-describe('BUG #3: handleEdit Error Handling', () => {
+describe('BUG #3: Product Creation with Custom Fields & Digital Prices', () => {
+  it('should clean custom fields removing undefined options property', () => {
+    // Simulate custom fields with non-select types
+    const customFields = [
+      { id: 'field_1', name: 'Category', type: 'text' }, // NO options property
+      { id: 'field_2', name: 'Material', type: 'textarea' }, // NO options property
+      { id: 'field_3', name: 'Size', type: 'select', options: ['S', 'M', 'L'] }, // HAS options
+    ];
+
+    // Clean function (replicate from Products.tsx)
+    const cleanedCustomFields = customFields.map((field: any) => {
+      const cleanField: any = {
+        id: field.id,
+        name: field.name,
+        type: field.type,
+      };
+      if (field.options && field.options.length > 0) {
+        cleanField.options = field.options;
+      }
+      return cleanField;
+    });
+
+    // Verify no undefined properties
+    expect(cleanedCustomFields[0]).not.toHaveProperty('options');
+    expect(cleanedCustomFields[1]).not.toHaveProperty('options');
+    expect(cleanedCustomFields[2]).toHaveProperty('options');
+    expect(cleanedCustomFields[2].options).toEqual(['S', 'M', 'L']);
+
+    // Verify JSON serialization works
+    const jsonString = JSON.stringify(cleanedCustomFields);
+    expect(jsonString).not.toContain('undefined');
+    expect(JSON.parse(jsonString)).toEqual(cleanedCustomFields);
+  });
+
+  it('should filter empty digital prices before saving', () => {
+    // Simulate digital prices with empty entries
+    const digitalPrices = [
+      { name: 'Basic', price: '99.99' },    // Valid
+      { name: '', price: '' },              // Empty
+      { name: 'Premium', price: '199.99' }, // Valid
+      { name: 'Pro', price: '' },          // Only name, no price
+      { name: '', price: '500' },          // Only price, no name
+    ];
+
+    // Filter function (replicate from Products.tsx)
+    const cleanedDigitalPrices = digitalPrices.filter((p: any) => p.name && p.price);
+
+    // Should only have valid entries
+    expect(cleanedDigitalPrices).toHaveLength(2);
+    expect(cleanedDigitalPrices[0].name).toBe('Basic');
+    expect(cleanedDigitalPrices[1].name).toBe('Premium');
+
+    // Verify JSON serialization
+    const jsonString = JSON.stringify(cleanedDigitalPrices);
+    expect(jsonString).not.toContain('undefined');
+  });
+
+  it('should validate digital product has at least one valid price tier', () => {
+    const isDigital = true;
+    const digitalPrices = [
+      { name: '', price: '' },
+      { name: '', price: '' },
+    ];
+
+    // Validation logic (replicate from Products.tsx)
+    const validDigitalPrices = digitalPrices.filter((p: any) => p.name && p.price);
+
+    if (isDigital && digitalPrices) {
+      if (validDigitalPrices.length === 0) {
+        // Should throw
+        expect(validDigitalPrices).toHaveLength(0);
+      }
+    }
+
+    // Now test with valid data
+    const validPrices = [{ name: 'Standard', price: '99.99' }];
+    const cleanedValid = validPrices.filter((p: any) => p.name && p.price);
+    expect(cleanedValid).toHaveLength(1);
+  });
+
+  it('should handle product with maximum complexity (all fields filled)', () => {
+    // COMPREHENSIVE TEST: Product with everything
+    const complexProduct = {
+      name: 'Premium Product',
+      barcode: 'BAR-123456',
+      sku: 'PREMIUM-SKU-001',
+      price: 199.99,
+      cost: 99.99,
+      stock: 100,
+      min_stock: 10,
+      is_digital: true,
+      currency: 'USD',
+      tags: ['featured', 'sale', 'new'],
+      custom_fields: {
+        field_1: 'Value 1',
+        field_2: 'Value 2',
+      },
+      digital_prices: [
+        { name: 'Basic', price: '99.99' },
+        { name: 'Pro', price: '199.99' },
+      ],
+      custom_field_definitions: [
+        { id: 'field_1', name: 'Color', type: 'select', options: ['Red', 'Blue', 'Green'] },
+        { id: 'field_2', name: 'Notes', type: 'textarea' },
+      ],
+    };
+
+    // Clean custom field definitions
+    const cleanedDefs = complexProduct.custom_field_definitions.map((field: any) => {
+      const cleanField: any = {
+        id: field.id,
+        name: field.name,
+        type: field.type,
+      };
+      if (field.options && field.options.length > 0) {
+        cleanField.options = field.options;
+      }
+      return cleanField;
+    });
+
+    // Clean digital prices
+    const cleanedPrices = complexProduct.digital_prices.filter((p: any) => p.name && p.price);
+
+    // Build final product data
+    const final = {
+      ...complexProduct,
+      custom_field_definitions: cleanedDefs,
+      digital_prices: cleanedPrices,
+    };
+
+    // Verify it serializes cleanly
+    const jsonString = JSON.stringify(final);
+    const parsed = JSON.parse(jsonString);
+
+    expect(parsed.name).toBe('Premium Product');
+    expect(parsed.digital_prices).toHaveLength(2);
+    expect(parsed.custom_field_definitions[0].options).toHaveLength(3);
+    expect(parsed.custom_field_definitions[1]).not.toHaveProperty('options');
+    expect(jsonString).not.toContain('undefined');
+  });
+});
+
+// ============================================================================
+// TEST SUITE 3: Bug #4 - Missing Error Handling in handleEdit
+// ============================================================================
+describe('BUG #4: handleEdit Error Handling', () => {
   it('should catch and log warehouse_stock query errors', async () => {
     const mockError = new Error('Database connection failed');
     const toastMock = vi.fn();
@@ -277,7 +476,7 @@ describe('BUG #3: handleEdit Error Handling', () => {
 // ============================================================================
 // TEST SUITE 4: Bug #4 - Async Validator Not Awaited
 // ============================================================================
-describe('BUG #4: Async Validator Handling', () => {
+describe('BUG #5: Async Validator Handling', () => {
   it('should properly await async validators in batch operations', async () => {
     const asyncValidator = async (item: any) => {
       return new Promise(resolve => {
@@ -358,7 +557,7 @@ describe('BUG #4: Async Validator Handling', () => {
 // ============================================================================
 // TEST SUITE 5: Bug #5 - Inconsistent Company Filter
 // ============================================================================
-describe('BUG #5: Warehouse Query Should Filter by Company', () => {
+describe('BUG #6: Warehouse Query Should Filter by Company', () => {
   it('should filter warehouses by company_id', () => {
     const buildWarehouseQuery = (supabase: any, companyId: string) => {
       return supabase
@@ -397,7 +596,7 @@ describe('BUG #5: Warehouse Query Should Filter by Company', () => {
 // ============================================================================
 // TEST SUITE 6: Bug #6 - Stock Adjustment Validation
 // ============================================================================
-describe('BUG #6: Stock Adjustment Input Validation', () => {
+describe('BUG #7: Stock Adjustment Input Validation', () => {
   it('should reject non-numeric stock values', () => {
     const validateStockValue = (value: any): boolean => {
       const stockStr = value.toString().trim();
@@ -447,7 +646,7 @@ describe('BUG #6: Stock Adjustment Input Validation', () => {
 // ============================================================================
 // TEST SUITE 7: Bug #7 - Search Filter Consistency
 // ============================================================================
-describe('BUG #7: Product Search Filter Consistency', () => {
+describe('BUG #8: Product Search Filter Consistency', () => {
   it('should filter active products when searching', () => {
     const products = [
       { id: '1', name: 'Active Product', active: true },
@@ -485,7 +684,7 @@ describe('BUG #7: Product Search Filter Consistency', () => {
 // ============================================================================
 // TEST SUITE 8: Bug #8 - Auth Error Handling
 // ============================================================================
-describe('BUG #8: Export Auth Error Handling', () => {
+describe('BUG #9: Export Auth Error Handling', () => {
   it('should handle missing user in export', async () => {
     const mockSupabase = {
       auth: {

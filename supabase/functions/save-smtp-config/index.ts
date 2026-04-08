@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimitByUser } from "../_shared/rateLimitMiddleware.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,8 +34,14 @@ serve(async (req: Request) => {
       .maybeSingle();
 
     if (membershipError || !membership?.company_id) throw new Error("User has no company membership");
-    const isAdmin = membership.role === "admin" || membership.role === "manager";
+    const isAdmin = membership.role === \"admin\" || membership.role === \"manager\";
     if (!isAdmin) throw new Error("Only admins/managers can change email settings");
+
+    // 🔒 RATE LIMITING: Proteger cambios de configuración SMTP
+    const rateLimitCheck = await checkRateLimitByUser(user.id, \"save-smtp-config\", \"admin\");
+    if (!rateLimitCheck.allowed) {
+      throw new Error(`RATE_LIMIT_EXCEEDED: ${rateLimitCheck.message}`);
+    }
 
     const body = await req.json();
     const { smtp } = body;
