@@ -15,6 +15,7 @@ import { useHistoricalRates } from "@/hooks/dashboard/useExchangeRates";
 import { WIDGET_CATALOG, WidgetType, getAvailableWidgets } from "@/lib/dashboard/widgets";
 import { WidgetPicker } from "./WidgetPicker";
 import { DashboardEmptyState } from "./DashboardEmptyState";
+import { DragDropWidgetContainer, SortableWidget } from "./DragDropWidgetContainer";
 import { KpiWidget } from "./KpiWidget";
 import { ChartWidget } from "./ChartWidget";
 import { ListWidget } from "./ListWidget";
@@ -35,6 +36,7 @@ export function DashboardBuilder() {
     isSaving,
     addWidget,
     removeWidget,
+    reorderWidgets,
     resetLayout,
     hasLayout,
   } = useDashboardLayout(currentCompany?.id, user?.id);
@@ -213,65 +215,64 @@ export function DashboardBuilder() {
       </div>
 
       {/* Widgets Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max">
-        {widgets.map((widget) => {
-          const definition = WIDGET_CATALOG[widget.type as WidgetType];
-          const data = dataMap[widget.type as WidgetType];
-          const isLoading = loadingMap[widget.type as WidgetType];
+      <DragDropWidgetContainer
+        widgets={widgets}
+        onReorder={reorderWidgets}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max">
+          {widgets.map((widget) => {
+            const definition = WIDGET_CATALOG[widget.type as WidgetType];
+            const data = dataMap[widget.type as WidgetType];
+            const isLoading = loadingMap[widget.type as WidgetType];
 
-          if (!definition) {
-            return null;
-          }
+            if (!definition) {
+              return null;
+            }
 
-          const commonProps = {
-            definition,
-            data,
-            isLoading,
-            onRemove: () => removeWidget(widget.id),
-            isDragging: false,
-          };
+            const commonProps = {
+              definition,
+              data,
+              isLoading,
+              onRemove: () => removeWidget(widget.id),
+              isDragging: false,
+            };
 
-          // Render widget based on category
-          switch (definition.category) {
-            case "kpi":
-              return (
-                <KpiWidget
-                  key={widget.id}
-                  {...commonProps}
-                />
-              );
+            // Render widget based on category
+            const widgetContent = (() => {
+              switch (definition.category) {
+                case "kpi":
+                  return <KpiWidget {...commonProps} />;
 
-            case "chart":
-              return (
-                <div key={widget.id} className="col-span-1 md:col-span-2 lg:col-span-3">
-                  <ChartWidget {...commonProps} />
-                </div>
-              );
+                case "chart":
+                  return <ChartWidget {...commonProps} />;
 
-            case "list":
-              return (
-                <div key={widget.id} className="col-span-1 md:col-span-2 lg:col-span-3">
-                  <ListWidget {...commonProps} />
-                </div>
-              );
+                case "list":
+                  return <ListWidget {...commonProps} />;
 
-            case "currency":
-              return (
+                case "currency":
+                  return <CurrencyWidget {...commonProps} />;
+
+                default:
+                  return null;
+              }
+            })();
+
+            if (!widgetContent) return null;
+
+            return (
+              <SortableWidget key={widget.id} id={widget.id}>
                 <div
-                  key={widget.id}
                   className={cn(
                     widget.size === "half" ? "md:col-span-1 lg:col-span-1" : "col-span-1 md:col-span-2 lg:col-span-3"
                   )}
                 >
-                  <CurrencyWidget {...commonProps} />
+                  {widgetContent}
                 </div>
-              );
-
-            default:
-              return null;
-          }
-        })}
-      </div>
+              </SortableWidget>
+            );
+          })}
+        </div>
+      </DragDropWidgetContainer>
 
       {/* Footer info */}
       <div className="text-xs text-muted-foreground text-center py-4">
