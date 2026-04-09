@@ -9,7 +9,7 @@ interface CriticalStockItem {
 
 export function useCriticalStock(companyId: string | undefined, enabled = true) {
   return useQuery<CriticalStockItem[]>({
-    queryKey: ["critical-stock-list", companyId],
+    queryKey: ["dashboard-critical-stock", companyId],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 

@@ -15,7 +15,7 @@ export interface HistoricalRate {
 
 export function useExchangeRates(companyId: string | undefined, enabled = true) {
   return useQuery<ExchangeRate[]>({
-    queryKey: ["exchange-rates-dashboard", companyId],
+    queryKey: ["dashboard-exchange-rates", companyId],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 
@@ -34,7 +34,7 @@ export function useExchangeRates(companyId: string | undefined, enabled = true) 
 
 export function useHistoricalRates(companyId: string | undefined, enabled = true) {
   return useQuery<HistoricalRate[]>({
-    queryKey: ["historical-rates", companyId],
+    queryKey: ["dashboard-historical-rates", companyId],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 

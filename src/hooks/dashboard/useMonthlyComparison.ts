@@ -25,7 +25,7 @@ export interface MonthlyComparisonData {
 
 export function useMonthlyComparison(companyId: string | undefined, enabled = true) {
   return useQuery<MonthlyComparisonData>({
-    queryKey: ["monthly-comparison", companyId],
+    queryKey: ["dashboard-monthly-comparison", companyId],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 

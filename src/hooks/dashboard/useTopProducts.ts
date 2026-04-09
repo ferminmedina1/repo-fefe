@@ -10,7 +10,7 @@ interface TopProductItem {
 
 export function useTopProducts(companyId: string | undefined, enabled = true) {
   return useQuery<TopProductItem[]>({
-    queryKey: ["top-profitable-products", companyId],
+    queryKey: ["dashboard-top-products", companyId],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 

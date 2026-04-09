@@ -10,7 +10,7 @@ interface TopCustomerItem {
 
 export function useTopCustomers(companyId: string | undefined, enabled = true) {
   return useQuery<TopCustomerItem[]>({
-    queryKey: ["top-customers", companyId],
+    queryKey: ["dashboard-top-customers", companyId],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 

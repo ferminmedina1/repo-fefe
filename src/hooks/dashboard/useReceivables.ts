@@ -10,7 +10,7 @@ export interface ReceivablesData {
 
 export function useReceivables(companyId: string | undefined, enabled = true) {
   return useQuery<ReceivablesData>({
-    queryKey: ["receivables", companyId],
+    queryKey: ["dashboard-receivables", companyId],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 
