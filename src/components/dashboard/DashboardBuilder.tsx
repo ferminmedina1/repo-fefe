@@ -10,6 +10,7 @@ import {
   useReceivables,
   useCriticalStock,
   useExchangeRates,
+  useSevenDaysSalesChart,
 } from "@/hooks/dashboard";
 import { useHistoricalRates } from "@/hooks/dashboard/useExchangeRates";
 import { WIDGET_CATALOG, WidgetType, getAvailableWidgets } from "@/lib/dashboard/widgets";
@@ -61,9 +62,10 @@ export function DashboardBuilder() {
   );
   const exchangeRatesQuery = useExchangeRates(currentCompany?.id, true);
   const historicalRatesQuery = useHistoricalRates(currentCompany?.id, true);
-
-  // Sales stats query (for charts)
-  const { data: salesData } = useMonthlyComparison(currentCompany?.id, hasPermission("sales", "view"));
+  const sevenDaysSalesChartQuery = useSevenDaysSalesChart(
+    currentCompany?.id,
+    hasPermission("sales", "view")
+  );
 
   // Get data map for easy access
   const dataMap = useMemo(
@@ -71,10 +73,10 @@ export function DashboardBuilder() {
       "kpi-monthly-sales": monthlyComparisonQuery.data,
       "kpi-gross-margin": monthlyComparisonQuery.data,
       "kpi-receivables": receivablesQuery.data,
-      "kpi-sales-today": salesData ? { today: salesData.currentMonth } : null,
+      "kpi-sales-today": monthlyComparisonQuery.data ? { today: monthlyComparisonQuery.data.currentMonth } : null,
       "chart-top-products": topProductsQuery.data,
       "chart-top-customers": topCustomersQuery.data,
-      "chart-sales-7days": null, // TODO: Add useSevenDaysSalesChart hook
+      "chart-sales-7days": sevenDaysSalesChartQuery.data,
       "list-critical-stock": criticalStockQuery.data,
       "currency-rates": historicalRatesQuery.data,
       "currency-summary": exchangeRatesQuery.data?.map((rate) => ({
@@ -84,9 +86,9 @@ export function DashboardBuilder() {
     [
       monthlyComparisonQuery.data,
       receivablesQuery.data,
-      salesData,
       topProductsQuery.data,
       topCustomersQuery.data,
+      sevenDaysSalesChartQuery.data,
       criticalStockQuery.data,
       historicalRatesQuery.data,
       exchangeRatesQuery.data,
@@ -102,7 +104,7 @@ export function DashboardBuilder() {
       "kpi-sales-today": monthlyComparisonQuery.isLoading,
       "chart-top-products": topProductsQuery.isLoading,
       "chart-top-customers": topCustomersQuery.isLoading,
-      "chart-sales-7days": false, // TODO
+      "chart-sales-7days": sevenDaysSalesChartQuery.isLoading,
       "list-critical-stock": criticalStockQuery.isLoading,
       "currency-rates": historicalRatesQuery.isLoading,
       "currency-summary": exchangeRatesQuery.isLoading,
@@ -112,6 +114,7 @@ export function DashboardBuilder() {
       receivablesQuery.isLoading,
       topProductsQuery.isLoading,
       topCustomersQuery.isLoading,
+      sevenDaysSalesChartQuery.isLoading,
       criticalStockQuery.isLoading,
       historicalRatesQuery.isLoading,
       exchangeRatesQuery.isLoading,
