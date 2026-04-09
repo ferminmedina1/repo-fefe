@@ -28,7 +28,8 @@ import { DashboardFilters } from "./DashboardFilters";
 import { TemplateGallery } from "./TemplateGallery";
 import { ShareModal } from "./ShareModal";
 import { RefreshButton } from "./RefreshButton";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { CSVUploader } from "./CSVUploader";
+import { AlertTriangle, RefreshCw, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -37,6 +38,7 @@ export function DashboardBuilder() {
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const { filters } = useDashboardFilters();
   const [userId, setUserId] = useState<string | undefined>();
+  const [showCSVUploader, setShowCSVUploader] = useState(false);
 
   // Get user ID from Supabase session
   useEffect(() => {
@@ -242,6 +244,16 @@ export function DashboardBuilder() {
                 resetLayout();
                 newWidgets.forEach(w => addWidget(w));
               }} />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCSVUploader(true)}
+                disabled={isSaving}
+                className="gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                Importar datos CSV
+              </Button>
               <TemplateGallery onSelectTemplate={async (templateWidgets) => {
                 resetLayout();
                 templateWidgets.forEach(w => addWidget(w));
@@ -339,6 +351,17 @@ export function DashboardBuilder() {
           <p>Todos los widgets están agregados</p>
         )}
       </div>
+
+      {/* CSV Uploader Modal */}
+      {showCSVUploader && (
+        <CSVUploader
+          onSuccess={(inserted) => {
+            setShowCSVUploader(false);
+            // Optionally refetch data or show success toast
+          }}
+          onClose={() => setShowCSVUploader(false)}
+        />
+      )}
     </div>
   );
 }
