@@ -29,7 +29,8 @@ import { TemplateGallery } from "./TemplateGallery";
 import { ShareModal } from "./ShareModal";
 import { RefreshButton } from "./RefreshButton";
 import { CSVUploader } from "./CSVUploader";
-import { AlertTriangle, RefreshCw, Upload } from "lucide-react";
+import { MetricBuilderModal } from "./MetricBuilderModal";
+import { AlertTriangle, RefreshCw, Upload, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -39,6 +40,7 @@ export function DashboardBuilder() {
   const { filters } = useDashboardFilters();
   const [userId, setUserId] = useState<string | undefined>();
   const [showCSVUploader, setShowCSVUploader] = useState(false);
+  const [showMetricBuilder, setShowMetricBuilder] = useState(false);
 
   // Get user ID from Supabase session
   useEffect(() => {
@@ -254,6 +256,16 @@ export function DashboardBuilder() {
                 <Upload className="h-4 w-4" />
                 Importar datos CSV
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMetricBuilder(true)}
+                disabled={isSaving}
+                className="gap-2"
+              >
+                <Zap className="h-4 w-4" />
+                Crear métrica
+              </Button>
               <TemplateGallery onSelectTemplate={async (templateWidgets) => {
                 resetLayout();
                 templateWidgets.forEach(w => addWidget(w));
@@ -361,6 +373,11 @@ export function DashboardBuilder() {
           }}
           onClose={() => setShowCSVUploader(false)}
         />
+      )}
+
+      {/* Metric Builder Modal */}
+      {showMetricBuilder && (
+        <MetricBuilderModal onClose={() => setShowMetricBuilder(false)} />
       )}
     </div>
   );
