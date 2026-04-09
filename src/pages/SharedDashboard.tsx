@@ -127,7 +127,7 @@ export default function SharedDashboardPage() {
   };
 
   const renderWidget = (widget: DashboardWidget) => {
-    const catalogEntry = WIDGET_CATALOG.find((w) => w.id === widget.type);
+    const catalogEntry = WIDGET_CATALOG[widget.type];
     const data = dataMap[widget.type as keyof typeof dataMap];
     const isLoading = isLoadingQuery(widget.type);
 
