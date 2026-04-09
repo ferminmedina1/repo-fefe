@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { DashboardFilters } from "@/contexts/DashboardFilterContext";
 
 interface SaleItem {
   quantity: number;
@@ -23,30 +24,55 @@ export interface MonthlyComparisonData {
   isPositive: boolean;
 }
 
-export function useMonthlyComparison(companyId: string | undefined, enabled = true) {
+export function useMonthlyComparison(
+  companyId: string | undefined,
+  enabled = true,
+  filters?: DashboardFilters
+) {
   return useQuery<MonthlyComparisonData>({
-    queryKey: ["dashboard-monthly-comparison", companyId],
+    queryKey: ["dashboard-monthly-comparison", companyId, filters?.dimension, filters?.dimensionValue],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 
-      const currentMonthStart = startOfMonth(new Date());
-      const currentMonthEnd = endOfMonth(new Date());
-      const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
-      const lastMonthEnd = endOfMonth(subMonths(new Date(), 1));
+      // Use provided date range from filters, or default to current/last month
+      const { from, to } = filters?.dateRange || {
+        from: startOfMonth(new Date()),
+        to: endOfMonth(new Date()),
+      };
 
-      const { data: currentMonth, error: currentError } = await supabase
+      const currentMonthStart = from;
+      const currentMonthEnd = to;
+      const lastMonthStart = startOfMonth(subMonths(currentMonthStart, 1));
+      const lastMonthEnd = endOfMonth(subMonths(currentMonthStart, 1));
+
+      // Build query with optional filters
+      let currentMonthQuery = supabase
         .from("sales")
         .select("total, sale_items(quantity, unit_price, subtotal, cost)")
         .eq("company_id", companyId)
         .gte("created_at", currentMonthStart.toISOString())
         .lte("created_at", currentMonthEnd.toISOString());
 
-      const { data: lastMonth, error: lastError } = await supabase
+      // Add dimension filter if specified
+      if (filters?.dimension && filters?.dimensionValue) {
+        currentMonthQuery = currentMonthQuery.eq(filters.dimension, filters.dimensionValue);
+      }
+
+      const { data: currentMonth, error: currentError } = await currentMonthQuery;
+
+      let lastMonthQuery = supabase
         .from("sales")
         .select("total")
         .eq("company_id", companyId)
         .gte("created_at", lastMonthStart.toISOString())
         .lte("created_at", lastMonthEnd.toISOString());
+
+      // Add same dimension filter if specified
+      if (filters?.dimension && filters?.dimensionValue) {
+        lastMonthQuery = lastMonthQuery.eq(filters.dimension, filters.dimensionValue);
+      }
+
+      const { data: lastMonth, error: lastError } = await lastMonthQuery;
 
       if (currentError || lastError) throw currentError || lastError;
 

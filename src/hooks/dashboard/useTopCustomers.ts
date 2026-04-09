@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth } from "date-fns";
+import { DashboardFilters } from "@/contexts/DashboardFilterContext";
 
 interface TopCustomerItem {
   cliente: string;
@@ -8,20 +9,30 @@ interface TopCustomerItem {
   compras: number;
 }
 
-export function useTopCustomers(companyId: string | undefined, enabled = true) {
+export function useTopCustomers(
+  companyId: string | undefined,
+  enabled = true,
+  filters?: DashboardFilters
+) {
   return useQuery<TopCustomerItem[]>({
-    queryKey: ["dashboard-top-customers", companyId],
+    queryKey: ["dashboard-top-customers", companyId, filters?.dimension, filters?.dimensionValue],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 
-      const currentMonthStart = startOfMonth(new Date());
+      const currentMonthStart = filters?.dateRange?.from || startOfMonth(new Date());
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("sales")
         .select("customer_id, total, customers(name)")
         .eq("company_id", companyId)
         .gte("created_at", currentMonthStart.toISOString())
         .not("customer_id", "is", null);
+
+      if (filters?.dimension && filters?.dimensionValue) {
+        query = query.eq(filters.dimension, filters.dimensionValue);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 

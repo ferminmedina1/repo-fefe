@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { DashboardFilters } from "@/contexts/DashboardFilterContext";
 
 export interface ReceivablesData {
   overdue: number;
@@ -8,18 +9,28 @@ export interface ReceivablesData {
   overdueCount: number;
 }
 
-export function useReceivables(companyId: string | undefined, enabled = true) {
+export function useReceivables(
+  companyId: string | undefined,
+  enabled = true,
+  filters?: DashboardFilters
+) {
   return useQuery<ReceivablesData>({
-    queryKey: ["dashboard-receivables", companyId],
+    queryKey: ["dashboard-receivables", companyId, filters?.dimension, filters?.dimensionValue],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("customer_account_movements")
         .select("debit_amount, status, due_date")
         .eq("company_id", companyId)
         .eq("movement_type", "sale")
         .in("status", ["pending", "partial"]);
+
+      if (filters?.dimension && filters?.dimensionValue) {
+        query = query.eq(filters.dimension, filters.dimensionValue);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 

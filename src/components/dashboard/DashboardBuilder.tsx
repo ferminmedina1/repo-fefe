@@ -2,6 +2,7 @@ import { useMemo, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useCompany } from "@/contexts/CompanyContext";
 import { usePermissions } from "@/hooks/usePermissions";
+import { useDashboardFilters } from "@/contexts/DashboardFilterContext";
 import {
   useDashboardLayout,
   useMonthlyComparison,
@@ -23,6 +24,7 @@ import { ListWidget } from "./ListWidget";
 import { CurrencyWidget } from "./CurrencyWidget";
 import { ExportButton } from "./ExportButton";
 import { ImportButton } from "./ImportButton";
+import { DashboardFilters } from "./DashboardFilters";
 import { TemplateGallery } from "./TemplateGallery";
 import { ShareModal } from "./ShareModal";
 import { RefreshButton } from "./RefreshButton";
@@ -33,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 export function DashboardBuilder() {
   const { currentCompany } = useCompany();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const { filters } = useDashboardFilters();
   const [userId, setUserId] = useState<string | undefined>();
 
   // Get user ID from Supabase session
@@ -57,29 +60,38 @@ export function DashboardBuilder() {
     layoutId,
   } = useDashboardLayout(currentCompany?.id, userId);
 
-  // Fetch all data (queries only run if needed)
+  // Fetch all data with filters
   const monthlyComparisonQuery = useMonthlyComparison(
     currentCompany?.id,
-    hasPermission("sales", "view")
+    hasPermission("sales", "view"),
+    filters
   );
   const topProductsQuery = useTopProducts(
     currentCompany?.id,
-    hasPermission("sales", "view") && hasPermission("products", "view")
+    hasPermission("sales", "view") && hasPermission("products", "view"),
+    filters
   );
   const topCustomersQuery = useTopCustomers(
     currentCompany?.id,
-    hasPermission("sales", "view") && hasPermission("customers", "view")
+    hasPermission("sales", "view") && hasPermission("customers", "view"),
+    filters
   );
-  const receivablesQuery = useReceivables(currentCompany?.id, hasPermission("sales", "view"));
+  const receivablesQuery = useReceivables(
+    currentCompany?.id,
+    hasPermission("sales", "view"),
+    filters
+  );
   const criticalStockQuery = useCriticalStock(
     currentCompany?.id,
-    hasPermission("products", "view")
+    hasPermission("products", "view"),
+    filters
   );
-  const exchangeRatesQuery = useExchangeRates(currentCompany?.id, true);
-  const historicalRatesQuery = useHistoricalRates(currentCompany?.id, true);
+  const exchangeRatesQuery = useExchangeRates(currentCompany?.id, true, filters);
+  const historicalRatesQuery = useHistoricalRates(currentCompany?.id, true, filters);
   const sevenDaysSalesChartQuery = useSevenDaysSalesChart(
     currentCompany?.id,
-    hasPermission("sales", "view")
+    hasPermission("sales", "view"),
+    filters
   );
 
   // Get data map for easy access
@@ -201,6 +213,9 @@ export function DashboardBuilder() {
 
   return (
     <div className="space-y-6">
+      {/* Global Filters */}
+      <DashboardFilters />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

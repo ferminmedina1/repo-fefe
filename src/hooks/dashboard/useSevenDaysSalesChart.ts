@@ -2,15 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { subDays, startOfDay, format } from "date-fns";
 import { es } from "date-fns/locale";
+import { DashboardFilters } from "@/contexts/DashboardFilterContext";
 
 interface ChartDataPoint {
   date: string;
   ventas: number;
 }
 
-export function useSevenDaysSalesChart(companyId: string | undefined, enabled = true) {
+export function useSevenDaysSalesChart(
+  companyId: string | undefined,
+  enabled = true,
+  filters?: DashboardFilters
+) {
   return useQuery<ChartDataPoint[]>({
-    queryKey: ["sales-chart", companyId],
+    queryKey: ["dashboard-seven-days-sales", companyId, filters?.dimension, filters?.dimensionValue],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 
@@ -19,11 +24,17 @@ export function useSevenDaysSalesChart(companyId: string | undefined, enabled = 
         return startOfDay(date);
       });
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("sales")
         .select("total, created_at")
         .eq("company_id", companyId)
         .gte("created_at", last7Days[0].toISOString());
+
+      if (filters?.dimension && filters?.dimensionValue) {
+        query = query.eq(filters.dimension, filters.dimensionValue);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 

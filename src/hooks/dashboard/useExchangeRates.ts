@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { DashboardFilters } from "@/contexts/DashboardFilterContext";
 
 export interface ExchangeRate {
   id: string;
@@ -13,17 +14,27 @@ export interface HistoricalRate {
   [key: string]: any;
 }
 
-export function useExchangeRates(companyId: string | undefined, enabled = true) {
+export function useExchangeRates(
+  companyId: string | undefined,
+  enabled = true,
+  filters?: DashboardFilters
+) {
   return useQuery<ExchangeRate[]>({
-    queryKey: ["dashboard-exchange-rates", companyId],
+    queryKey: ["dashboard-exchange-rates", companyId, filters?.dimension, filters?.dimensionValue],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("exchange_rates")
         .select("*")
         .eq("company_id", companyId)
         .order("currency", { ascending: true });
+
+      if (filters?.dimension && filters?.dimensionValue) {
+        query = query.eq(filters.dimension, filters.dimensionValue);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       return (data as ExchangeRate[]) || [];
@@ -32,9 +43,13 @@ export function useExchangeRates(companyId: string | undefined, enabled = true) 
   });
 }
 
-export function useHistoricalRates(companyId: string | undefined, enabled = true) {
+export function useHistoricalRates(
+  companyId: string | undefined,
+  enabled = true,
+  filters?: DashboardFilters
+) {
   return useQuery<HistoricalRate[]>({
-    queryKey: ["dashboard-historical-rates", companyId],
+    queryKey: ["dashboard-historical-rates", companyId, filters?.dimension, filters?.dimensionValue],
     queryFn: async () => {
       if (!companyId) throw new Error("Company ID is required");
 
@@ -42,13 +57,19 @@ export function useHistoricalRates(companyId: string | undefined, enabled = true
       const { format } = await import("date-fns");
 
       const thirtyDaysAgo = subDays(new Date(), 30);
-      const { data, error } = await supabase
+      let query = supabase
         .from("exchange_rates")
         .select("*")
         .eq("company_id", companyId)
         .gte("updated_at", thirtyDaysAgo.toISOString())
         .in("currency", ["USD", "EUR"])
         .order("updated_at", { ascending: true });
+
+      if (filters?.dimension && filters?.dimensionValue) {
+        query = query.eq(filters.dimension, filters.dimensionValue);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 

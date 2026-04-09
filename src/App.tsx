@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { useEffect, useState, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
+import { DashboardFilterProvider } from "@/contexts/DashboardFilterContext";
 import { User, Session } from "@supabase/supabase-js";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
@@ -332,8 +333,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <TutorialProvider>
-          <CompanyProvider>
-            <Suspense fallback={<PageLoader />}>
+          <DashboardFilterProvider>
+            <CompanyProvider>
+              <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/signup" element={<SignupWizard />} />
                 {/*<Route path="/signup" element={<SignupMaintenance />}  ONLY FOR MAINTENANCE MODE */}
@@ -455,6 +457,7 @@ const App = () => (
           <TutorialRunner />
             </Suspense>
           </CompanyProvider>
+            </DashboardFilterProvider>
         </TutorialProvider>
       </BrowserRouter>
     </TooltipProvider>
