@@ -78,6 +78,7 @@ const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRe
 const LearningCenter = lazy(() => import("./pages/LearningCenter"));
 const DashboardEditor = lazy(() => import("./pages/DashboardEditor"));
 const DashboardExampleBuilder = lazy(() => import("./pages/DashboardExampleBuilder"));
+const SharedDashboard = lazy(() => import("./pages/SharedDashboard"));
 const KnowledgeBaseCenter = lazy(() => import("./pages/KnowledgeBaseCenter"));
 const SetupWizardPage = lazy(() =>
   import("./pages/SetupWizardPage").then((module) => ({ default: module.SetupWizardPage }))
@@ -350,6 +351,7 @@ const App = () => (
                 <Route path="/app" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="dashboard"><Dashboard /></ModuleProtectedRoute></ProtectedRoute>} />
                 <Route path="/dashboard-builder" element={<ProtectedRoute><DashboardExampleBuilder /></ProtectedRoute>} />
                 <Route path="/dashboards/:dashboardId/editor" element={<ProtectedRoute><DashboardEditor /></ProtectedRoute>} />
+                <Route path="/dashboard/shared/:token" element={<Suspense fallback={<PageLoader/>}><SharedDashboard /></Suspense>} />
                 <Route path="/pos" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos"><POS /></ModuleProtectedRoute></ProtectedRoute>} />
                 <Route path="/products" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="products"><Products /></ModuleProtectedRoute></ProtectedRoute>} />
                 <Route path="/customers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customers"><Customers /></ModuleProtectedRoute></ProtectedRoute>} />

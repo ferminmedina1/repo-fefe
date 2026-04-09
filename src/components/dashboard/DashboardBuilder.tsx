@@ -25,6 +25,7 @@ import { ExportButton } from "./ExportButton";
 import { ImportButton } from "./ImportButton";
 import { TemplateGallery } from "./TemplateGallery";
 import { ShareModal } from "./ShareModal";
+import { RefreshButton } from "./RefreshButton";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,6 +54,7 @@ export function DashboardBuilder() {
     reorderWidgets,
     resetLayout,
     hasLayout,
+    layoutId,
   } = useDashboardLayout(currentCompany?.id, userId);
 
   // Fetch all data (queries only run if needed)
@@ -210,6 +212,7 @@ export function DashboardBuilder() {
           )}
           {widgets.length > 0 && (
             <>
+              <RefreshButton disabled={isSaving} />
               <ExportButton widgets={widgets} dashboardName="My Dashboard" />
               <ImportButton onImport={async (newWidgets) => {
                 resetLayout();
@@ -219,7 +222,7 @@ export function DashboardBuilder() {
                 resetLayout();
                 templateWidgets.forEach(w => addWidget(w.type));
               }} />
-              <ShareModal layoutId={currentCompany?.id || ""} />
+              {layoutId && <ShareModal layoutId={layoutId} />}
             </>
           )}
           {availableWidgets.length > 0 && (
