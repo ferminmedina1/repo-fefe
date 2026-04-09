@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useCompany } from "@/contexts/CompanyContext";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -21,14 +21,27 @@ import { KpiWidget } from "./KpiWidget";
 import { ChartWidget } from "./ChartWidget";
 import { ListWidget } from "./ListWidget";
 import { CurrencyWidget } from "./CurrencyWidget";
+import { ExportButton } from "./ExportButton";
+import { ImportButton } from "./ImportButton";
+import { TemplateGallery } from "./TemplateGallery";
+import { ShareModal } from "./ShareModal";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@supabase/auth-helpers-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export function DashboardBuilder() {
   const { currentCompany } = useCompany();
-  const { user } = useAuth();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
+  const [userId, setUserId] = useState<string | undefined>();
+
+  // Get user ID from Supabase session
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getSession();
+      setUserId(data?.session?.user?.id);
+    };
+    getUser();
+  }, []);
 
   // Load dashboard layout
   const {
@@ -40,7 +53,7 @@ export function DashboardBuilder() {
     reorderWidgets,
     resetLayout,
     hasLayout,
-  } = useDashboardLayout(currentCompany?.id, user?.id);
+  } = useDashboardLayout(currentCompany?.id, userId);
 
   // Fetch all data (queries only run if needed)
   const monthlyComparisonQuery = useMonthlyComparison(
@@ -194,6 +207,20 @@ export function DashboardBuilder() {
               </div>
               Guardando...
             </div>
+          )}
+          {widgets.length > 0 && (
+            <>
+              <ExportButton widgets={widgets} dashboardName="My Dashboard" />
+              <ImportButton onImport={async (newWidgets) => {
+                resetLayout();
+                newWidgets.forEach(w => addWidget(w.type));
+              }} />
+              <TemplateGallery onSelectTemplate={async (templateWidgets) => {
+                resetLayout();
+                templateWidgets.forEach(w => addWidget(w.type));
+              }} />
+              <ShareModal layoutId={currentCompany?.id || ""} />
+            </>
           )}
           {availableWidgets.length > 0 && (
             <WidgetPicker
