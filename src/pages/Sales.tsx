@@ -481,8 +481,7 @@ export default function Sales() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
-                )}
+                ))}
               </TableBody>
             </Table>
             {!isProductFiltered && (
