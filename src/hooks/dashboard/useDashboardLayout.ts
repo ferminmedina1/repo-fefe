@@ -37,10 +37,9 @@ export function useDashboardLayout(companyId: string | undefined, userId: string
         .eq("company_id", companyId)
         .order("is_default", { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== "PGRST116") {
-        // PGRST116 = no rows found, which is OK
+      if (error) {
         console.error("Error fetching dashboard layout:", error);
         return null;
       }

@@ -1,4 +1,4 @@
-import React, { createContext, useState, ReactNode } from 'react';
+import React, { createContext, useState, ReactNode, useMemo } from 'react';
 
 export interface DateRange {
   type: 'week' | 'month' | 'year' | 'custom';
@@ -18,25 +18,25 @@ interface DashboardFilterContextType {
   resetFilters: () => void;
 }
 
-const defaultDateRange: DateRange = {
+const getDefaultDateRange = (): DateRange => ({
   type: 'month',
   from: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   to: new Date(),
-};
-
-const defaultFilters: DashboardFilters = {
-  dateRange: defaultDateRange,
-};
+});
 
 export const DashboardFilterContext = createContext<DashboardFilterContextType | undefined>(
   undefined
 );
 
 export function DashboardFilterProvider({ children }: { children: ReactNode }) {
-  const [filters, setFilters] = useState<DashboardFilters>(defaultFilters);
+  const [filters, setFilters] = useState<DashboardFilters>(() => ({
+    dateRange: getDefaultDateRange(),
+  }));
 
   const resetFilters = () => {
-    setFilters(defaultFilters);
+    setFilters({
+      dateRange: getDefaultDateRange(),
+    });
   };
 
   return (
