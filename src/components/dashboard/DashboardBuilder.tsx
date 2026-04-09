@@ -179,8 +179,8 @@ export function DashboardBuilder() {
             // TODO: Implement template selection
           }}
           onChooseFreeBuilder={() => {
-            // Open widget picker
-            addWidget("kpi-monthly-sales" as WidgetType);
+            // Open widget picker or add first widget
+            handleAddWidget("kpi-monthly-sales" as WidgetType);
           }}
         />
       </div>
@@ -189,6 +189,15 @@ export function DashboardBuilder() {
 
   const addedWidgetTypes = widgets.map((w) => w.type);
   const availableWidgets = getAvailableWidgets(addedWidgetTypes);
+
+  // Wrapper for addWidget to match WidgetPicker's interface
+  const handleAddWidget = (widgetType: WidgetType, size?: 'full' | 'half' | 'quarter') => {
+    addWidget({
+      id: `${widgetType}-${Date.now()}`, // Generate unique ID
+      type: widgetType,
+      size: size || 'full',
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -216,11 +225,11 @@ export function DashboardBuilder() {
               <ExportButton widgets={widgets} dashboardName="My Dashboard" />
               <ImportButton onImport={async (newWidgets) => {
                 resetLayout();
-                newWidgets.forEach(w => addWidget(w.type));
+                newWidgets.forEach(w => addWidget(w));
               }} />
               <TemplateGallery onSelectTemplate={async (templateWidgets) => {
                 resetLayout();
-                templateWidgets.forEach(w => addWidget(w.type));
+                templateWidgets.forEach(w => addWidget(w));
               }} />
               {layoutId && <ShareModal layoutId={layoutId} />}
             </>
@@ -228,7 +237,7 @@ export function DashboardBuilder() {
           {availableWidgets.length > 0 && (
             <WidgetPicker
               addedWidgetIds={addedWidgetTypes}
-              onAddWidget={addWidget}
+              onAddWidget={handleAddWidget}
               disabled={isSaving}
             />
           )}

@@ -156,6 +156,9 @@ export const WIDGET_CATEGORIES = {
   currency: Object.values(WIDGET_CATALOG).filter((w) => w.category === "currency"),
 };
 
+// Export DashboardWidget from dashboard hooks for convenience
+export type { DashboardWidget } from '@/hooks/dashboard/useDashboardLayout';
+
 // Type guard
 export function isValidWidgetType(type: any): type is WidgetType {
   return type in WIDGET_CATALOG;

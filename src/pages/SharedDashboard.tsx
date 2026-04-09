@@ -25,17 +25,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function SharedDashboardPage() {
   const { token } = useParams<{ token: string }>();
   const [layoutData, setLayoutData] = useState<{ widgets: DashboardWidget[] } | null>(null);
+  const [companyId, setCompanyId] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
 
   const retrieveShared = useRetrieveSharedDashboard(token || "");
-  const monthlyComparisonQuery = useMonthlyComparison(undefined, Boolean(layoutData), true);
-  const topProductsQuery = useTopProducts(undefined, Boolean(layoutData), true);
-  const topCustomersQuery = useTopCustomers(undefined, Boolean(layoutData), true);
-  const receivablesQuery = useReceivables(undefined, Boolean(layoutData), true);
-  const criticalStockQuery = useCriticalStock(undefined, Boolean(layoutData), true);
-  const exchangeRatesQuery = useExchangeRates(undefined, Boolean(layoutData), true);
-  const sevenDaysSalesChartQuery = useSevenDaysSalesChart(undefined, Boolean(layoutData), true);
-  const historicalRatesQuery = useHistoricalRates(undefined, Boolean(layoutData), true);
+  const monthlyComparisonQuery = useMonthlyComparison(companyId, Boolean(layoutData));
+  const topProductsQuery = useTopProducts(companyId, Boolean(layoutData));
+  const topCustomersQuery = useTopCustomers(companyId, Boolean(layoutData));
+  const receivablesQuery = useReceivables(companyId, Boolean(layoutData));
+  const criticalStockQuery = useCriticalStock(companyId, Boolean(layoutData));
+  const exchangeRatesQuery = useExchangeRates(companyId, Boolean(layoutData));
+  const sevenDaysSalesChartQuery = useSevenDaysSalesChart(companyId, Boolean(layoutData));
+  const historicalRatesQuery = useHistoricalRates(companyId, Boolean(layoutData));
 
   useEffect(() => {
     const loadSharedDashboard = async () => {
@@ -46,6 +47,7 @@ export default function SharedDashboardPage() {
         }
 
         const result = await retrieveShared.mutateAsync();
+        setCompanyId(result.company_id);
         setLayoutData(result.dashboard_layouts.widgets);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load shared dashboard");
