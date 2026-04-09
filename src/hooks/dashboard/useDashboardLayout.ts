@@ -30,21 +30,36 @@ export function useDashboardLayout(companyId: string | undefined, userId: string
     queryFn: async () => {
       if (!userId || !companyId) return null;
 
-      const { data, error } = await supabase
-        .from("dashboard_layouts")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("company_id", companyId)
-        .order("is_default", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from("dashboard_layouts")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("company_id", companyId)
+          .order("is_default", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (error) {
-        console.error("Error fetching dashboard layout:", error);
+        if (error) {
+          // Gracefully handle table doesn't exist or RLS errors
+          if (
+            error.code === '42P01' || 
+            error.code === '42501' ||
+            error.message?.includes('does not exist') ||
+            error.message?.includes('permission')
+          ) {
+            console.warn("Dashboard layouts table may not exist yet, using empty layout");
+            return null;
+          }
+          console.error("Error fetching dashboard layout:", error);
+          return null;
+        }
+
+        return (data as DashboardLayoutData) || null;
+      } catch (err) {
+        console.error("Exception fetching dashboard layout:", err);
         return null;
       }
-
-      return (data as DashboardLayoutData) || null;
     },
     enabled: !!userId && !!companyId,
   });

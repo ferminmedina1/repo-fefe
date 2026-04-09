@@ -57,12 +57,14 @@ export const MetricBuilderModal = ({ onClose }: MetricBuilderModalProps) => {
   const [formula, setFormula] = useState("");
   const [expandedHelp, setExpandedHelp] = useState(false);
   const [editingMetric, setEditingMetric] = useState<CustomMetric | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const suggestions = getFormulaSuggestions(dataSource);
 
   const handleCreateMetric = async () => {
     if (!name || !formula || !currentCompany) return;
 
+    setError(null);
     try {
       if (editingMetric) {
         await updateMutation.mutateAsync({
@@ -91,7 +93,9 @@ export const MetricBuilderModal = ({ onClose }: MetricBuilderModalProps) => {
       setFormula("");
       setOperation("custom");
       setTab("manage");
-    } catch (err) {
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Error saving metric. Please try again later or ensure the database migration has been run.';
+      setError(errorMsg);
       console.error("Error saving metric:", err);
     }
   };
@@ -99,12 +103,15 @@ export const MetricBuilderModal = ({ onClose }: MetricBuilderModalProps) => {
   const handleDeleteMetric = async (metricId: string) => {
     if (!currentCompany) return;
 
+    setError(null);
     try {
       await deleteMutation.mutateAsync({
         id: metricId,
         companyId: currentCompany.id,
       });
-    } catch (err) {
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Error deleting metric';
+      setError(errorMsg);
       console.error("Error deleting metric:", err);
     }
   };
@@ -165,6 +172,21 @@ export const MetricBuilderModal = ({ onClose }: MetricBuilderModalProps) => {
         </div>
 
         <div className="p-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex gap-2">
+              <div className="text-red-600 mt-0.5">⚠️</div>
+              <div>
+                <p className="text-sm font-medium text-red-900">Error</p>
+                <p className="text-sm text-red-700">{error}</p>
+                {error.includes('not yet initialized') && (
+                  <p className="text-xs text-red-600 mt-1">
+                    Ejecuta: <code className="bg-red-100 px-1 rounded">supabase db push</code> para crear las tablas
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {tab === "create" ? (
             <div className="space-y-6">
               {/* Name & Description */}

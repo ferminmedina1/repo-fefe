@@ -11,3 +11,4 @@ export { useImportDashboard, type ImportResult } from "./useImportDashboard";
 export { useTemplates, useTemplatesForCategory, useSaveTemplateFromLayout, type DashboardTemplate } from "./useTemplates";
 export { useCreateShareLink, useGetShareLink, useDeleteShareLink, useRetrieveSharedDashboard, generateShareUrl, type DashboardShare } from "./useShareLink";
 export { useInvalidateDashboardQueries } from "./useInvalidateDashboard";
+export { useInitializeDashboardTables, safeQuery, getDashboardFallbacks } from "./useDashboardTableCheck";

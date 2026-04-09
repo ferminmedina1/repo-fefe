@@ -32,49 +32,69 @@ export function useMonthlyComparison(
   return useQuery<MonthlyComparisonData>({
     queryKey: ["dashboard-monthly-comparison", companyId, filters?.dimension, filters?.dimensionValue],
     queryFn: async () => {
-      if (!companyId) throw new Error("Company ID is required");
+      try {
+        if (!companyId) throw new Error("Company ID is required");
 
-      // Use provided date range from filters, or default to current/last month
-      const { from, to } = filters?.dateRange || {
-        from: startOfMonth(new Date()),
-        to: endOfMonth(new Date()),
-      };
+        // Use provided date range from filters, or default to current/last month
+        const { from, to } = filters?.dateRange || {
+          from: startOfMonth(new Date()),
+          to: endOfMonth(new Date()),
+        };
 
-      const currentMonthStart = from;
-      const currentMonthEnd = to;
-      const lastMonthStart = startOfMonth(subMonths(currentMonthStart, 1));
-      const lastMonthEnd = endOfMonth(subMonths(currentMonthStart, 1));
+        const currentMonthStart = from;
+        const currentMonthEnd = to;
+        const lastMonthStart = startOfMonth(subMonths(currentMonthStart, 1));
+        const lastMonthEnd = endOfMonth(subMonths(currentMonthStart, 1));
 
-      // Build query with optional filters
-      let currentMonthQuery = supabase
-        .from("sales")
-        .select("total, sale_items(quantity, unit_price, subtotal, cost)")
-        .eq("company_id", companyId)
-        .gte("created_at", currentMonthStart.toISOString())
-        .lte("created_at", currentMonthEnd.toISOString());
+        // Build query with optional filters
+        let currentMonthQuery = supabase
+          .from("sales")
+          .select("total, sale_items(quantity, unit_price, subtotal, cost)")
+          .eq("company_id", companyId)
+          .gte("created_at", currentMonthStart.toISOString())
+          .lte("created_at", currentMonthEnd.toISOString());
 
-      // Add dimension filter if specified
-      if (filters?.dimension && filters?.dimensionValue) {
-        currentMonthQuery = currentMonthQuery.eq(filters.dimension, filters.dimensionValue);
-      }
+        // Add dimension filter if specified
+        if (filters?.dimension && filters?.dimensionValue) {
+          currentMonthQuery = currentMonthQuery.eq(filters.dimension, filters.dimensionValue);
+        }
 
-      const { data: currentMonth, error: currentError } = await currentMonthQuery;
+        const { data: currentMonth, error: currentError } = await currentMonthQuery;
 
-      let lastMonthQuery = supabase
-        .from("sales")
-        .select("total")
-        .eq("company_id", companyId)
-        .gte("created_at", lastMonthStart.toISOString())
-        .lte("created_at", lastMonthEnd.toISOString());
+        let lastMonthQuery = supabase
+          .from("sales")
+          .select("total")
+          .eq("company_id", companyId)
+          .gte("created_at", lastMonthStart.toISOString())
+          .lte("created_at", lastMonthEnd.toISOString());
 
-      // Add same dimension filter if specified
-      if (filters?.dimension && filters?.dimensionValue) {
-        lastMonthQuery = lastMonthQuery.eq(filters.dimension, filters.dimensionValue);
-      }
+        // Add same dimension filter if specified
+        if (filters?.dimension && filters?.dimensionValue) {
+          lastMonthQuery = lastMonthQuery.eq(filters.dimension, filters.dimensionValue);
+        }
 
-      const { data: lastMonth, error: lastError } = await lastMonthQuery;
+        const { data: lastMonth, error: lastError } = await lastMonthQuery;
 
-      if (currentError || lastError) throw currentError || lastError;
+        if (currentError || lastError) {
+          const error = currentError || lastError;
+          if (
+            (error as any)?.code === '42P01' ||
+            (error as any)?.code === '42501' ||
+            (error as any)?.message?.includes('does not exist') ||
+            (error as any)?.message?.includes('permission')
+          ) {
+            console.warn("Sales table not available yet, using fallback data");
+            return {
+              currentMonth: 0,
+              lastMonth: 0,
+              percentageChange: 0,
+              grossMargin: 0,
+              marginPercentage: 0,
+              isPositive: false,
+            };
+          }
+          throw error;
+        }
 
       const currentTotal = (currentMonth as Sale[] | null)?.reduce(
         (acc, sale) => acc + Number(sale.total),
@@ -109,6 +129,28 @@ export function useMonthlyComparison(
         marginPercentage,
         isPositive: percentageChange >= 0,
       };
+      } catch (error) {
+        console.error("Error fetching monthly comparison:", error);
+        if (
+          error instanceof Object &&
+          (
+            ((error as any)?.code === '42P01') ||
+            ((error as any)?.code === '42501') ||
+            ((error as any)?.message?.includes('does not exist')) ||
+            ((error as any)?.message?.includes('permission'))
+          )
+        ) {
+          return {
+            currentMonth: 0,
+            lastMonth: 0,
+            percentageChange: 0,
+            grossMargin: 0,
+            marginPercentage: 0,
+            isPositive: false,
+          };
+        }
+        throw error;
+      }
     },
     enabled: enabled && !!companyId,
   });
