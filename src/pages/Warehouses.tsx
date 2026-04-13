@@ -284,6 +284,7 @@ export default function Warehouses() {
               variant="outline"
               size="sm"
               className="flex-1 sm:flex-none text-xs sm:text-sm"
+              data-tutorial="warehouse-stock"
             >
               <Package className="mr-1 sm:mr-2 h-4 w-4" />
               Stock
@@ -293,7 +294,7 @@ export default function Warehouses() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DialogTrigger asChild>
-                      <Button onClick={resetForm} className="hover:scale-105 transition-transform gap-2">
+                      <Button onClick={resetForm} className="hover:scale-105 transition-transform gap-2" data-tutorial="create-warehouse">
                         <Plus className="h-4 w-4" />
                   Nuevo Depósito
                       </Button>
@@ -410,7 +411,7 @@ export default function Warehouses() {
                       <h3 className="text-sm font-semibold">Gestión</h3>
                     </div>
                     <div>
-                      <Label>Encargado</Label>
+                      <Label data-tutorial="warehouse-manager">Encargado</Label>
                       <Input
                         value={formData.manager_name}
                         onChange={(e) => setFormData({ ...formData, manager_name: e.target.value })}

@@ -561,7 +561,7 @@ const Purchases = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" data-tutorial="purchases-filters">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
@@ -573,7 +573,7 @@ const Purchases = () => {
               </div>
             </div>
 
-            <Table>
+            <Table data-tutorial="purchase-detail">
               <TableHeader>
                 <TableRow>
                   <TableHead>Número</TableHead>

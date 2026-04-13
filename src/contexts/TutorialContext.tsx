@@ -10,7 +10,7 @@ interface TutorialContextType {
   tutorialState: TutorialState;
   isRunning: boolean;
   activeModuleId: string | null;
-  
+
   // Acciones
   startTutorial: (moduleId: string) => void;
   startTutorialWithRoute: (moduleId: string, route?: string, navigate?: (path: string) => void) => void;
@@ -20,7 +20,10 @@ interface TutorialContextType {
   endTutorial: () => void;
   skipTutorial: () => void;
   setNavigate: (navigate: (path: string) => void) => void;
-  
+
+  // Flag: true mientras el tutorial mismo navega (para que TutorialRunner no lo mate)
+  isTutorialNavigating: () => boolean;
+
   // Información
   getCurrentStep: () => TutorialStep | null;
   getCurrentTutorial: () => any;
@@ -43,6 +46,17 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
   
   // Guardamos la función de navegación
   const navigateRef = useRef<((path: string) => void) | null>(null);
+  // Flag para indicar que la navegación fue disparada por el tutorial (no por el usuario)
+  const isTutorialNavigatingRef = useRef(false);
+  const isTutorialNavigating = useCallback(() => isTutorialNavigatingRef.current, []);
+
+  // Helper: navegar internamente sin cerrar el tutorial
+  const internalNavigate = useCallback((path: string) => {
+    if (!navigateRef.current) return;
+    isTutorialNavigatingRef.current = true;
+    navigateRef.current(path);
+    setTimeout(() => { isTutorialNavigatingRef.current = false; }, 800);
+  }, []);
   
   const setNavigate = useCallback((navigate: (path: string) => void) => {
     navigateRef.current = navigate;
@@ -73,9 +87,12 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       navigateRef.current = navigate;
     }
 
+    // Capturar originRoute ANTES de navegar
+    const originRoute = window.location.pathname;
+
     // Primero navegar a la ruta si existe y hay función de navegación
     if (route && navigateRef.current) {
-      navigateRef.current(route);
+      internalNavigate(route);
     }
 
     // Luego iniciar el tutorial
@@ -86,10 +103,10 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
         currentStepIndex: 0,
         isRunning: true,
         completedSteps: [],
-        originRoute: window.location.pathname,
+        originRoute,
       }));
     }, 0);
-  }, []);
+  }, [internalNavigate]);
 
   // FIX #1 + #2: Evitar trigger doble en último paso + Sincronizar isRunning
   const nextStep = useCallback(() => {
@@ -120,7 +137,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       
       // Si el próximo paso requiere navegación, navega sin apagar Joyride
       if (nextStepData.route && navigateRef.current) {
-        navigateRef.current!(nextStepData.route!);
+        internalNavigate(nextStepData.route!);
         setTimeout(() => {
           setTutorialState(currentState => ({
             ...currentState,
@@ -155,7 +172,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       
       const prevStepData = tutorial.steps[newIndex];
       if (prevStepData.route && navigateRef.current) {
-        navigateRef.current!(prevStepData.route!);
+        internalNavigate(prevStepData.route!);
         setTimeout(() => {
           setTutorialState(currentState => ({
             ...currentState,
@@ -187,7 +204,7 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
       const stepData = tutorial.steps[clampedIndex];
       
       if (stepData.route && navigateRef.current) {
-        navigateRef.current!(stepData.route!);
+        internalNavigate(stepData.route!);
         setTimeout(() => {
           setTutorialState(currentState => ({
             ...currentState,
@@ -284,7 +301,8 @@ export function TutorialProvider({ children }: { children: React.ReactNode }) {
     endTutorial,
     skipTutorial,
     setNavigate,
-    
+    isTutorialNavigating,
+
     getCurrentStep,
     getCurrentTutorial,
     getProgress,

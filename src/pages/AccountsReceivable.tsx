@@ -165,7 +165,7 @@ export default function AccountsReceivable() {
                         <p className="text-xs text-muted-foreground">{customer.email}</p>
                       </div>
                       <div className="text-right">
-                        <Badge variant="destructive" className="text-xs">
+                        <Badge variant="destructive" className="text-xs" data-tutorial="customer-debt">
                           ${Number(customer.current_balance || 0).toFixed(2)}
                         </Badge>
                       </div>
@@ -195,6 +195,7 @@ export default function AccountsReceivable() {
                     size="sm" 
                     onClick={() => setIsPaymentDialogOpen(true)}
                     className="flex items-center gap-2"
+                    data-tutorial="payment-record"
                   >
                     <DollarSign className="h-4 w-4" />
                     Registrar Pago
@@ -240,7 +241,7 @@ export default function AccountsReceivable() {
                         <TableHead>Estado</TableHead>
                       </TableRow>
                     </TableHeader>
-                    <TableBody>
+                    <TableBody data-tutorial="payment-history">
                       {Array.isArray(customerMovements) && customerMovements.length > 0 ? (
                         customerMovements.map((movement: any) => (
                           <TableRow key={movement.id} className={

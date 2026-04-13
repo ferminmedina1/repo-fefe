@@ -233,7 +233,7 @@ const AFIPBilling = () => {
             </div>
           </div>
           {afipAmbiente === "testing" && (
-            <Badge variant="outline" className="text-yellow-600 border-yellow-600 self-start sm:self-auto">
+            <Badge variant="outline" className="text-yellow-600 border-yellow-600 self-start sm:self-auto" data-tutorial="afip-status">
               <AlertCircle className="h-3 w-3 mr-1" />
               PRUEBAS
             </Badge>
@@ -299,7 +299,7 @@ const AFIPBilling = () => {
                     </div>
                   </div>
                   <Select value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-[180px]" data-tutorial="invoice-types">
                       <SelectValue placeholder="Tipo" />
                     </SelectTrigger>
                     <SelectContent>
@@ -368,7 +368,7 @@ const AFIPBilling = () => {
                                 {getTipoComprobante(comprobante.tipo_comprobante)}
                               </Badge>
                             </TableCell>
-                            <TableCell className="font-mono">{comprobante.numero_completo}</TableCell>
+                            <TableCell className="font-mono" data-tutorial="invoice-number">{comprobante.numero_completo}</TableCell>
                             <TableCell className="hidden sm:table-cell">
                               {comprobante.sales?.customer_name || "-"}
                             </TableCell>

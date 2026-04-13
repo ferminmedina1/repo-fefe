@@ -382,7 +382,7 @@ export default function Suppliers() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DialogTrigger asChild>
-                      <Button onClick={resetForm} className="gap-2 w-full sm:w-auto">
+                      <Button onClick={resetForm} className="gap-2 w-full sm:w-auto" data-tutorial="btn-add-supplier">
                         <Plus className="h-4 w-4" />
                         Nuevo Proveedor
                       </Button>
@@ -491,7 +491,7 @@ export default function Suppliers() {
                     />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-tutorial="supplier-terms">
                     <Label htmlFor="payment_terms">Términos de Pago</Label>
                     <Input
                       id="payment_terms"
@@ -622,6 +622,7 @@ export default function Suppliers() {
             </CardHeader>
             <CardContent>
               <div className="text-xl sm:text-2xl font-bold break-all leading-tight">
+
                 ${allSuppliers.reduce((sum, s) => sum + s.current_balance, 0).toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground">Balance pendiente</p>

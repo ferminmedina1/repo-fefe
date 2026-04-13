@@ -494,7 +494,7 @@ const AccountantReports = () => {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card data-tutorial="tax-liability">
             <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 p-3 md:p-6">
               <CardTitle className="text-xs md:text-sm font-medium">IVA</CardTitle>
               <DollarSign className="h-4 w-4 text-blue-500" />
@@ -541,7 +541,7 @@ const AccountantReports = () => {
           <TabsContent value="downloads" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {/* Libro IVA Ventas */}
-              <Card className="hover:border-primary/50 transition-colors">
+              <Card className="hover:border-primary/50 transition-colors" data-tutorial="book-movements">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <FileSpreadsheet className="h-5 w-5 text-green-600" />
@@ -633,7 +633,7 @@ const AccountantReports = () => {
               </Card>
 
               {/* Resumen Mensual */}
-              <Card className="hover:border-primary/50 transition-colors">
+              <Card className="hover:border-primary/50 transition-colors" data-tutorial="balance-sheet">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <FileText className="h-5 w-5 text-purple-600" />

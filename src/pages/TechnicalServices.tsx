@@ -446,7 +446,7 @@ export default function TechnicalServices() {
               }}
             >
               <DialogTrigger asChild>
-                <Button onClick={resetForm} className="w-full lg:w-auto">
+                <Button onClick={resetForm} className="w-full sm:w-auto" data-tutorial="new-service">
                   <Plus className="mr-2 h-4 w-4" />
                   Nuevo Servicio
                 </Button>
@@ -747,7 +747,7 @@ export default function TechnicalServices() {
                           <TableCell className="max-w-xs truncate">
                             {service.reported_issue}
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-tutorial="service-status">
                             <Badge className={statusColors[service.status]}>
                               {statusLabels[service.status]}
                             </Badge>
@@ -759,7 +759,7 @@ export default function TechnicalServices() {
                             )}
                           </TableCell>
                           {/* M-3: Use company currency instead of hardcoded "$" */}
-                          <TableCell>
+                          <TableCell data-tutorial="service-invoice">
                             {currency} {service.total_cost.toFixed(2)}
                           </TableCell>
                           <TableCell>

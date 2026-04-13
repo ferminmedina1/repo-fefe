@@ -686,7 +686,7 @@ export default function InventoryAlerts() {
               Monitoreo de stock bajo y productos próximos a vencer
             </p>
           </div>
-          <Button onClick={() => setCreateDialogOpen(true)} className="w-full sm:w-auto">
+          <Button onClick={() => setCreateDialogOpen(true)} className="w-full sm:w-auto" data-tutorial="btn-create-order">
             <Plus className="h-4 w-4 mr-2" />
             Agregar Alertas
           </Button>
@@ -754,7 +754,7 @@ export default function InventoryAlerts() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" data-tutorial="stock-table">
         <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="my-alerts" className="flex-1 min-w-[100px] text-xs sm:text-sm">Mis Alertas</TabsTrigger>
-          <TabsTrigger value="low-stock" className="flex-1 min-w-[100px] text-xs sm:text-sm">Stock Bajo</TabsTrigger>
+          <TabsTrigger value="low-stock" className="flex-1 min-w-[100px] text-xs sm:text-sm" data-tutorial="low-stock">Stock Bajo</TabsTrigger>
           <TabsTrigger value="expiring" className="flex-1 min-w-[100px] text-xs sm:text-sm">Próx. Vencer</TabsTrigger>
           <TabsTrigger value="currency" className="flex-1 min-w-[100px] text-xs sm:text-sm">Monedas</TabsTrigger>
           <TabsTrigger value="notifications" className="flex-1 min-w-[100px] text-xs sm:text-sm flex items-center gap-1">
@@ -768,7 +768,7 @@ export default function InventoryAlerts() {
         </TabsList>
 
         {/* Mis Alertas - custom alert rules */}
-        <TabsContent value="my-alerts" className="space-y-4">
+        <TabsContent value="my-alerts" className="space-y-4" data-tutorial="create-po-alert">
           {loadingAlertRules ? (
             <div className="flex justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -860,7 +860,7 @@ export default function InventoryAlerts() {
           )}
         </TabsContent>
 
-        <TabsContent value="low-stock" className="space-y-4">
+        <TabsContent value="low-stock" className="space-y-4" data-tutorial="critical-stock">
           {loadingLowStock ? (
             <div className="flex justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin" />
