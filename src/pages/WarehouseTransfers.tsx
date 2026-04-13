@@ -112,6 +112,8 @@ export default function WarehouseTransfers() {
 
   const createTransfer = useMutation({
     mutationFn: async () => {
+      if (!currentCompany?.id) throw new Error("Empresa no seleccionada");
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autorizado");
 
@@ -125,7 +127,7 @@ export default function WarehouseTransfers() {
         status: "pending",
         requested_by: user.id,
         notes,
-        company_id: currentCompany?.id,
+        company_id: currentCompany.id,
       }));
 
       const { data: createdTransfers, error: transferError } = await supabase
@@ -143,7 +145,7 @@ export default function WarehouseTransfers() {
           product_id: item.product_id,
           product_name: item.product_name,
           quantity: item.quantity,
-          company_id: currentCompany?.id!
+          company_id: currentCompany.id
         }));
         allItems.push(...lineItems);
       });
@@ -169,6 +171,8 @@ export default function WarehouseTransfers() {
 
   const updateTransferStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      if (!currentCompany?.id) throw new Error("Empresa no seleccionada");
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autorizado");
 
@@ -182,6 +186,7 @@ export default function WarehouseTransfers() {
       const { error } = await supabase
         .from("warehouse_transfers")
         .update(updates)
+        .eq("company_id", currentCompany.id)
         .eq("id", id);
       if (error) throw error;
     },
@@ -311,11 +316,15 @@ export default function WarehouseTransfers() {
 
   const validateAndCreateTransfer = async () => {
     try {
+      const companyId = currentCompany?.id;
+      if (!companyId) throw new Error("Empresa no seleccionada");
+
       // Validate stock for all lines
       for (const line of lines) {
         const { data: warehouseStock, error: stockError } = await supabase
           .from("warehouse_stock")
           .select("product_id, stock")
+          .eq("company_id", companyId)
           .eq("warehouse_id", line.from_warehouse_id);
 
         if (stockError) throw stockError;

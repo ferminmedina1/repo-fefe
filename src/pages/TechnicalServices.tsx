@@ -426,8 +426,8 @@ export default function TechnicalServices() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold">
               Servicios Técnicos
             </h1>
@@ -446,7 +446,7 @@ export default function TechnicalServices() {
               }}
             >
               <DialogTrigger asChild>
-                <Button onClick={resetForm} className="w-full sm:w-auto">
+                <Button onClick={resetForm} className="w-full lg:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
                   Nuevo Servicio
                 </Button>

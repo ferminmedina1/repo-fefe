@@ -520,12 +520,12 @@ export default function Customers() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Clientes</h1>
             <p className="text-muted-foreground text-sm sm:text-base">Gestiona tu base de clientes</p>
           </div>
-          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap gap-2 w-full lg:w-auto lg:justify-end">
             <Button variant="outline" onClick={() => navigate("/reports?tab=customers")} className="w-full sm:w-auto">
               <BarChart3 className="h-4 w-4 mr-2" />
               Ver Reportes
@@ -536,7 +536,7 @@ export default function Customers() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DialogTrigger asChild>
-                      <Button onClick={() => { setEditingCustomer(null); resetForm(); }} className="gap-2" data-tutorial="btn-create-customer">
+                      <Button onClick={() => { setEditingCustomer(null); resetForm(); }} className="gap-2 w-full sm:w-auto" data-tutorial="btn-create-customer">
                         <Plus className="h-4 w-4" />
                         Nuevo Cliente
                       </Button>

@@ -337,12 +337,12 @@ const Purchases = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div>
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Compras</h1>
             <p className="text-muted-foreground text-sm sm:text-base">Administra las compras a proveedores</p>
           </div>
-          <Button variant="outline" onClick={() => navigate("/reports?tab=purchases")} className="w-full sm:w-auto">
+          <Button variant="outline" onClick={() => navigate("/reports?tab=purchases")} className="w-full lg:w-auto">
             <BarChart3 className="h-4 w-4 mr-2" />
             Ver Reportes
           </Button>

@@ -464,14 +464,14 @@ const Reports = () => {
   return (
     <Layout>
       <div className="space-y-4 md:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="min-w-0">
             <h1 className="text-2xl md:text-3xl font-bold">Reportes</h1>
             <p className="text-sm text-muted-foreground hidden sm:block">Visualiza el rendimiento de tu negocio</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 w-full lg:w-auto lg:justify-end">
             <Select value={dateRangeType} onValueChange={setDateRangeType}>
-              <SelectTrigger className="w-[130px] md:w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -489,7 +489,7 @@ const Reports = () => {
                   <Button
                     variant="outline"
                     className={cn(
-                      "justify-start text-left font-normal min-w-[240px]",
+                      "w-full sm:w-auto justify-start text-left font-normal sm:min-w-[240px]",
                       !customDateRange && "text-muted-foreground"
                     )}
                   >
@@ -524,7 +524,7 @@ const Reports = () => {
             )}
             
             <Select value={reportCurrency} onValueChange={setReportCurrency}>
-              <SelectTrigger className="w-[100px] md:w-[140px]">
+              <SelectTrigger className="w-full sm:w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -569,16 +569,16 @@ const Reports = () => {
         {/* Gráficos */}
         <Tabs defaultValue="sales" className="space-y-4">
           <div className="overflow-x-auto -mx-4 px-4">
-            <TabsList className="inline-flex w-auto min-w-full md:grid md:w-full md:grid-cols-9">
-              <TabsTrigger value="sales" className="text-xs md:text-sm">Ventas</TabsTrigger>
-              <TabsTrigger value="customers" className="text-xs md:text-sm">Clientes</TabsTrigger>
-              <TabsTrigger value="products" className="text-xs md:text-sm">Productos</TabsTrigger>
-              <TabsTrigger value="balances" className="text-xs md:text-sm">Saldos</TabsTrigger>
-              <TabsTrigger value="purchases" className="text-xs md:text-sm">Compras</TabsTrigger>
-              <TabsTrigger value="payments" className="text-xs md:text-sm">Pagos</TabsTrigger>
-              <TabsTrigger value="rotation" className="text-xs md:text-sm">Rotación</TabsTrigger>
-              <TabsTrigger value="returns" className="text-xs md:text-sm">Devoluciones</TabsTrigger>
-              <TabsTrigger value="repairs" className="text-xs md:text-sm">Arreglos</TabsTrigger>
+            <TabsList className="inline-flex w-max min-w-max lg:grid lg:w-full lg:grid-cols-9">
+              <TabsTrigger value="sales" className="text-xs md:text-sm whitespace-nowrap">Ventas</TabsTrigger>
+              <TabsTrigger value="customers" className="text-xs md:text-sm whitespace-nowrap">Clientes</TabsTrigger>
+              <TabsTrigger value="products" className="text-xs md:text-sm whitespace-nowrap">Productos</TabsTrigger>
+              <TabsTrigger value="balances" className="text-xs md:text-sm whitespace-nowrap">Saldos</TabsTrigger>
+              <TabsTrigger value="purchases" className="text-xs md:text-sm whitespace-nowrap">Compras</TabsTrigger>
+              <TabsTrigger value="payments" className="text-xs md:text-sm whitespace-nowrap">Pagos</TabsTrigger>
+              <TabsTrigger value="rotation" className="text-xs md:text-sm whitespace-nowrap">Rotación</TabsTrigger>
+              <TabsTrigger value="returns" className="text-xs md:text-sm whitespace-nowrap">Devoluciones</TabsTrigger>
+              <TabsTrigger value="repairs" className="text-xs md:text-sm whitespace-nowrap">Arreglos</TabsTrigger>
             </TabsList>
           </div>
 

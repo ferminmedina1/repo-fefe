@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -40,6 +41,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const [currentCompanyRole, setCurrentCompanyRole] = useState<CompanyUser['role'] | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const fetchUserCompanies = async () => {
     try {
@@ -154,6 +156,11 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const switchCompany = (companyId: string) => {
     const company = userCompanies.find((cu) => cu.company_id === companyId);
     if (company) {
+      // Invalidate all relevant caches before switching
+      queryClient.invalidateQueries({ queryKey: ['activeModules'] });
+      queryClient.invalidateQueries({ queryKey: ['permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['company'] });
+      
       setCurrentCompany(company.companies);
       setCurrentCompanyRole(company.role);
       localStorage.setItem('currentCompanyId', companyId);
@@ -161,8 +168,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         title: 'Empresa cambiada',
         description: `Ahora estás trabajando en ${company.companies.name}`,
       });
-      // Reload page to refresh all data and clear cache
-      window.location.reload();
+      // Keep current route; protected routes will redirect to /module-not-available if needed
     } else {
       // Si la empresa no existe en la lista del usuario, limpiar localStorage
       localStorage.removeItem('currentCompanyId');
