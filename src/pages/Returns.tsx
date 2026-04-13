@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,14 +15,17 @@ import { Search, RotateCcw, CheckCircle, XCircle, Eye, Info, User, ShoppingCart,
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
+import { getUserErrorMessage } from "@/lib/errorUtils";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export default function Returns() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [saleSearchQuery, setSaleSearchQuery] = useState("");
   const [selectedReturn, setSelectedReturn] = useState<any>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -31,22 +35,35 @@ export default function Returns() {
   const [refundMethod, setRefundMethod] = useState<string>("credit_note");
   const [warehouseId, setWarehouseId] = useState<string>("");
   const [returnItems, setReturnItems] = useState<Array<{ product_id: string; product_name: string; unit_price: number; quantity: number; subtotal: number }>>([]);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
   const queryClient = useQueryClient();
 
   const { currentCompany } = useCompany();
+  const { hasPermission } = usePermissions();
 
-  // Sales for origin selection
+  const canCreate = hasPermission("returns", "create");
+  const canEdit = hasPermission("returns", "edit");
+
+  // Sales for origin selection — MED-4: búsqueda para poder encontrar ventas antiguas
   const { data: sales } = useQuery({
-    queryKey: ["sales-for-returns", currentCompany?.id],
+    queryKey: ["sales-for-returns", currentCompany?.id, saleSearchQuery],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("sales")
         .select(`id, sale_number, customer_id, customer:customers(name), sale_items(*)`)
         .eq("company_id", currentCompany?.id)
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(200);
+      if (saleSearchQuery) {
+        const sanitized = sanitizeSearchQuery(saleSearchQuery);
+        if (sanitized) {
+          query = query.ilike("sale_number", `%${sanitized}%`);
+        }
+      }
+      const { data, error } = await query;
       if (error) throw error;
-      return data as any[];
+      return data;
     },
   });
 
@@ -62,7 +79,7 @@ export default function Returns() {
         .order("is_main", { ascending: false })
         .order("name");
       if (error) throw error;
-      return data as any[];
+      return data;
     },
   });
 
@@ -87,7 +104,10 @@ export default function Returns() {
     setReturnItems((prev) => {
       const next = [...prev];
       const item = next[idx];
-      const quantity = Math.max(0, qty);
+      // MED-3: Cap qty usando product_id (no índice de array) para evitar desajustes de orden
+      const saleItem = selectedSale?.sale_items?.find((si: any) => si.product_id === item.product_id);
+      const maxQty = saleItem ? Number(saleItem.quantity) : Infinity;
+      const quantity = Math.min(Math.max(0, qty), maxQty);
       item.quantity = quantity;
       item.subtotal = quantity * item.unit_price;
       return next;
@@ -103,14 +123,17 @@ export default function Returns() {
   );
   const total = totals.subtotal;
   
-  const { data: returns } = useQuery({
-    queryKey: ["returns", searchQuery, currentCompany?.id],
+  const { data: returnResult } = useQuery({
+    queryKey: ["returns", searchQuery, currentCompany?.id, page, pageSize],
     queryFn: async () => {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
       let query = supabase
         .from("returns")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("company_id", currentCompany?.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
       if (searchQuery) {
         const sanitized = sanitizeSearchQuery(searchQuery);
@@ -119,11 +142,15 @@ export default function Returns() {
         }
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw error;
-      return data;
+      return { data: data || [], count: count || 0 };
     },
   });
+
+  const returns = returnResult?.data || [];
+  const returnsTotal = returnResult?.count || 0;
+  const returnsTotalPages = Math.max(1, Math.ceil(returnsTotal / pageSize));
 
   const { data: returnDetails } = useQuery({
     queryKey: ["return-details", selectedReturn?.id],
@@ -156,22 +183,71 @@ export default function Returns() {
         .from("returns")
         .update(updates)
         .eq("id", id);
-      
+
       if (error) throw error;
 
-      // Si es aprobada y método es credit_note, crear nota de crédito
       if (status === "approved") {
-        const returnData = returns?.find(r => r.id === id);
-        if (returnData && returnData.refund_method === "credit_note") {
-          const { data: numberData } = await supabase.rpc("generate_credit_note_number");
-          
-          await supabase.from("credit_notes").insert({
-            credit_note_number: numberData,
-            return_id: id,
-            customer_id: returnData.customer_id,
-            amount: returnData.total,
-            balance: returnData.total,
+        // HIGH-1: Fetch return data from server (no usar estado local paginado)
+        const { data: returnData, error: returnFetchError } = await supabase
+          .from("returns")
+          .select("id, customer_id, total, refund_method, warehouse_id")
+          .eq("id", id)
+          .eq("company_id", currentCompany?.id)
+          .single();
+        if (returnFetchError || !returnData) throw new Error("No se pudo obtener la información de la devolución");
+
+        // Restore stock for returned items
+        const { data: returnItems, error: itemsError } = await supabase
+          .from("return_items")
+          .select("product_id, quantity")
+          .eq("return_id", id);
+        if (itemsError) throw itemsError;
+
+        if (returnItems && returnItems.length > 0) {
+          // Build positive adjustments (stock comes back)
+          const adjustments: Record<string, number> = {};
+          returnItems.forEach((item) => {
+            if (item.product_id) {
+              adjustments[item.product_id] = (adjustments[item.product_id] || 0) + item.quantity;
+            }
           });
+
+          const { error: stockError } = await supabase.rpc("batch_update_product_stock", { adjustments });
+          if (stockError) throw stockError;
+
+          // Also restore warehouse stock if a warehouse was assigned
+          if (returnData.warehouse_id) {
+            const { error: whError } = await supabase.rpc("batch_update_warehouse_stock", {
+              p_warehouse_id: returnData.warehouse_id,
+              adjustments,
+            });
+            if (whError) throw whError;
+          }
+        }
+
+        // HIGH-2: Verificar que no exista ya una nota de crédito para evitar duplicados
+        if (returnData.refund_method === "credit_note") {
+          const { data: existingCN } = await supabase
+            .from("credit_notes")
+            .select("id")
+            .eq("return_id", id)
+            .maybeSingle();
+
+          if (!existingCN) {
+            const { data: numberData, error: numberError } = await supabase.rpc("generate_credit_note_number");
+            if (numberError) throw numberError;
+            if (!numberData) throw new Error("No se pudo generar el número de nota de crédito");
+
+            const { error: cnError } = await supabase.from("credit_notes").insert({
+              credit_note_number: numberData,
+              return_id: id,
+              customer_id: returnData.customer_id,
+              amount: returnData.total,
+              balance: returnData.total,
+              company_id: currentCompany?.id,
+            });
+            if (cnError) throw cnError;
+          }
         }
       }
     },
@@ -181,7 +257,7 @@ export default function Returns() {
       queryClient.invalidateQueries({ queryKey: ["return-details"] });
     },
     onError: (error: Error) => {
-      toast.error("Error: " + error.message);
+      toast.error(getUserErrorMessage(error, "Error al actualizar estado"));
     },
   });
 
@@ -255,6 +331,7 @@ export default function Returns() {
           status: "pending",
           company_id: currentCompany?.id,
           user_id: user.id,
+          warehouse_id: warehouseId || null,
         })
         .select()
         .single();
@@ -286,7 +363,7 @@ export default function Returns() {
       setWarehouseId("");
       setReturnItems([]);
     },
-    onError: (e: any) => toast.error(e.message),
+    onError: (e: any) => toast.error(getUserErrorMessage(e, "Error al crear devolución")),
   });
 
   const getRefundMethodLabel = (method: string) => {
@@ -315,7 +392,7 @@ export default function Returns() {
                 <Input
                   placeholder="Buscar por número o cliente..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
                   className="pl-10"
                 />
               </div>
@@ -324,7 +401,7 @@ export default function Returns() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <DialogTrigger asChild>
-                        <Button className="gap-2 w-full sm:w-auto">
+                        <Button className="gap-2 w-full sm:w-auto" disabled={!canCreate} data-tutorial="btn-create-return">
                           <RotateCcw className="h-4 w-4" />
                           Nueva Devolución
                         </Button>
@@ -352,6 +429,12 @@ export default function Returns() {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label>Venta *</Label>
+                          <Input
+                            placeholder="Buscar por número de venta..."
+                            value={saleSearchQuery}
+                            onChange={(e) => setSaleSearchQuery(e.target.value)}
+                            className="mb-1"
+                          />
                           <Select
                             value={selectedSaleId}
                             onValueChange={(v) => {
@@ -470,7 +553,7 @@ export default function Returns() {
                         </div>
                         <h3 className="text-sm font-semibold">Detalles</h3>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-4" data-tutorial="return-reason">
                         <div>
                           <Label>Motivo</Label>
                           <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo de la devolución" />
@@ -496,7 +579,7 @@ export default function Returns() {
 
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
-                      <Button className="gap-2" disabled={!selectedSale || returnItems.every(i => i.quantity === 0)} onClick={() => createReturnMutation.mutate()}>
+                      <Button className="gap-2" disabled={!canCreate || !selectedSale || returnItems.every(i => i.quantity === 0)} onClick={() => createReturnMutation.mutate()} data-tutorial="process-return">
                         <CheckCircle2 className="h-4 w-4" />
                         Crear Devolución
                       </Button>
@@ -521,7 +604,7 @@ export default function Returns() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {returns?.map((returnItem) => (
+                {returns.map((returnItem) => (
                   <TableRow key={returnItem.id}>
                     <TableCell className="font-mono font-medium">
                       <div className="flex items-center gap-2">
@@ -574,6 +657,7 @@ export default function Returns() {
                                     size="icon"
                                     variant="outline"
                                     className="text-success"
+                                    disabled={!canEdit}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       updateStatusMutation.mutate({ id: returnItem.id, status: "approved" });
@@ -592,6 +676,7 @@ export default function Returns() {
                                     size="icon"
                                     variant="outline"
                                     className="text-destructive"
+                                    disabled={!canEdit}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       updateStatusMutation.mutate({ id: returnItem.id, status: "rejected" });
@@ -611,6 +696,22 @@ export default function Returns() {
                 ))}
               </TableBody>
             </Table>
+            <PaginationControls
+              currentPage={page + 1}
+              totalPages={returnsTotalPages}
+              totalItems={returnsTotal}
+              startIndex={returnsTotal === 0 ? 0 : page * pageSize + 1}
+              endIndex={Math.min((page + 1) * pageSize, returnsTotal)}
+              pageSize={pageSize}
+              canGoNext={page + 1 < returnsTotalPages}
+              canGoPrevious={page > 0}
+              onPageChange={(p) => setPage(p - 1)}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(0); }}
+              onNextPage={() => setPage(prev => prev + 1)}
+              onPreviousPage={() => setPage(prev => prev - 1)}
+              onFirstPage={() => setPage(0)}
+              onLastPage={() => setPage(returnsTotalPages - 1)}
+            />
           </CardContent>
         </Card>
 
@@ -731,6 +832,7 @@ export default function Returns() {
                       <Button
                         variant="outline"
                         className="text-destructive"
+                        disabled={!canEdit}
                         onClick={() => {
                           updateStatusMutation.mutate({
                             id: returnDetails.id,
@@ -744,6 +846,7 @@ export default function Returns() {
                       </Button>
                       <Button
                         className="bg-success"
+                        disabled={!canEdit}
                         onClick={() => {
                           updateStatusMutation.mutate({
                             id: returnDetails.id,

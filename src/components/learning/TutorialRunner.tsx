@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Joyride, { CallBackProps, STATUS, Step, TooltipRenderProps, ACTIONS, EVENTS } from 'react-joyride';
 import { useTutorial } from '@/hooks/useTutorial';
 import { Button } from '@/components/ui/button';
@@ -10,38 +11,24 @@ import { cn } from '@/lib/utils';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Spotlight pulse animation - Enhanced visibility with strong glow and border
-// Better highlight effect with multiple layers
+// Spotlight pulse animation
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const spotlightStyles = `
   @keyframes spotlight-pulse {
     0%, 100% {
-      box-shadow: 
-        inset 0 0 0 2px rgba(59, 130, 246, 0.8),
-        0 0 0 6px rgba(59, 130, 246, 0.7),
-        0 0 0 12px rgba(59, 130, 246, 0.4),
-        0 0 0 18px rgba(59, 130, 246, 0.2),
-        0 0 25px 2px rgba(59, 130, 246, 0.5),
-        0 0 50px 4px rgba(59, 130, 246, 0.3) !important;
-      outline: 3px solid rgba(59, 130, 246, 0.6) !important;
-      outline-offset: -2px;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.8), 0 0 0 8px rgba(59, 130, 246, 0.4), 0 0 25px rgba(59, 130, 246, 0.6), inset 0 0 0 2px rgba(59, 130, 246, 0.5) !important;
     }
     50% {
-      box-shadow: 
-        inset 0 0 0 2px rgba(59, 130, 246, 1),
-        0 0 0 8px rgba(59, 130, 246, 0.85),
-        0 0 0 16px rgba(59, 130, 246, 0.5),
-        0 0 0 24px rgba(59, 130, 246, 0.25),
-        0 0 35px 3px rgba(59, 130, 246, 0.7),
-        0 0 70px 5px rgba(59, 130, 246, 0.4) !important;
-      outline: 3px solid rgba(59, 130, 246, 0.8) !important;
-      outline-offset: -2px;
+      box-shadow: 0 0 0 4px rgba(59, 130, 246, 1), 0 0 0 10px rgba(59, 130, 246, 0.5), 0 0 35px rgba(59, 130, 246, 0.8), inset 0 0 0 2px rgba(59, 130, 246, 0.7) !important;
     }
   }
   
   .react-joyride__spotlight {
-    animation: spotlight-pulse 3s ease-in-out infinite !important;
+    animation: spotlight-pulse 1.5s ease-in-out infinite !important;
     border-radius: 14px !important;
-    background-color: transparent !important;
+    border: 2px solid rgba(59, 130, 246, 0.6) !important;
+    background-color: rgba(59, 130, 246, 0.08) !important;
+    position: relative !important;
   }
 `;
 
@@ -102,27 +89,12 @@ function validateTarget(selector: string | undefined, debug = false): Validation
   try {
     const element = document.querySelector(selector);
     if (!element) {
-      if (debug) console.log(`[Tutorial Debug] ❌ validateTarget FAIL: "${selector}" no se encontró en el DOM.`);
+      console.log(`[Tutorial Debug] validateTarget FAIL: "${selector}" no se encontró en el DOM.`);
       return { isValid: false, reason: 'Element not found in DOM' };
     }
-    
-    // Advanced validation: check if element is actually visible and renderable
-    const rect = element.getBoundingClientRect();
-    const hasVisibleBounds = rect.width > 0 && rect.height > 0;
-    const computedStyle = window.getComputedStyle(element);
-    const isVisible = computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden';
-    const hasContent = element.childNodes.length > 0 || element.textContent?.trim().length > 0;
-    
-    if (debug) {
-      console.log(`[Tutorial Debug] ✅ validateTarget OK: "${selector}"`, {
-        hasVisibleBounds,
-        isVisible,
-        hasContent,
-        dimensions: { width: rect.width, height: rect.height }
-      });
-    }
-    
-    // Permissive: if it's in the DOM with some content/dimension, it's valid
+    console.log(`[Tutorial Debug] validateTarget OK: "${selector}" encontrado.`);
+    // Extremely permissive: if it's in the DOM, let Joyride attempt to highlight it.
+    // This fixes issues where zero-height parents or opacity 0 during animations falsely invalidated targets.
     return { isValid: true };
   } catch (e) {
     return { isValid: false, reason: `Error during validation: ${(e as Error).message}` };
@@ -160,7 +132,7 @@ function NarrationCard({
   blockName, action, isLastStep, canGoBack, onNext, onBack, onSkip, onMinimize, targetUnavailable, targetFailureReason
 }: NarrationCardProps) {
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10001] w-[400px] max-w-[calc(100vw-24px)]">
+    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[10001] w-[400px] max-w-[calc(100vw-32px)] max-h-[calc(100vh-32px)] overflow-y-auto">
       {/* Block name or "General Overview" badge â€” positioned ABOVE card, not clipped */}
       <div className="flex justify-center mb-3">
         <div className="flex items-center gap-1.5 bg-gradient-to-r from-primary/15 to-primary/10 border border-primary/30 rounded-lg px-3 py-1.5 shadow-sm shadow-primary/20 whitespace-nowrap">
@@ -367,9 +339,25 @@ const CustomTooltip = ({
   const totalSteps = tutorial?.steps.length || 0;
   const originalStep = tutorial?.steps[index];
   const hasAction = !!originalStep?.action;
+  // Modal SIEMPRE centrado en la pantalla, independiente del scroll y del target
+  if (typeof document === 'undefined') return null;
 
-  return (
-    <div {...tooltipProps} className="relative w-[400px] max-w-[calc(100vw-24px)] flex flex-col items-center">
+  const dynamicStyle: React.CSSProperties = {
+    position: 'fixed',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    zIndex: 10001,
+    pointerEvents: 'auto',
+    boxSizing: 'border-box',
+    width: 400,
+    maxWidth: 'calc(100vw - 32px)',
+    maxHeight: 'calc(100vh - 32px)',
+    overflowY: 'auto',
+  };
+
+  return createPortal(
+    <div style={dynamicStyle} className="w-[400px]">
       {/* Block indicator badge — positioned ABOVE card, just like NarrationCard */}
       {originalStep?.blockName && (
         <div className="flex justify-center mb-3">
@@ -460,7 +448,8 @@ const CustomTooltip = ({
         {originalStep?.duration && (
           <p className="text-[10px] text-muted-foreground/40 mt-3 text-center">⏱️ ~{originalStep.duration}s</p>
         )}
-      </div>      </div>    </div>
+      </div>      </div>    </div>,
+    document.body
   );
 };
 
@@ -498,7 +487,7 @@ export function TutorialRunner() {
   const location = useLocation();
   const {
     isRunning, tutorialState, getCurrentTutorial,
-    setNavigate, endTutorial, goToStep, nextStep, skipTutorial,
+    setNavigate, endTutorial, goToStep, nextStep, skipTutorial, isTutorialNavigating,
   } = useTutorial();
 
   const [joyrideSteps, setJoyrideSteps] = useState<Step[]>([]);
@@ -512,6 +501,7 @@ export function TutorialRunner() {
   const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const validationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentTutorial = getCurrentTutorial();
+  const lastPathRef = useRef(location.pathname);
 
   useEffect(() => { setNavigate(navigate); }, [navigate, setNavigate]);
 
@@ -530,27 +520,32 @@ export function TutorialRunner() {
     };
   }, []);
 
-  // Abort on public routes
+  // Always close tutorial UI when route changes
   useEffect(() => {
-    if (!isRunning) return;
-    const pub = ['/', '/auth', '/signup', '/reset-password', '/setup-wizard'];
-    const path = location.pathname;
-    if (pub.includes(path) || path.startsWith('/set-password/') || path.includes('/signup/')) {
-      endTutorial();
+    const currentPath = location.pathname;
+
+    // Inicializar / sincronizar referencia en estados no activos
+    if (!isRunning) {
+      lastPathRef.current = currentPath;
+      return;
+    }
+
+    // Si hay un cambio real de ruta mientras el tutorial está corriendo,
+    // cerramos SÓLO si la navegación NO fue disparada por el tutorial mismo.
+    if (currentPath !== lastPathRef.current) {
+      lastPathRef.current = currentPath;
+      if (!isTutorialNavigating()) {
+        endTutorial();
+        setShowCompletion(false);
+        setMinimized(false);
+      }
     }
   }, [location.pathname, isRunning, endTutorial]);
 
   // Reset minimized on step change
-  useEffect(() => { 
-    setMinimized(false);
-    
-    // Clear invalid targets on step change to allow re-validation
-    // This ensures each step gets a fresh chance to validate its target
-    setInvalidTargets(new Set());
-    setTargetFailureReasons(new Map());
-  }, [tutorialState.currentStepIndex]);
+  useEffect(() => { setMinimized(false); }, [tutorialState.currentStepIndex]);
 
-  // Continuously validate current target (robust: 20 sec retry tolerance)
+  // Continuously validate current target (robust: 8 sec retry with exponential backoff)
   useEffect(() => {
     if (!isRunning || minimized) {
       if (validationTimerRef.current) clearInterval(validationTimerRef.current);
@@ -562,11 +557,12 @@ export function TutorialRunner() {
 
     const selector = currentStep.target;
     let attempts = 0;
-    const maxAttempts = 40; // 20 seconds total (500ms each) - increased from 20
+    const maxAttempts = 20; // 10 seconds total (500ms each)
     let observer: IntersectionObserver | null = null;
 
     const checkAndUpdateTarget = () => {
       const validation = validateTarget(selector, attempts === 0);
+      console.log(`[Tutorial Debug] checkAndUpdateTarget Attempt ${attempts} for "${selector}", isValid=${validation.isValid}`);
       
       if (validation.isValid) {
         // Target is valid, ensure it's not in invalid set
@@ -591,9 +587,7 @@ export function TutorialRunner() {
         if (observer) observer.disconnect();
         
         if (attempts > 0) {
-          console.log(`[Tutorial] ✅ Target "${selector}" found after ${attempts} attempts (${(attempts * 0.5).toFixed(1)}s)`);
-        } else {
-          console.log(`[Tutorial] ✅ Target "${selector}" found immediately`);
+          console.log(`[Tutorial] Target "${selector}" recovered after ${attempts} attempts`);
         }
         return true;
       }
@@ -604,8 +598,8 @@ export function TutorialRunner() {
     // Check immediately
     if (checkAndUpdateTarget()) return;
 
-    // DON'T mark as invalid yet - wait for maxAttempts first
-    // This allows time for async-loaded elements to appear
+    // Mark as temporarily invalid
+    setInvalidTargets(prev => new Set([...prev, selector]));
 
     // Set up IntersectionObserver to catch async-loaded elements
     try {
@@ -616,9 +610,7 @@ export function TutorialRunner() {
             entries.forEach(entry => {
               if (entry.isIntersecting) {
                 // Element became visible
-                if (checkAndUpdateTarget()) {
-                  console.log(`[Tutorial] ✅ Target visibility detected: "${selector}"`);
-                }
+                checkAndUpdateTarget();
               }
             });
           },
@@ -639,10 +631,10 @@ export function TutorialRunner() {
       }
 
       if (attempts >= maxAttempts) {
-        // 20+ seconds passed, NOW mark as permanently unavailable
+        // 10+ seconds passed, mark as permanently unavailable
         const validation = validateTarget(selector);
         console.warn(
-          `[Tutorial] ❌ Target "${selector}" not found after ${maxAttempts} attempts (${(maxAttempts * 0.5).toFixed(1)}s). Marcándolo como inválido.`,
+          `[Tutorial Debug] Target "${selector}" not found after ${maxAttempts} attempts. Marcándolo como inválido.`,
           validation
         );
         
@@ -651,7 +643,7 @@ export function TutorialRunner() {
         // Save failure reason
         setTargetFailureReasons(prev => {
           const updated = new Map(prev);
-          updated.set(selector, `Element not found (waited ${(maxAttempts * 0.5).toFixed(0)}s)`);
+          updated.set(selector, validation.reason || 'Elemento no encontrado');
           return updated;
         });
         
@@ -673,7 +665,7 @@ export function TutorialRunner() {
   const stepIndex = tutorialState.currentStepIndex;
   const currentOriginalStep = currentTutorial?.steps[stepIndex] ?? null;
   
-  // Only treat as untargeted if step explicitly has NO target defined (after 20 seconds timeout, mark as untargeted)
+  // If target exists but is invalid in DOM, treat as untargeted (fallback to narration)
   const targetIsInvalid = currentOriginalStep?.target && invalidTargets.has(currentOriginalStep.target);
   const isUntargetedStep = isRunning && currentOriginalStep && (!currentOriginalStep.target || targetIsInvalid);
   const isLastStep = !!currentTutorial && stepIndex === currentTutorial.steps.length - 1;
@@ -682,73 +674,68 @@ export function TutorialRunner() {
   useEffect(() => {
     if (!currentTutorial) { setJoyrideSteps([]); return; }
     const steps: Step[] = currentTutorial.steps.map(step => ({
-      // Always use the original target selector - allow time for async elements to load
-      // Don't fallback to 'body' just because element hasn't loaded yet
-      target: step.target || 'body',
+      target: (step.target && !invalidTargets.has(step.target)) ? step.target : 'body',
       title: step.title,
       content: step.description,
-      placement: step.target
+      placement: (step.target && !invalidTargets.has(step.target))
         ? (step.position === 'top' ? 'top' : step.position === 'bottom' ? 'bottom' : step.position === 'left' ? 'left' : step.position === 'right' ? 'right' : 'auto')
         : 'center',
       disableBeacon: true,
       disableOverlayClose: true,
       spotlightClicks: minimized,
-      spotlightPadding: 20,
+      spotlightPadding: 22,
       floaterProps: { 
         disableAnimation: true,
-        autoUpdate: true, // Recalculate position on scroll/resize
       },
     }));
     
-    console.log(
-      `[Tutorial] 📋 Generated Joyride Steps:`,
-      steps.map((s, i) => ({
-        step: i + 1,
-        target: s.target,
-        placement: s.placement
-      }))
-    );
+    console.log(`[Tutorial Debug] Generando joyrideSteps:`, steps.map(s => s.target));
     setJoyrideSteps(steps);
-  }, [currentTutorial, minimized]);
+  }, [currentTutorial, invalidTargets, minimized]);
 
-  // Trigger completion flash
-  const triggerCompletion = useCallback((name: string) => {
-    if (completionTimerRef.current) clearTimeout(completionTimerRef.current);
-    setCompletedName(name);
-    setShowCompletion(true);
-    completionTimerRef.current = setTimeout(() => setShowCompletion(false), 2600);
-  }, []);
-
+  // Limpieza de timer de "completion flash" si existiera
   useEffect(() => () => { if (completionTimerRef.current) clearTimeout(completionTimerRef.current); }, []);
 
   // Joyride callback â€” only relevant for targeted steps
   const handleJoyrideCallback = useCallback((data: CallBackProps) => {
     const { action, index, status, type } = data;
 
+    // Si Joyride marca el tour como finalizado u omitido, cerramos el tutorial globalmente
     if (([STATUS.FINISHED, STATUS.SKIPPED] as string[]).includes(status)) {
-      if (status === STATUS.FINISHED && currentTutorial) triggerCompletion(currentTutorial.moduleName);
       endTutorial();
       return;
     }
+
     if (type === EVENTS.STEP_AFTER) {
-      if (action === ACTIONS.NEXT) goToStep(index + 1);
-      else if (action === ACTIONS.PREV) goToStep(index - 1);
+      const totalSteps = currentTutorial?.steps.length ?? 0;
+      const isLastIndex = totalSteps > 0 && index >= totalSteps - 1;
+
+      if (action === ACTIONS.NEXT) {
+        // En el último paso, hacer lo mismo que el botón "Finalizar" de la MiniBar
+        if (isLastIndex) {
+          endTutorial();
+        } else {
+          goToStep(index + 1);
+        }
+      } else if (action === ACTIONS.PREV) {
+        goToStep(index - 1);
+      }
     } else if (type === EVENTS.TARGET_NOT_FOUND) {
       console.warn(`Tutorial: target no encontrado en paso ${index}`);
     }
+
+    // Cierre explícito con la X del tooltip
     if (action === ACTIONS.CLOSE && type === EVENTS.STEP_AFTER) endTutorial();
-  }, [currentTutorial, endTutorial, goToStep, triggerCompletion]);
+  }, [currentTutorial, endTutorial, goToStep]);
 
   // NarrationCard handlers
   const handleNarrationNext = useCallback(() => {
     if (isLastStep && currentTutorial) {
-      triggerCompletion(currentTutorial.moduleName);
-      // Delay endTutorial to allow completion flash to show
-      setTimeout(() => endTutorial(), 100);
+      endTutorial();
     } else {
       nextStep();
     }
-  }, [isLastStep, currentTutorial, endTutorial, triggerCompletion]);
+  }, [isLastStep, currentTutorial, endTutorial]);
 
   const handleNarrationBack = useCallback(() => {
     goToStep(stepIndex - 1);
@@ -758,13 +745,12 @@ export function TutorialRunner() {
   const handleMiniBarNext = useCallback(() => {
     if (isLastStep && currentTutorial) {
       setMinimized(false);
-      triggerCompletion(currentTutorial.moduleName);
-      setTimeout(() => endTutorial(), 160);
+      endTutorial();
     } else {
       setMinimized(false);
       setTimeout(() => nextStep(), 160);
     }
-  }, [isLastStep, currentTutorial, nextStep, endTutorial, triggerCompletion]);
+  }, [isLastStep, currentTutorial, nextStep, endTutorial]);
 
   // Cleanup on unmount or when tutorial ends
   useEffect(() => {
@@ -775,8 +761,9 @@ export function TutorialRunner() {
   }, []);
 
   // Joyride should be running only when:
-  // - isRunning AND not minimized AND current step HAS a VALID target
-  const shouldRunJoyride = isRunning && !minimized && !isUntargetedStep;
+  // - isRunning AND current step HAS a VALID target
+  //   (minimizado solo oculta el tooltip, pero mantiene el spotlight azul)
+  const shouldRunJoyride = isRunning && !isUntargetedStep;
 
   if (!isRunning && !showCompletion) return null;
 
@@ -797,13 +784,16 @@ export function TutorialRunner() {
           disableScrollParentFix={false}
           floaterProps={{ disableAnimation: true }}
           tooltipComponent={(props: TooltipRenderProps) => {
-            if (isUntargetedStep) return <div style={{ display: 'none' }} />;
+            // Si el paso es sin target o está minimizado, ocultamos solo el tooltip
+            // pero mantenemos Joyride para que siga visible la selección azul.
+            if (isUntargetedStep || minimized) return <div style={{ display: 'none' }} />;
             return <CustomTooltip {...props} onMinimize={() => setMinimized(true)} />;
           }}
+          disableOverlay={false}
           styles={{
             options: {
-              zIndex: 10000,
-              overlayColor: 'rgba(0, 0, 0, 0.75)',
+              zIndex: 9999,
+              overlayColor: 'rgba(0, 0, 0, 0)',
               arrowColor: 'transparent',
               backgroundColor: 'transparent',
               textColor: 'transparent',
@@ -811,10 +801,11 @@ export function TutorialRunner() {
             },
             spotlight: {
               borderRadius: '14px',
-              backgroundColor: 'transparent',
+              backgroundColor: 'rgba(59, 130, 246, 0.08)',
+              border: '2px solid rgba(59, 130, 246, 0.6)',
             },
             overlay: {
-              zIndex: 10000,
+              zIndex: 9999,
             },
             tooltip: {
               backgroundColor: 'transparent',

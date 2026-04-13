@@ -246,10 +246,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, Partial<RolePermissionDef
         "accountant_reports",
         "expenses",
         "cash_register",
-        "bank_accounts",
-        "bank_movements",
-        "card_movements",
-        "retentions",
         "checks",
         "accounts_receivable",
         "customers",
@@ -260,6 +256,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, Partial<RolePermissionDef
       ],
       DEFAULT_VIEW_EXPORT
     ),
+    // Finance modules: accountant has full create+edit access (no delete)
+    bank_accounts: DEFAULT_NO_DELETE,
+    bank_movements: DEFAULT_NO_DELETE,
+    card_movements: DEFAULT_NO_DELETE,
+    retentions: DEFAULT_NO_DELETE,
   },
   auditor: {
     ...allowAll(

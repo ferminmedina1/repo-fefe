@@ -22,6 +22,7 @@ import { PaymentMethodsManager } from "@/components/settings/PaymentMethodsManag
 import { PlanChanger } from "@/components/settings/PlanChanger";
 import { SubscriptionActions } from "@/components/settings/SubscriptionActions";
 import { InvoiceViewer } from "@/components/settings/InvoiceViewer";
+import { Dialog } from "@/components/ui/dialog";
 
 function getSubscriptionStatusLabel(status?: string) {
   const map: Record<string, string> = {
@@ -471,7 +472,7 @@ export default function Settings() {
             </TabsList>
           </div>
 
-          <TabsContent value="company">
+          <TabsContent value="company" data-tutorial="company-info">
             <CompanySettings />
           </TabsContent>
 
@@ -1025,7 +1026,7 @@ export default function Settings() {
 
               <InvoiceViewer companyId={currentCompany?.id} />
 
-              <PaymentMethodsManager companyId={currentCompany?.id} />
+              <div data-tutorial="payment-methods"><PaymentMethodsManager companyId={currentCompany?.id} /></div>
             </div>
           </TabsContent>
         </Tabs>

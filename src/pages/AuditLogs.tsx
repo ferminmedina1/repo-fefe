@@ -90,7 +90,7 @@ export default function AuditLogs() {
         </div>
 
         <Card>
-          <CardHeader>
+          <CardHeader data-tutorial="export-audit">
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
               Registros de Auditoría
@@ -100,7 +100,7 @@ export default function AuditLogs() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-4">
+            <div className="mb-4" data-tutorial="filter-logs">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -112,7 +112,7 @@ export default function AuditLogs() {
               </div>
             </div>
 
-            <div className="rounded-md border">
+            <div className="rounded-md border" data-tutorial="audit-detail">
               <Table>
                 <TableHeader>
                   <TableRow>

@@ -11,10 +11,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, Eye, Trash2, TrendingDown, Package, AlertCircle } from "lucide-react";
+import { Plus, Search, Eye, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { useCompany } from "@/contexts/CompanyContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 
 interface ReturnItem {
   product_id: string;
@@ -26,6 +28,8 @@ interface ReturnItem {
 
 const PurchaseReturns = () => {
   const { currentCompany } = useCompany();
+  const { hasPermission } = usePermissions();
+  const canCreate = hasPermission("purchases", "create");
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -60,7 +64,8 @@ const PurchaseReturns = () => {
         .order("created_at", { ascending: false });
 
       if (searchQuery) {
-        query = query.ilike("return_number", `%${searchQuery}%`);
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) query = query.ilike("return_number", `%${sanitized}%`);
       }
 
       const { data, error } = await query;
@@ -102,7 +107,7 @@ const PurchaseReturns = () => {
         `)
         .eq("company_id", currentCompany.id)
         .eq("supplier_id", supplierId)
-        .eq("status", "completed");
+        .order("purchase_date", { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -127,7 +132,7 @@ const PurchaseReturns = () => {
           company_id: currentCompany.id,
           supplier_id: returnData.supplier_id,
           purchase_id: returnData.purchase_id,
-          return_number: `PR-${Date.now()}`,
+          return_number: `PR-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`,
           total_amount: total,
           status: "pending",
           notes: returnData.notes,
@@ -159,11 +164,28 @@ const PurchaseReturns = () => {
       const { error: stockError } = await supabase.rpc('batch_update_product_stock', { adjustments });
       if (stockError) throw stockError;
 
+      // MED-4: Update supplier balance — return reduces debt (fresh fetch to avoid race)
+      const { data: freshSupplier, error: fetchSupplierError } = await supabase
+        .from("suppliers")
+        .select("current_balance")
+        .eq("id", returnData.supplier_id)
+        .eq("company_id", currentCompany.id)
+        .single();
+      if (fetchSupplierError) throw fetchSupplierError;
+      const { error: balanceError } = await supabase
+        .from("suppliers")
+        .update({ current_balance: (freshSupplier?.current_balance || 0) - total })
+        .eq("id", returnData.supplier_id)
+        .eq("company_id", currentCompany.id);
+      if (balanceError) throw balanceError;
+
       return returnRecord;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-returns"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers-stats"] });
       toast.success("Devolución creada exitosamente");
       resetForm();
       setIsDialogOpen(false);
@@ -175,18 +197,59 @@ const PurchaseReturns = () => {
 
   const deleteReturnMutation = useMutation({
     mutationFn: async (returnId: string) => {
+      if (!currentCompany?.id) throw new Error("No company selected");
+
+      // CRIT-1: Fetch return + items from DB to reverse stock and supplier balance
+      const { data: returnRecord, error: fetchError } = await (supabase as any)
+        .from("purchase_returns")
+        .select("supplier_id, total_amount, purchase_return_items(product_id, quantity)")
+        .eq("id", returnId)
+        .eq("company_id", currentCompany.id)
+        .single();
+      if (fetchError) throw fetchError;
+
+      // Re-increment stock for all returned items
+      const adjustments: Record<string, number> = {};
+      returnRecord.purchase_return_items.forEach((item: any) => {
+        adjustments[item.product_id] = (adjustments[item.product_id] || 0) + item.quantity;
+      });
+      if (Object.keys(adjustments).length > 0) {
+        const { error: stockError } = await supabase.rpc('batch_update_product_stock', { adjustments });
+        if (stockError) throw stockError;
+      }
+
+      // Re-increment supplier balance (fresh fetch to avoid race)
+      const { data: freshSupplier, error: fetchSupplierError } = await supabase
+        .from("suppliers")
+        .select("current_balance")
+        .eq("id", returnRecord.supplier_id)
+        .eq("company_id", currentCompany.id)
+        .single();
+      if (fetchSupplierError) throw fetchSupplierError;
+      const { error: balanceError } = await supabase
+        .from("suppliers")
+        .update({ current_balance: (freshSupplier?.current_balance || 0) + returnRecord.total_amount })
+        .eq("id", returnRecord.supplier_id)
+        .eq("company_id", currentCompany.id);
+      if (balanceError) throw balanceError;
+
+      // Delete the return (cascade deletes purchase_return_items)
       const { error } = await (supabase as any)
         .from("purchase_returns")
         .delete()
-        .eq("id", returnId);
+        .eq("id", returnId)
+        .eq("company_id", currentCompany.id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-returns"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers-stats"] });
       toast.success("Devolución eliminada");
     },
-    onError: () => {
-      toast.error("Error al eliminar devolución");
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar devolución");
     },
   });
 
@@ -198,6 +261,16 @@ const PurchaseReturns = () => {
 
     const product = selectedPurchaseProducts.find((p: any) => p.product_id === currentProduct);
     if (!product) return;
+
+    // MED-5: Account for quantities already queued in returnItems for this product
+    const alreadyQueued = returnItems
+      .filter(i => i.product_id === currentProduct)
+      .reduce((sum, i) => sum + i.quantity, 0);
+    const remaining = product.quantity - alreadyQueued;
+    if (currentQuantity > remaining) {
+      toast.error(`Solo puedes devolver ${remaining} unidades más de este producto`);
+      return;
+    }
 
     const newItem: ReturnItem = {
       product_id: currentProduct,
@@ -246,12 +319,13 @@ const PurchaseReturns = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
-      pending: "default",
-      approved: "secondary",
-      rejected: "destructive",
+    const config: Record<string, { label: string; variant: any }> = {
+      pending:  { label: "Pendiente",  variant: "default" },
+      approved: { label: "Aprobada",   variant: "secondary" },
+      rejected: { label: "Rechazada",  variant: "destructive" },
     };
-    return <Badge variant={variants[status] || "default"}>{status}</Badge>;
+    const { label, variant } = config[status] || { label: status, variant: "outline" };
+    return <Badge variant={variant}>{label}</Badge>;
   };
 
   return (
@@ -262,9 +336,10 @@ const PurchaseReturns = () => {
             <h1 className="text-2xl sm:text-3xl font-bold">Devoluciones a Proveedores</h1>
             <p className="text-muted-foreground text-sm sm:text-base">Gestiona las devoluciones de productos a proveedores</p>
           </div>
+          {canCreate && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto" data-tutorial="refund-status">
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Devolución
               </Button>
@@ -415,6 +490,7 @@ const PurchaseReturns = () => {
               </div>
             </DialogContent>
           </Dialog>
+          )}
         </div>
 
         <Card>
@@ -468,7 +544,7 @@ const PurchaseReturns = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {returnItem.status === "pending" && (
+                          {canCreate && returnItem.status === "pending" && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -491,6 +567,75 @@ const PurchaseReturns = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Return detail dialog — MED-3 */}
+      <Dialog open={selectedReturn !== null} onOpenChange={(open) => { if (!open) setSelectedReturn(null); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalle de Devolución {selectedReturn?.return_number}</DialogTitle>
+          </DialogHeader>
+          {selectedReturn && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                <div>
+                  <p className="text-sm text-muted-foreground">Proveedor</p>
+                  <p className="font-medium">{selectedReturn.suppliers?.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Compra Original</p>
+                  <p className="font-medium">{selectedReturn.purchases?.purchase_number}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Fecha</p>
+                  <p className="font-medium">{format(new Date(selectedReturn.created_at), "dd/MM/yyyy")}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Estado</p>
+                  <div className="mt-1">{getStatusBadge(selectedReturn.status)}</div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="font-semibold mb-3">Productos Devueltos</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Cantidad</TableHead>
+                      <TableHead>Costo Unit.</TableHead>
+                      <TableHead>Motivo</TableHead>
+                      <TableHead>Subtotal</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedReturn.purchase_return_items?.map((item: any) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.products?.name}</TableCell>
+                        <TableCell>{item.quantity}</TableCell>
+                        <TableCell>${item.unit_cost?.toFixed(2)}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{item.reason}</TableCell>
+                        <TableCell>${(item.quantity * item.unit_cost).toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex justify-between font-bold text-lg p-3 bg-muted rounded-lg">
+                <span>Total Devuelto:</span>
+                <span className="text-green-600 dark:text-green-400">${selectedReturn.total_amount?.toFixed(2)}</span>
+              </div>
+
+              {selectedReturn.notes && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Notas</p>
+                  <p className="text-sm mt-1">{selectedReturn.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };

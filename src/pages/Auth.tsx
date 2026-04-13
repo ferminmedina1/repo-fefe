@@ -11,12 +11,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { z } from "zod";
 
 const authSchema = z.object({
-  email: z.string().trim().toLowerCase().email({ message: "Email inválido" }),
-  password: z.string()
-    .min(8, { message: "La contraseña debe tener al menos 8 caracteres" })
-    .regex(/[A-Z]/, { message: "La contraseña debe contener al menos una mayúscula" })
-    .regex(/[a-z]/, { message: "La contraseña debe contener al menos una minúscula" })
-    .regex(/[0-9]/, { message: "La contraseña debe contener al menos un número" }),
+  email: z.string().trim().toLowerCase().min(1, { message: "Email es requerido" }),
+  password: z.string().min(1, { message: "Contraseña es requerida" }),
 });
 
 export default function Auth() {
@@ -67,11 +63,9 @@ export default function Auth() {
       try { localStorage.setItem("just_signed_in_at", String(Date.now())); } catch {}
       navigate("/app");
     } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-      } else {
-        toast.error(error.message || "Error al iniciar sesión");
-      }
+      // Never reveal if it's email or password that's wrong - always generic message
+      console.error("Login error:", error); // Log for debugging only
+      toast.error("Email o contraseña inválida");
     } finally {
       setIsLoading(false);
     }

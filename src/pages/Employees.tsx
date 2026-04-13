@@ -14,8 +14,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Users, Plus, Edit, Trash2, Shield, Clock, AlertTriangle, EyeOff, HelpCircle, Linkedin, Facebook, Instagram, Briefcase } from "lucide-react";
+import { Users, Plus, Edit, Trash2, Shield, Clock, AlertTriangle, EyeOff, HelpCircle, Linkedin, Facebook, Instagram, Briefcase, Mail } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { z } from "zod";
@@ -288,6 +289,9 @@ const Employees = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["company-users"] });
+      queryClient.invalidateQueries({ queryKey: ["company-users-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["employees-for-roles"] });
       toast.success("Empleado desactivado exitosamente. Su acceso al sistema ha sido revocado.");
       setEmployeeToDelete(null);
       setDeleteConfirmOpen(false);
@@ -321,7 +325,7 @@ const Employees = () => {
         if (profiles) {
           await supabase
             .from("company_users")
-            .update({ active: false })
+            .delete()
             .eq("user_id", profiles.id)
             .eq("company_id", currentCompany.id);
         }
@@ -330,12 +334,40 @@ const Employees = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employees"] });
       queryClient.invalidateQueries({ queryKey: ["company-users"] });
+      queryClient.invalidateQueries({ queryKey: ["company-users-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["employees-for-roles"] });
+      queryClient.invalidateQueries({ queryKey: ["company-user-profiles"] });
       toast.success("Empleado eliminado permanentemente de la base de datos");
       setEmployeeToDelete(null);
       setDeleteConfirmOpen(false);
     },
     onError: (error: any) => {
       toast.error("Error al eliminar el empleado: " + error.message);
+    },
+  });
+
+  const resendEmailMutation = useMutation({
+    mutationFn: async (employee: any) => {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+      if (!employee.email) throw new Error("El empleado no tiene email");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No hay sesion activa");
+      const response = await supabase.functions.invoke("invite-employee", {
+        body: {
+          email: employee.email,
+          role: employee.role || "employee",
+          companyId: currentCompany.id,
+          full_name: `${employee.first_name} ${employee.last_name}`,
+        },
+      });
+      if (response.error) throw response.error;
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success("Invitacion reenviada por email");
+    },
+    onError: (error: any) => {
+      toast.error("Error al reenviar invitacion: " + error.message);
     },
   });
 
@@ -810,6 +842,17 @@ const Employees = () => {
                                     <Edit className="h-4 w-4" />
                                   </Button>
                                 )}
+                                {canEdit && employee.email && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    title="Reenviar invitacion por email"
+                                    disabled={resendEmailMutation.isPending}
+                                    onClick={() => resendEmailMutation.mutate(employee)}
+                                  >
+                                    <Mail className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 {canDelete && (
                                   <div className="flex gap-1">
                                     <Button
@@ -858,12 +901,15 @@ const Employees = () => {
                   </div>
                 )}
               </CardContent>
-            </Card>
             {canManageRoles && (
-              <div className="mt-4 md:mt-6">
-                <EmployeeRoleAssignment />
-              </div>
+              <>
+                <Separator />
+                <CardContent className="pt-4 pb-2 px-3 sm:px-6">
+                  <EmployeeRoleAssignment standalone={false} />
+                </CardContent>
+              </>
             )}
+            </Card>
           </TabsContent>
 
           <TabsContent value="work">
@@ -891,23 +937,23 @@ const Employees = () => {
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-          <AlertDialogContent className="max-w-md">
+          <AlertDialogContent className="max-w-sm">
             <AlertDialogHeader>
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="h-6 w-6 text-destructive" />
-                <AlertDialogTitle>¿Qué deseas hacer con este empleado?</AlertDialogTitle>
-              </div>
+              <AlertDialogTitle className="flex items-center gap-2 text-base">
+                <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+                {employeeToDelete?.first_name} {employeeToDelete?.last_name}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                ¿Qué deseas hacer con este empleado?
+              </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogDescription className="space-y-4">
-              <div>
-                <p className="font-semibold text-foreground mb-2">
-                  {employeeToDelete?.first_name} {employeeToDelete?.last_name}
-                </p>
-                <p className="text-sm">Elige una de las siguientes opciones:</p>
-              </div>
-            </AlertDialogDescription>
-            <AlertDialogFooter className="gap-3">
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <div className="bg-muted/60 rounded-md p-3 text-xs space-y-1.5 border">
+              <p className="font-medium text-muted-foreground mb-1">¡Tener en cuenta!</p>
+              <p><strong>Desactivar</strong> — revoca el acceso pero conserva los datos históricos.</p>
+              <p><strong>Eliminar</strong> — borra permanentemente, sin posibilidad de recuperar.</p>
+            </div>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-2">
+              <AlertDialogCancel className="mt-0">Cancelar</AlertDialogCancel>
               <Button
                 variant="outline"
                 onClick={() => {
@@ -931,21 +977,9 @@ const Employees = () => {
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-2"
               >
                 <Trash2 className="h-4 w-4" />
-                Eliminar Permanentemente
+                Eliminar
               </AlertDialogAction>
             </AlertDialogFooter>
-            <div className="bg-destructive/10 p-3 rounded-md text-sm space-y-2 border border-destructive/20">
-              <div className="flex gap-2">
-                <HelpCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-destructive mb-1">Diferencia importante:</p>
-                  <ul className="text-xs space-y-1 list-disc list-inside">
-                    <li><strong>Desactivar:</strong> Revoca acceso pero mantiene datos históricos</li>
-                    <li><strong>Eliminar:</strong> Borra permanentemente (sin recuperación)</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
           </AlertDialogContent>
         </AlertDialog>
       </div>

@@ -303,7 +303,7 @@ export default function StockReservations() {
           </Dialog>
         </div>
 
-        <Card>
+        <Card data-tutorial="reserved-items">
           <CardHeader>
             <CardTitle>Reservas Activas</CardTitle>
             <Input
@@ -382,6 +382,7 @@ export default function StockReservations() {
                         <Button
                           size="sm"
                           variant="outline"
+                          data-tutorial="confirm-sale"
                           onClick={() =>
                             updateStatusMutation.mutate({ id: reservation.id, status: "completed" })
                           }
@@ -391,6 +392,7 @@ export default function StockReservations() {
                         <Button
                           size="sm"
                           variant="outline"
+                          data-tutorial="release-reservation"
                           onClick={() =>
                             updateStatusMutation.mutate({ id: reservation.id, status: "released" })
                           }

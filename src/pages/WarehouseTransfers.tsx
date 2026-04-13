@@ -365,7 +365,7 @@ export default function WarehouseTransfers() {
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={resetForm} className="hover:scale-105 transition-transform">
+              <Button onClick={resetForm} className="hover:scale-105 transition-transform" data-tutorial="new-transfer">
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Transferencia
               </Button>
@@ -386,7 +386,7 @@ export default function WarehouseTransfers() {
                 </div>
 
                 {/* Líneas de transferencia */}
-                <div className="border-t pt-4">
+                <div className="border-t pt-4" data-tutorial="transfer-products">
                   <div className="flex justify-between items-center mb-4">
                     <Label className="text-lg">Líneas de Transferencia</Label>
                     <Badge variant="secondary">{lines.length} línea{lines.length !== 1 ? 's' : ''}</Badge>
@@ -522,7 +522,7 @@ export default function WarehouseTransfers() {
                   <Button variant="outline" onClick={() => setDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button onClick={handleSubmit}>
+                  <Button onClick={handleSubmit} data-tutorial="confirm-transfer">
                     Crear Transferencia ({lines.length} línea{lines.length !== 1 ? 's' : ''})
                   </Button>
                 </div>

@@ -31,6 +31,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useCompany } from "@/contexts/CompanyContext";
+import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -88,6 +89,7 @@ export default function Suppliers() {
     tax_id: "",
     payment_terms: "",
     credit_limit: "0",
+    current_balance: "0",
     active: true,
     notes: "",
   });
@@ -109,15 +111,33 @@ export default function Suppliers() {
         .order("name");
 
       if (searchQuery) {
-        query = query.or(
-          `name.ilike.%${searchQuery}%,contact_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`
-        );
+        const sanitized = sanitizeSearchQuery(searchQuery);
+        if (sanitized) {
+          query = query.or(
+            `name.ilike.%${sanitized}%,contact_name.ilike.%${sanitized}%,email.ilike.%${sanitized}%`
+          );
+        }
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data as Supplier[];
     },
+    enabled: !!currentCompany?.id,
+  });
+
+  // MED-5: Separate stats query — not affected by searchQuery so totals are always global
+  const { data: allSuppliers = [] } = useQuery({
+    queryKey: ["suppliers-stats", currentCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("suppliers")
+        .select("active, current_balance, credit_limit")
+        .eq("company_id", currentCompany?.id);
+      if (error) throw error;
+      return data as Pick<Supplier, "active" | "current_balance" | "credit_limit">[];
+    },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: supplierPayments = [] } = useQuery({
@@ -129,6 +149,7 @@ export default function Suppliers() {
         .from("supplier_payments")
         .select("*")
         .eq("supplier_id", selectedSupplier.id)
+        .eq("company_id", currentCompany?.id)
         .order("payment_date", { ascending: false });
 
       if (error) throw error;
@@ -157,6 +178,7 @@ export default function Suppliers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers-stats"] });
       toast.success("Proveedor creado exitosamente");
       setDialogOpen(false);
       resetForm();
@@ -189,17 +211,26 @@ export default function Suppliers() {
 
       if (paymentError) throw paymentError;
 
-      // Update supplier balance
-      const newBalance = selectedSupplier.current_balance - amount;
+      // HIGH-3: Fresh fetch to avoid read-modify-write race + company_id for IDOR protection
+      const { data: freshSupplier, error: fetchError } = await supabase
+        .from("suppliers")
+        .select("current_balance")
+        .eq("id", selectedSupplier.id)
+        .eq("company_id", currentCompany?.id)
+        .single();
+      if (fetchError) throw fetchError;
+      const newBalance = (freshSupplier?.current_balance || 0) - amount;
       const { error: balanceError } = await supabase
         .from("suppliers")
         .update({ current_balance: newBalance })
-        .eq("id", selectedSupplier.id);
+        .eq("id", selectedSupplier.id)
+        .eq("company_id", currentCompany?.id);
 
       if (balanceError) throw balanceError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers-stats"] });
       queryClient.invalidateQueries({ queryKey: ["supplier-payments"] });
       toast.success("Pago registrado exitosamente");
       setPaymentDialogOpen(false);
@@ -224,15 +255,18 @@ export default function Suppliers() {
           tax_id: data.tax_id || null,
           payment_terms: data.payment_terms || null,
           credit_limit: parseFloat(data.credit_limit),
+          current_balance: parseFloat(data.current_balance),
           active: data.active,
           notes: data.notes || null,
         })
-        .eq("id", data.id);
+        .eq("id", data.id)
+        .eq("company_id", currentCompany?.id);
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers-stats"] });
       toast.success("Proveedor actualizado exitosamente");
       setDialogOpen(false);
       resetForm();
@@ -252,6 +286,7 @@ export default function Suppliers() {
       tax_id: "",
       payment_terms: "",
       credit_limit: "0",
+      current_balance: "0",
       active: true,
       notes: "",
     });
@@ -304,6 +339,7 @@ export default function Suppliers() {
       tax_id: supplier.tax_id || "",
       payment_terms: supplier.payment_terms || "",
       credit_limit: supplier.credit_limit.toString(),
+      current_balance: supplier.current_balance.toString(),
       active: supplier.active,
       notes: supplier.notes || "",
     });
@@ -346,7 +382,7 @@ export default function Suppliers() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DialogTrigger asChild>
-                      <Button onClick={resetForm} className="gap-2 w-full sm:w-auto">
+                      <Button onClick={resetForm} className="gap-2 w-full sm:w-auto" data-tutorial="btn-add-supplier">
                         <Plus className="h-4 w-4" />
                         Nuevo Proveedor
                       </Button>
@@ -455,7 +491,7 @@ export default function Suppliers() {
                     />
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-tutorial="supplier-terms">
                     <Label htmlFor="payment_terms">Términos de Pago</Label>
                     <Input
                       id="payment_terms"
@@ -497,6 +533,21 @@ export default function Suppliers() {
                       </Badge>
                     </div>
                   </div>
+                  {editingSupplier && (
+                    <div className="space-y-2">
+                      <Label htmlFor="current_balance">Saldo Actual (ajuste manual)</Label>
+                      <Input
+                        id="current_balance"
+                        type="number"
+                        step="0.01"
+                        value={formData.current_balance}
+                        onChange={(e) => setFormData({ ...formData, current_balance: e.target.value })}
+                      />
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        ⚠ Modificar este valor sobreescribe el saldo directamente. Usalo solo para correcciones manuales.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Sección Extra */}
@@ -532,7 +583,7 @@ export default function Suppliers() {
                   <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>
                     Cancelar
                   </Button>
-                  <Button type="submit" className="gap-2">
+                  <Button type="submit" className="gap-2" disabled={createSupplierMutation.isPending || updateSupplierMutation.isPending}>
                     {editingSupplier ? (
                       <>
                         <CheckCircle2 className="h-4 w-4" /> Actualizar
@@ -557,9 +608,9 @@ export default function Suppliers() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{suppliers.length}</div>
+              <div className="text-2xl font-bold">{allSuppliers.length}</div>
               <p className="text-xs text-muted-foreground">
-                {suppliers.filter((s) => s.active).length} activos
+                {allSuppliers.filter((s) => s.active).length} activos
               </p>
             </CardContent>
           </Card>
@@ -571,7 +622,7 @@ export default function Suppliers() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ${suppliers.reduce((sum, s) => sum + s.current_balance, 0).toFixed(2)}
+                ${allSuppliers.reduce((sum, s) => sum + s.current_balance, 0).toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground">Balance pendiente</p>
             </CardContent>
@@ -585,7 +636,7 @@ export default function Suppliers() {
             <CardContent>
               <div className="text-2xl font-bold">
                 $
-                {suppliers
+                {allSuppliers
                   .reduce(
                     (sum, s) => sum + Math.max(0, s.credit_limit - s.current_balance),
                     0
@@ -803,7 +854,9 @@ export default function Suppliers() {
                 >
                   Cancelar
                 </Button>
-                <Button type="submit">Registrar Pago</Button>
+                <Button type="submit" disabled={createPaymentMutation.isPending}>
+                  {createPaymentMutation.isPending ? "Registrando..." : "Registrar Pago"}
+                </Button>
               </div>
             </form>
           </DialogContent>

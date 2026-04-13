@@ -26,8 +26,6 @@ const TechnicalServices = lazy(() => import("./pages/TechnicalServices"));
 const Employees = lazy(() => import("./pages/Employees"));
 const CashRegister = lazy(() => import("./pages/CashRegister"));
 const Purchases = lazy(() => import("./pages/Purchases"));
-const PurchaseOrders = lazy(() => import("./pages/PurchaseOrders"));
-const PurchaseReception = lazy(() => import("./pages/PurchaseReception"));
 const PurchaseReturns = lazy(() => import("./pages/PurchaseReturns"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -72,8 +70,8 @@ const ModuleNotAvailable = lazy(() => import("./pages/ModuleNotAvailable"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const AccountsReceivable = lazy(() => import("./pages/AccountsReceivable"));
 const EmailConfig = lazy(() => import("./pages/EmailConfig"));
-/*const SignupWizard = lazy(() => import("./pages/SignupWizard")); ONLY FOR PROD*/
-const SignupMaintenance = lazy(() => import("./pages/SignupMaintenance"));
+const SignupWizard = lazy(() => import("./pages/SignupWizard"));
+/*const SignupMaintenance = lazy(() => import("./pages/SignupMaintenance"));*/ // ONLY FOR MAINTENANCE
 const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRequests"));
@@ -83,11 +81,15 @@ const SetupWizardPage = lazy(() =>
   import("./pages/SetupWizardPage").then((module) => ({ default: module.SetupWizardPage }))
 );
 const AllianceMarket = lazy(() => import("./pages/AllianceMarket"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 
 
 const Opportunities = lazy(() => import("./pages/Opportunities"));
 const Pipelines = lazy(() => import("./pages/Pipelines"));
 const CrmReports = lazy(() => import("./pages/CrmReports"));
+const CrmAutomations = lazy(() => import("./pages/CrmAutomations"));
+const CrmAutomationEditor = lazy(() => import("./pages/CrmAutomationEditor"));
 const CrmRoles = lazy(() => import("./pages/CrmRoles"));
 const MonthlySalesAnalytics = lazy(() => import("./pages/analytics/MonthlySalesAnalytics"));
 const GrossMarginAnalytics = lazy(() => import("./pages/analytics/GrossMarginAnalytics"));
@@ -330,8 +332,8 @@ const App = () => (
           <CompanyProvider>
             <Suspense fallback={<PageLoader />}>
               <Routes>
-                {/* ONLY FOR PROD <Route path="/signup" element={<SignupWizard />} />*/}
-                <Route path="/signup" element={<SignupMaintenance />} />
+                <Route path="/signup" element={<SignupWizard />} />
+                {/*<Route path="/signup" element={<SignupMaintenance />}  ONLY FOR MAINTENANCE MODE */}
                 <Route path="/signup/success" element={<SignupSuccess />} />
                 <Route path="/signup/cancel" element={<SignupCancel />} />
                 <Route path="/setup-wizard" element={<ProtectedRoute><SetupWizardPage /></ProtectedRoute>} />
@@ -365,21 +367,21 @@ const App = () => (
             <Route path="/delivery-notes" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="delivery_notes"><DeliveryNotes /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/returns" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="returns"><Returns /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/reservations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="reservations"><Reservations /></ModuleProtectedRoute></ProtectedRoute>} />
-              <Route path="/customer-account" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><CustomerAccount /></ModuleProtectedRoute></ProtectedRoute>} />
-              <Route path="/accounts-receivable" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><AccountsReceivable /></ModuleProtectedRoute></ProtectedRoute>} />
-              <Route path="/promotions" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="promotions"><Promotions /></ModuleProtectedRoute></ProtectedRoute>} />
-              <Route path="/opportunities" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><Opportunities /></ModuleProtectedRoute></ProtectedRoute>} />
-              <Route path="/pipelines" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pipelines"><Pipelines /></ModuleProtectedRoute></ProtectedRoute>} />
-              <Route path="/crm-reports" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmReports /></ModuleProtectedRoute></ProtectedRoute>} />
-              <Route path="/settings/crm-roles" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmRoles /></ModuleProtectedRoute></ProtectedRoute>} />
-              <Route path="/alliance-market" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="alliance_market"><AllianceMarket /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/customer-account" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><CustomerAccount /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/accounts-receivable" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="accounts_receivable"><AccountsReceivable /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/promotions" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="promotions"><Promotions /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/opportunities" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><Opportunities /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/pipelines" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pipelines"><Pipelines /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/crm-reports" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmReports /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/crm-automations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmAutomations /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/crm-automations/:workflowId" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmAutomationEditor /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/settings/crm-roles" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmRoles /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/alliance-market" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="alliance_market"><AllianceMarket /></ModuleProtectedRoute></ProtectedRoute>} />
             
 
             {/* Inventario & Compras */}
             <Route path="/suppliers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="suppliers"><Suppliers /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/purchases" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><Purchases /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/purchase-orders" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><PurchaseOrders /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/purchase-reception" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><PurchaseReception /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/purchase-returns" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="purchases"><PurchaseReturns /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/warehouses" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouses"><Warehouses /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/warehouse-stock" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="warehouse_stock"><WarehouseStock /></ModuleProtectedRoute></ProtectedRoute>} />

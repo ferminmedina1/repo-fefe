@@ -183,7 +183,7 @@ export default function WarehouseStock() {
                 </div>
               </div>
               <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
-                <SelectTrigger className="w-full sm:w-64">
+                <SelectTrigger className="w-full sm:w-64" data-tutorial="warehouse-select">
                   <SelectValue placeholder="Seleccionar depósito" />
                 </SelectTrigger>
                 <SelectContent>
@@ -221,6 +221,7 @@ export default function WarehouseStock() {
                 size="sm"
                 onClick={exportData}
                 className="ml-auto"
+              data-tutorial="transfer-between"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Exportar
@@ -247,7 +248,7 @@ export default function WarehouseStock() {
                     <TableHead>Producto</TableHead>
                     <TableHead className="w-24">SKU</TableHead>
                     <TableHead className="w-32">Categoría</TableHead>
-                    <TableHead className="text-right">Stock Actual</TableHead>
+                    <TableHead className="text-right" data-tutorial="available-stock">Stock Actual</TableHead>
                     <TableHead className="text-right">Stock Mín.</TableHead>
                     <TableHead className="w-40">Estado</TableHead>
                   </TableRow>

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignupFormData } from "@/hooks/useSignupWizard";
-import { Loader2, Building2, Mail, User, CreditCard, Package } from "lucide-react";
+import { Loader2, Building2, Mail, User, CreditCard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
@@ -13,22 +13,20 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
 import { AlertCircle } from "lucide-react";
 
-const MODULE_PRICE = 10;
-
 // Format currency to 2 decimal places
 const formatCurrency = (value: number) => value.toFixed(2);
 
-interface Step5ConfirmationProps {
+interface Step4ConfirmationProps {
   formData: SignupFormData;
   prevStep: () => void;
   onCreateIntent: () => Promise<void>;
 }
 
-export function Step5Confirmation({
+export function Step4Confirmation({
   formData,
   prevStep,
   onCreateIntent,
-}: Step5ConfirmationProps) {
+}: Step4ConfirmationProps) {
   const [isCreating, setIsCreating] = useState(false);
 
   const { data: plan, isLoading: isPlanLoading } = useQuery({
@@ -52,9 +50,7 @@ export function Step5Confirmation({
     enabled: !!formData.plan_id,
   });
 
-  const totalModulesCost = formData.modules.length * MODULE_PRICE;
-  const baseCost = Number(plan?.price || 0);
-  const totalCost = baseCost + totalModulesCost;
+  const totalCost = Number(plan?.price || 0);
   const isFreeTrial = formData.plan_id === "460d1274-59bc-4c99-a815-c3c1d52d0803"; // FREE_PLAN_ID
   const billingCountry = (formData.billing_country || "").toUpperCase() || "N/D";
   const hasPaymentMethod = !!formData.payment_method_ref && !!formData.payment_provider;
@@ -130,31 +126,10 @@ export function Step5Confirmation({
                     <span className="text-muted-foreground">Precio base:</span>
                     <span className="font-medium">${formatCurrency(baseCost)} USD/mes</span>
                   </div>
-                </>
+                </>total
               )}
             </CardContent>
           </Card>
-
-          {formData.modules.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="w-4 h-4" />
-                  Módulos adicionales
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {formData.modules.map((moduleId) => (
-                    <div key={moduleId} className="flex justify-between text-sm">
-                      <span className="capitalize">{moduleId}</span>
-                      <span className="font-medium">${MODULE_PRICE} USD/mes</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         {/* Right column - Card Input or Summary */}
@@ -167,16 +142,8 @@ export function Step5Confirmation({
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Plan {plan?.name}:</span>
-                  <span>${formatCurrency(baseCost)} USD</span>
+                  <span>${formatCurrency(totalCost)} USD</span>
                 </div>
-                {formData.modules.length > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Módulos ({formData.modules.length}):
-                    </span>
-                    <span>${formatCurrency(totalModulesCost)} USD</span>
-                  </div>
-                )}
                 <Separator />
                 <div className="flex justify-between font-bold text-lg">
                   <span>Total mensual:</span>

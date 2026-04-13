@@ -68,7 +68,7 @@ export function KnowledgeBaseSearch({ onClose }: KnowledgeBaseSearchProps) {
         .select("view_count")
         .eq("id", articleId)
         .single();
-      
+
       await supabase
         .from("knowledge_base_articles")
         .update({ view_count: (article?.view_count || 0) + 1 })
@@ -84,14 +84,14 @@ export function KnowledgeBaseSearch({ onClose }: KnowledgeBaseSearchProps) {
         .select(column)
         .eq("id", articleId)
         .single();
-      
+
       const currentCount = article?.[column] || 0;
-      
+
       const { error } = await supabase
         .from("knowledge_base_articles")
         .update({ [column]: currentCount + 1 })
         .eq("id", articleId);
-      
+
       if (error) throw error;
     },
     onSuccess: (_, { helpful }) => {
