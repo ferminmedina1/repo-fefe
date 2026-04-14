@@ -39,7 +39,7 @@ const DashboardBuilder: React.FC<DashboardBuilderProps> = ({
 }) => {
   const defaultConfig: DashboardConfig = {
     id: dashboardId,
-    name: 'New Dashboard',
+    name: 'Nuevo Panel de Control',
     description: '',
     company_id: '',
     widgets: [],

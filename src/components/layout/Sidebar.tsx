@@ -142,7 +142,7 @@ export function Sidebar() {
       section: "General",
       items: [
         {
-          title: "Dashboard",
+          title: "Panel de Control",
           href: "/app",
           icon: LayoutDashboard,
           module: "dashboard",

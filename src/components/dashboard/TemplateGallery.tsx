@@ -54,7 +54,7 @@ export function TemplateGallery({ onSelectTemplate }: TemplateGalleryProps) {
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Dashboard Templates</DialogTitle>
+          <DialogTitle>Plantillas de Panel de Control</DialogTitle>
           <DialogDescription>
             Choose a template to quickly set up your dashboard
           </DialogDescription>

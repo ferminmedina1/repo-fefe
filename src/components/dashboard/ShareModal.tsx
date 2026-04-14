@@ -55,7 +55,7 @@ export function ShareModal({ layoutId }: ShareModalProps) {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Share Dashboard</DialogTitle>
+          <DialogTitle>Compartir Panel de Control</DialogTitle>
           <DialogDescription>
             Create a shareable link to your dashboard
           </DialogDescription>

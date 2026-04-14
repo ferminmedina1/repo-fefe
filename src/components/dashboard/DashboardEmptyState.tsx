@@ -45,7 +45,7 @@ export function DashboardEmptyState({
           {/* Headline */}
           <div className="space-y-3">
             <h1 className={`${DASHBOARD_DESIGN.typography.hero} text-foreground`}>
-              Construí tu dashboard
+              Construí tu Panel de Control
             </h1>
             <p className={`${DASHBOARD_DESIGN.typography.caption} text-lg max-w-xl mx-auto`}>
               Empieza con un template prearmado o diseña desde cero. Sin límites de creatividad.

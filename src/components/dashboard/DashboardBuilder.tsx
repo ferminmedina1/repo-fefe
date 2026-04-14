@@ -159,7 +159,7 @@ export function DashboardBuilder() {
   if (permissionsLoading || layoutLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-muted-foreground">Cargando dashboard...</p>
+        <p className="text-muted-foreground">Cargando Panel de Control...</p>
       </div>
     );
   }
@@ -182,8 +182,8 @@ export function DashboardBuilder() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard Personalizado</h1>
-            <p className="text-muted-foreground">Crea tu dashboard agregando widgets</p>
+            <h1 className="text-3xl font-bold text-foreground">Panel de Control Personalizado</h1>
+            <p className="text-muted-foreground">Crea tu Panel de Control agregando widgets</p>
           </div>
           <WidgetPicker
             addedWidgetIds={widgets.map((w) => w.type)}
@@ -223,7 +223,7 @@ export function DashboardBuilder() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard Personalizado</h1>
+          <h1 className="text-3xl font-bold text-foreground">Panel de Control Personalizado</h1>
           <p className="text-muted-foreground">
             {widgets.length} widget{widgets.length !== 1 ? "s" : ""} agregado
             {widgets.length !== 1 ? "s" : ""}
