@@ -401,7 +401,7 @@ export default function Returns() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <DialogTrigger asChild>
-                        <Button className="gap-2 w-full sm:w-auto" disabled={!canCreate}>
+                        <Button className="gap-2 w-full sm:w-auto" disabled={!canCreate} data-tutorial="btn-create-return">
                           <RotateCcw className="h-4 w-4" />
                           Nueva Devolución
                         </Button>
@@ -553,7 +553,7 @@ export default function Returns() {
                         </div>
                         <h3 className="text-sm font-semibold">Detalles</h3>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-2 gap-4" data-tutorial="return-reason">
                         <div>
                           <Label>Motivo</Label>
                           <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motivo de la devolución" />
@@ -579,7 +579,7 @@ export default function Returns() {
 
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
-                      <Button className="gap-2" disabled={!canCreate || !selectedSale || returnItems.every(i => i.quantity === 0)} onClick={() => createReturnMutation.mutate()}>
+                      <Button className="gap-2" disabled={!canCreate || !selectedSale || returnItems.every(i => i.quantity === 0)} onClick={() => createReturnMutation.mutate()} data-tutorial="process-return">
                         <CheckCircle2 className="h-4 w-4" />
                         Crear Devolución
                       </Button>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Layout } from "@/components/layout/Layout";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Package, Search, AlertTriangle, Download, Filter, TrendingDown } from "lucide-react";
 import { StockStatusIndicator } from "@/components/inventory/StockStatusIndicator";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface Warehouse {
   id: string;
@@ -35,26 +36,37 @@ interface WarehouseStock {
 }
 
 export default function WarehouseStock() {
+  const { currentCompany } = useCompany();
   const [selectedWarehouse, setSelectedWarehouse] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "critical" | "low" | "ok">("all");
 
+  useEffect(() => {
+    setSelectedWarehouse("all");
+  }, [currentCompany?.id]);
+
   const { data: warehouses } = useQuery({
-    queryKey: ["warehouses"],
+    queryKey: ["warehouses", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return [];
+
       const { data, error } = await supabase
         .from("warehouses")
         .select("id, name, code")
+        .eq("company_id", currentCompany.id)
         .eq("active", true)
         .order("name");
       if (error) throw error;
       return data as Warehouse[];
     },
+    enabled: !!currentCompany?.id,
   });
 
   const { data: stock, isLoading } = useQuery({
-    queryKey: ["warehouse-stock", selectedWarehouse, searchQuery, filterStatus],
+    queryKey: ["warehouse-stock", currentCompany?.id, selectedWarehouse, searchQuery, filterStatus],
     queryFn: async () => {
+      if (!currentCompany?.id) return [];
+
       let query = supabase
         .from("warehouse_stock")
         .select(`
@@ -62,6 +74,7 @@ export default function WarehouseStock() {
           products (name, sku, category),
           warehouses (name, code)
         `)
+        .eq("company_id", currentCompany.id)
         .order("stock", { ascending: true });
 
       if (selectedWarehouse !== "all") {
@@ -92,6 +105,7 @@ export default function WarehouseStock() {
 
       return filtered;
     },
+    enabled: !!currentCompany?.id,
   });
 
   // Estadísticas
@@ -183,7 +197,7 @@ export default function WarehouseStock() {
                 </div>
               </div>
               <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
-                <SelectTrigger className="w-full sm:w-64">
+                <SelectTrigger className="w-full sm:w-64" data-tutorial="warehouse-select">
                   <SelectValue placeholder="Seleccionar depósito" />
                 </SelectTrigger>
                 <SelectContent>
@@ -221,6 +235,7 @@ export default function WarehouseStock() {
                 size="sm"
                 onClick={exportData}
                 className="ml-auto"
+              data-tutorial="transfer-between"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Exportar
@@ -247,7 +262,7 @@ export default function WarehouseStock() {
                     <TableHead>Producto</TableHead>
                     <TableHead className="w-24">SKU</TableHead>
                     <TableHead className="w-32">Categoría</TableHead>
-                    <TableHead className="text-right">Stock Actual</TableHead>
+                    <TableHead className="text-right" data-tutorial="available-stock">Stock Actual</TableHead>
                     <TableHead className="text-right">Stock Mín.</TableHead>
                     <TableHead className="w-40">Estado</TableHead>
                   </TableRow>

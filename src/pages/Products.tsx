@@ -30,7 +30,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { auditLogger, AuditActionType } from "@/lib/auditLog";
 import { validateProductUniqueness, validateStockConsistency, validateWarehouseDistribution, validateBulkUpdateData, validatePriceChange } from "@/lib/dataIntegrity";
-import { batchInsertWithValidation, batchUpdateWithValidation, softDeleteBatch, createTransactionContext, upsertWithConflictHandling } from "@/lib/transactionService";
+import { batchInsertWithValidation, batchUpdateWithValidation, createTransactionContext, upsertWithConflictHandling } from "@/lib/transactionService";
 import { createAppError, classifyError, getUserFriendlyError } from "@/lib/errorHandler";
 
 const productSchema = z.object({
@@ -429,9 +429,9 @@ export default function Products() {
 
   // Fetch warehouse stock for expanded products
   const { data: warehouseStock } = useQuery({
-    queryKey: ["warehouse-stock-detail", Array.from(expandedProducts)],
+    queryKey: ["warehouse-stock-detail", currentCompany?.id, Array.from(expandedProducts)],
     queryFn: async () => {
-      if (expandedProducts.size === 0) return [];
+      if (!currentCompany?.id || expandedProducts.size === 0) return [];
       
       const { data, error } = await supabase
         .from("warehouse_stock")
@@ -439,12 +439,13 @@ export default function Products() {
           *,
           warehouses (code, name)
         `)
+        .eq("company_id", currentCompany.id)
         .in("product_id", Array.from(expandedProducts));
       
       if (error) throw error;
       return data;
     },
-    enabled: expandedProducts.size > 0,
+    enabled: !!currentCompany?.id && expandedProducts.size > 0,
   });
 
   // Fetch product prices for price list dialog
@@ -1035,10 +1036,11 @@ export default function Products() {
       }
       
       // Load warehouse stock data for this product
-      if (warehouses) {
+      if (warehouses && currentCompany?.id) {
         const { data: warehouseStockData, error } = await supabase
           .from("warehouse_stock")
           .select("warehouse_id, stock")
+          .eq("company_id", currentCompany.id)
           .eq("product_id", product.id);
         
         if (error) {
@@ -1120,10 +1122,11 @@ export default function Products() {
     setAdjustingProduct(product);
     
     // Load current warehouse stock values
-    if (warehouses) {
+    if (warehouses && currentCompany?.id) {
       const { data: warehouseStockData } = await supabase
         .from("warehouse_stock")
         .select("warehouse_id, stock")
+        .eq("company_id", currentCompany.id)
         .eq("product_id", product.id);
       
       const initialStockValues: Record<string, string> = {};
@@ -1185,6 +1188,7 @@ export default function Products() {
     if (!adjustingProduct) return;
 
     try {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
@@ -1229,6 +1233,7 @@ export default function Products() {
       const { data: allStocks, error: fetchError } = await supabase
         .from("warehouse_stock")
         .select("stock")
+        .eq("company_id", currentCompany!.id)
         .eq("product_id", adjustingProduct.id);
 
       if (fetchError) throw fetchError;
@@ -1602,11 +1607,13 @@ export default function Products() {
     }
 
     try {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
       const productIds = Array.from(selectedProducts);
-      const txContext = createTransactionContext(user.id, currentCompany!.id);
+      const txContext = createTransactionContext(user.id, currentCompany.id);
       
       // Actualizar en la base de datos
       const { error } = await supabase
@@ -1653,20 +1660,37 @@ export default function Products() {
     }
 
     try {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
       const productIds = Array.from(selectedProducts);
-      const txContext = createTransactionContext(user.id, currentCompany!.id);
+      const txContext = createTransactionContext(user.id, currentCompany.id);
       
-      // Usar soft delete para mantener integridad histÃ³rica
-      const result = await softDeleteBatch('products', productIds, txContext);
+      // Desactivar productos para mantener integridad histórica
+      const { error } = await supabase
+        .from("products")
+        .update({ active: false, updated_at: new Date().toISOString() })
+        .in("id", productIds)
+        .eq("company_id", currentCompany.id);
 
-      if (!result.success) {
-        throw new Error(result.error);
-      }
+      if (error) throw error;
 
-      toast.success(`${result.itemsProcessed} productos eliminados exitosamente`);
+      await auditLogger.log({
+        action: AuditActionType.BULK_DELETE,
+        resourceType: 'product',
+        resourceId: productIds.join(','),
+        userId: user.id,
+        companyId: currentCompany.id,
+        metadata: {
+          transactionId: txContext.transactionId,
+          totalDeleted: productIds.length,
+          deleteType: 'deactivate',
+        },
+        status: 'success',
+      });
+
+      toast.success(`${productIds.length} productos eliminados exitosamente`);
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setIsDeleteDialogOpen(false);
       setSelectedProducts(new Set());
@@ -1861,12 +1885,12 @@ export default function Products() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <div>
+        <div className="flex flex-col lg:flex-row justify-between gap-4">
+          <div className="min-w-0">
             <h1 className="text-xl sm:text-3xl font-bold text-foreground">Productos</h1>
             <p className="text-xs sm:text-sm text-muted-foreground">Gestiona tu inventario</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 w-full lg:w-auto lg:justify-end">
             <Button variant="outline" size="sm" onClick={() => navigate("/reports?tab=products")}>
               <BarChart3 className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Ver Reportes</span>
@@ -4014,3 +4038,4 @@ export default function Products() {
     </Layout>
   );
 }
+

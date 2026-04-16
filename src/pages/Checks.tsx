@@ -309,7 +309,7 @@ export default function Checks() {
               }}
             >
               <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto" data-tutorial="cheque-emitido">
                   <Plus className="mr-2 h-4 w-4" />
                   Registrar Cheque
                 </Button>
@@ -379,7 +379,7 @@ export default function Checks() {
                           setFormData({ ...formData, type: value })
                         }
                       >
-                        <SelectTrigger>
+                        <SelectTrigger data-tutorial="cheque-recibido">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -529,6 +529,7 @@ export default function Checks() {
                                   ? "bg-blue-500"
                                   : "bg-purple-500"
                               }
+                              data-tutorial={check.type === "received" ? "cheque-recibido" : undefined}
                             >
                               {typeLabels[check.type]}
                             </Badge>
@@ -547,7 +548,7 @@ export default function Checks() {
                           <TableCell>
                             {format(new Date(check.due_date), "dd/MM/yyyy")}
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-tutorial="cheque-status">
                             {/* C-1: Status selector only for authorized roles */}
                             {canEdit ? (
                               <Select

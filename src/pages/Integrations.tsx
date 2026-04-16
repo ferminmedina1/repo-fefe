@@ -637,7 +637,7 @@ const Integrations = () => {
           <h1 className="text-2xl md:text-3xl font-bold">Integraciones</h1>
         </div>
 
-        <div className="grid gap-4 md:gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:gap-6 sm:grid-cols-2 lg:grid-cols-3" data-tutorial="available-integrations">
         {integrationTypes.map((integration) => {
           const status = getIntegrationStatus(integration.type);
           const Icon = integration.icon;
@@ -653,7 +653,7 @@ const Integrations = () => {
                     <div>
                       <CardTitle className="text-lg">{integration.name}</CardTitle>
                       {status && (
-                        <Badge variant={status.active ? "default" : "secondary"} className="mt-1">
+                        <Badge variant={status.active ? "default" : "secondary"} className="mt-1" data-tutorial="integration-sync">
                           {status.active ? "Activo" : "Inactivo"}
                         </Badge>
                       )}
@@ -676,6 +676,7 @@ const Integrations = () => {
                 <Button 
                   variant="outline" 
                   className="w-full"
+                  data-tutorial="connect-integration"
                   onClick={() => onConfigure(integration.type)}
                 >
                   <Settings className="mr-2 h-4 w-4" />

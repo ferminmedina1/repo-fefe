@@ -121,7 +121,7 @@ export default function AccessLogs() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-4">
+            <div className="mb-4" data-tutorial="login-history">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -141,7 +141,7 @@ export default function AccessLogs() {
                     <TableHead>Usuario</TableHead>
                     <TableHead>Acción</TableHead>
                     <TableHead>Página/URL</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead data-tutorial="failed-attempts">Estado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -184,7 +184,7 @@ export default function AccessLogs() {
                             {log.page_url || "-"}
                           </span>
                         </TableCell>
-                        <TableCell>
+                        <TableCell data-tutorial="security-alert">
                           {getSuccessIndicator(log.success, log.error_message)}
                         </TableCell>
                       </TableRow>

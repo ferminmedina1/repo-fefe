@@ -221,7 +221,7 @@ export default function POSPoints() {
             </p>
           </div>
           {canCreate && (
-            <Button onClick={() => handleOpenDialog()} className="w-full sm:w-auto shrink-0">
+            <Button onClick={() => handleOpenDialog()} className="w-full sm:w-auto shrink-0" data-tutorial="register-pdv">
               <Plus className="h-4 w-4 mr-2" />
               Nuevo Punto de Venta
             </Button>
@@ -322,7 +322,7 @@ export default function POSPoints() {
                           📍 {pos.ubicacion}
                         </div>
                       )}
-                      <div className="text-xs text-muted-foreground mt-2 font-mono">
+                      <div className="text-xs text-muted-foreground mt-2 font-mono" data-tutorial="next-voucher">
                         Último número: {formatComprobanteNumber(pos.punto_venta, pos.ultimo_numero)}
                       </div>
                     </div>
@@ -393,7 +393,7 @@ export default function POSPoints() {
                       value={formData.tipo_comprobante}
                       onValueChange={(value) => setFormData({ ...formData, tipo_comprobante: value })}
                     >
-                      <SelectTrigger id="tipo_comprobante">
+                      <SelectTrigger id="tipo_comprobante" data-tutorial="voucher-types">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

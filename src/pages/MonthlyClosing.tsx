@@ -418,7 +418,7 @@ const MonthlyClosing = () => {
             )}
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-4">
-            <Button variant="outline" onClick={downloadIVASales} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={downloadIVASales} className="w-full sm:w-auto" data-tutorial="generate-reports">
               <Download className="h-4 w-4 mr-2" />
               Descargar Libro IVA Ventas
             </Button>
@@ -540,7 +540,7 @@ const MonthlyClosing = () => {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Progreso del Cierre</CardTitle>
+                <CardTitle data-tutorial="closing-checklist">Progreso del Cierre</CardTitle>
                 <CardDescription>
                   {completedSteps.size} de {steps.length} pasos completados
                 </CardDescription>
@@ -553,12 +553,12 @@ const MonthlyClosing = () => {
               )}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent data-tutorial="lock-period">
             <Progress value={progress} className="h-2" />
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4" data-tutorial="verify-data">
           {steps.map((step) => {
             const Icon = step.icon;
             const isCompleted = completedSteps.has(step.id);
