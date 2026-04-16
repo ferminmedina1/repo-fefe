@@ -127,6 +127,7 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
   const [isValidating, setIsValidating] = useState(false);
   const [passwordValidation, setPasswordValidation] = useState<PasswordValidation | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const handlePasswordChange = (value: string) => {
     updateFormData({ password: value });
@@ -165,8 +166,14 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
 
       // Check security validations first
       const securityErrors = validateFormSecurity(formData);
-      if (Object.keys(securityErrors).length > 0) {
-        setErrors(securityErrors);
+      const combinedErrors: Record<string, string> = { ...securityErrors };
+
+      if (!acceptedTerms) {
+        combinedErrors.terms = "Debes aceptar los Términos y Condiciones";
+      }
+
+      if (Object.keys(combinedErrors).length > 0) {
+        setErrors(combinedErrors);
         setIsValidating(false);
         return;
       }
@@ -178,19 +185,19 @@ export function Step1Account({ formData, updateFormData, nextStep }: Step1Accoun
       const duplicateCheck = await checkDuplicates(formData.email, formData.company_name);
 
       if (duplicateCheck.error) {
-        setErrors({ ...securityErrors, general: `Error en validación: ${duplicateCheck.error}` });
+        setErrors({ ...combinedErrors, general: `Error en validación: ${duplicateCheck.error}` });
         setIsValidating(false);
         return;
       }
 
       if (duplicateCheck.email_exists) {
-        setErrors({ ...securityErrors, email: "Este email de empresa ya está registrado" });
+        setErrors({ ...combinedErrors, email: "Este email de empresa ya está registrado" });
         setIsValidating(false);
         return;
       }
 
       if (duplicateCheck.company_name_exists) {
-        setErrors({ ...securityErrors, company_name: "Este nombre de empresa ya está registrado" });
+        setErrors({ ...combinedErrors, company_name: "Este nombre de empresa ya está registrado" });
         setIsValidating(false);
         return;
       }
