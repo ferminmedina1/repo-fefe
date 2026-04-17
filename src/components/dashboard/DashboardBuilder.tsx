@@ -156,6 +156,15 @@ export function DashboardBuilder() {
   const canViewProducts = hasPermission("products", "view");
   const hasAnyPermission = canViewSales || hasPermission("customers", "view");
 
+  // Wrapper for addWidget to match WidgetPicker's interface
+  const handleAddWidget = (widgetType: WidgetType, size?: 'full' | 'half' | 'quarter') => {
+    addWidget({
+      id: `${widgetType}-${Date.now()}`, // Generate unique ID
+      type: widgetType,
+      size: size || 'full',
+    });
+  };
+
   if (permissionsLoading || layoutLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -205,15 +214,6 @@ export function DashboardBuilder() {
 
   const addedWidgetTypes = widgets.map((w) => w.type);
   const availableWidgets = getAvailableWidgets(addedWidgetTypes);
-
-  // Wrapper for addWidget to match WidgetPicker's interface
-  const handleAddWidget = (widgetType: WidgetType, size?: 'full' | 'half' | 'quarter') => {
-    addWidget({
-      id: `${widgetType}-${Date.now()}`, // Generate unique ID
-      type: widgetType,
-      size: size || 'full',
-    });
-  };
 
   return (
     <div className="space-y-6">
