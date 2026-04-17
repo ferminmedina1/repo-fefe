@@ -1667,7 +1667,7 @@ export default function Products() {
       const productIds = Array.from(selectedProducts);
       const txContext = createTransactionContext(user.id, currentCompany.id);
       
-      // Desactivar productos para mantener integridad hist�rica
+      // Desactivar productos para mantener integridad hist�rica
       const { error } = await supabase
         .from("products")
         .update({ active: false, updated_at: new Date().toISOString() })
@@ -2831,7 +2831,7 @@ export default function Products() {
                               <SelectValue placeholder="Dejar vacío para no modificar" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">Sin categoría</SelectItem>
+                              <SelectItem value="null">Sin categoría</SelectItem>
                               {categories?.map((cat: any) => (
                                 <SelectItem key={cat.id} value={cat.id}>
                                   {cat.name}
