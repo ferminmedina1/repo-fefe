@@ -77,13 +77,18 @@ export function useMonthlyComparison(
 
         if (currentError || lastError) {
           const error = currentError || lastError;
+          // Handle various error codes including 400 (bad request) and 406 (not acceptable)
           if (
             (error as any)?.code === '42P01' ||
             (error as any)?.code === '42501' ||
+            (error as any)?.code === '400' ||
+            (error as any)?.code === '406' ||
+            (error as any)?.status === 400 ||
+            (error as any)?.status === 406 ||
             (error as any)?.message?.includes('does not exist') ||
             (error as any)?.message?.includes('permission')
           ) {
-            console.warn("Sales table not available yet, using fallback data");
+            console.warn("Sales table not available yet, using fallback data", error);
             return {
               currentMonth: 0,
               lastMonth: 0,
@@ -93,7 +98,16 @@ export function useMonthlyComparison(
               isPositive: false,
             };
           }
-          throw error;
+          // For unexpected errors, also return fallback to prevent crash
+          console.error("Unexpected error in useMonthlyComparison:", error);
+          return {
+            currentMonth: 0,
+            lastMonth: 0,
+            percentageChange: 0,
+            grossMargin: 0,
+            marginPercentage: 0,
+            isPositive: false,
+          };
         }
 
       const currentTotal = (currentMonth as Sale[] | null)?.reduce(

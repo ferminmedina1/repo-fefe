@@ -34,11 +34,16 @@ export function useReceivables(
         const { data, error } = await query;
 
         if (error) {
+          // Handle various error codes gracefully
           if (
-            error.code === '42P01' ||
-            error.code === '42501' ||
-            error.message?.includes('does not exist') ||
-            error.message?.includes('permission')
+            (error as any)?.code === '42P01' ||
+            (error as any)?.code === '42501' ||
+            (error as any)?.code === '400' ||
+            (error as any)?.code === '406' ||
+            (error as any)?.status === 400 ||
+            (error as any)?.status === 406 ||
+            (error as any)?.message?.includes('does not exist') ||
+            (error as any)?.message?.includes('permission')
           ) {
             console.warn("Customer account movements table not available yet, using fallback data");
             return {
@@ -48,7 +53,14 @@ export function useReceivables(
               overdueCount: 0,
             };
           }
-          throw error;
+          // For unexpected errors, return fallback instead of throwing
+          console.error("Unexpected error in useReceivables:", error);
+          return {
+            overdue: 0,
+            total: 0,
+            overduePercentage: 0,
+            overdueCount: 0,
+          };
         }
 
       const today = new Date();

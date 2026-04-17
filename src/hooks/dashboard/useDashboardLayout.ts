@@ -38,12 +38,13 @@ export function useDashboardLayout(companyId: string | undefined, userId: string
           .eq("company_id", companyId)
           .order("is_default", { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         if (error) {
           // PGRST116 = no rows found, which is OK
           // 42P01 = table doesn't exist, return null gracefully
-          if (error.code !== "PGRST116" && error.code !== "42P01") {
+          // 406 = Not Acceptable (table structure issue), return null gracefully
+          if (error.code !== "PGRST116" && error.code !== "42P01" && error.code !== "406") {
             console.error("Error fetching dashboard layout:", error);
           }
           return null;

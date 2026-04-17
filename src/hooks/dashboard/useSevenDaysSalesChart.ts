@@ -38,11 +38,16 @@ export function useSevenDaysSalesChart(
         const { data, error } = await query;
 
         if (error) {
+          // Handle various error codes gracefully
           if (
-            error.code === '42P01' ||
-            error.code === '42501' ||
-            error.message?.includes('does not exist') ||
-            error.message?.includes('permission')
+            (error as any)?.code === '42P01' ||
+            (error as any)?.code === '42501' ||
+            (error as any)?.code === '400' ||
+            (error as any)?.code === '406' ||
+            (error as any)?.status === 400 ||
+            (error as any)?.status === 406 ||
+            (error as any)?.message?.includes('does not exist') ||
+            (error as any)?.message?.includes('permission')
           ) {
             console.warn("Sales table not available yet, using fallback data");
             return last7Days.map((date) => ({
@@ -50,7 +55,12 @@ export function useSevenDaysSalesChart(
               ventas: 0,
             }));
           }
-          throw error;
+          // For unexpected errors, return fallback instead of throwing
+          console.error("Unexpected error in useSevenDaysSalesChart:", error);
+          return last7Days.map((date) => ({
+            date: format(date, "dd/MM", { locale: es }),
+            ventas: 0,
+          }));
         }
 
         return last7Days.map((date) => {

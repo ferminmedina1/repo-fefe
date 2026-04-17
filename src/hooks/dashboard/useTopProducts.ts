@@ -42,16 +42,23 @@ export function useTopProducts(
         const { data: saleItems, error } = await query;
 
         if (error) {
+          // Handle various error codes gracefully
           if (
-            error.code === '42P01' ||
-            error.code === '42501' ||
-            error.message?.includes('does not exist') ||
-            error.message?.includes('permission')
+            (error as any)?.code === '42P01' ||
+            (error as any)?.code === '42501' ||
+            (error as any)?.code === '400' ||
+            (error as any)?.code === '406' ||
+            (error as any)?.status === 400 ||
+            (error as any)?.status === 406 ||
+            (error as any)?.message?.includes('does not exist') ||
+            (error as any)?.message?.includes('permission')
           ) {
             console.warn("Sale items table not available yet, using fallback data");
             return [];
           }
-          throw error;
+          // For unexpected errors, return empty instead of throwing
+          console.error("Unexpected error fetching top products:", error);
+          return [];
         }
 
       const productMap = new Map<string, { name: string; revenue: number; quantity: number }>();
