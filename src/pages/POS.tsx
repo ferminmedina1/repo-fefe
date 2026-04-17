@@ -8,9 +8,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { getUserErrorMessage } from "@/lib/errorUtils";
 import { useCompany } from "@/contexts/CompanyContext";
-import { sanitizeSearchQuery } from "@/lib/searchUtils";
-import { getUserErrorMessage } from "@/lib/errorUtils";
-import { useCompany } from "@/contexts/CompanyContext";
 
 import { useCartLogic } from "@/hooks/pos/useCartLogic";
 import { usePaymentLogic } from "@/hooks/pos/usePaymentLogic";

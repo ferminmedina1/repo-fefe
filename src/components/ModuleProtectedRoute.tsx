@@ -1,6 +1,6 @@
 import { ReactNode, useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { useActiveModules } from "@/hooks/useActiveModules";
+import { useActiveModules, BASE_MODULES } from "@/hooks/useActiveModules";
 import { Permission, usePermissions } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -11,9 +11,6 @@ interface ModuleProtectedRouteProps {
   redirectTo?: string;
   permission?: Permission;
 }
-
-// Módulos base que siempre están disponibles (sincronizado con platform_modules.is_base_module = true)
-const BASE_MODULES = ["dashboard", "pos", "products", "sales", "customers", "settings", "reports"];
 
 export function ModuleProtectedRoute({
   children,

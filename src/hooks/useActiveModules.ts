@@ -1,90 +1,84 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useCompany } from '@/contexts/CompanyContext';
-import { useEffect } from 'react';
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useEffect, useRef } from "react";
 
-// Módulos base que siempre están activos para todas las empresas
-const BASE_MODULES = ['dashboard', 'pos', 'sales', 'products', 'customers', 'settings'];
+// Modulos base que siempre estan activos para todas las empresas
+// Sincronizado con platform_modules.is_base_module = true + reports (tratado como base en UI)
+export const BASE_MODULES = ["dashboard", "pos", "sales", "products", "customers", "settings", "reports"];
 
 export const useActiveModules = () => {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
+  // Ref para evitar multiples canales realtime por la misma instancia del hook
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const query = useQuery({
-    queryKey: ['activeModules', currentCompany?.id],
+    queryKey: ["activeModules", currentCompany?.id],
     queryFn: async () => {
       if (!currentCompany?.id) {
-        return [...BASE_MODULES]; // Retornar base modules si no hay empresa
+        return [...BASE_MODULES];
       }
 
-      console.log('[useActiveModules] Fetching active modules for company:', currentCompany.id);
-
       const { data, error } = await supabase
-        .from('company_modules')
+        .from("company_modules")
         .select(`
-          *,
-          platform_modules(code, is_base)
+          module_id,
+          active,
+          platform_modules(code)
         `)
-        .eq('company_id', currentCompany.id)
-        .eq('active', true);
+        .eq("company_id", currentCompany.id)
+        .eq("active", true);
 
       if (error) {
-        console.error('[useActiveModules] Error fetching active modules:', error);
+        console.error("[useActiveModules] Error:", error);
         throw error;
       }
 
-      // Obtener códigos de módulos activos de la empresa
       const companyModules = data?.map((cm: any) => cm.platform_modules?.code).filter(Boolean) || [];
-      
-      // Combinar con módulos base (siempre activos)
-      const allActiveModules = [...new Set([...BASE_MODULES, ...companyModules])];
-      
-      console.log('[useActiveModules] Active modules loaded:', allActiveModules);
-      return allActiveModules;
+      return [...new Set([...BASE_MODULES, ...companyModules])];
     },
     enabled: !!currentCompany?.id,
-    staleTime: 0, // Always refetch when switching companies
-    refetchOnWindowFocus: true,
-    refetchOnMount: 'stale',
-    refetchInterval: 1000 * 10, // Periodic validation
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchInterval: 60_000,
   });
 
-  // Suscribirse a cambios en tiempo real de company_modules
   useEffect(() => {
     if (!currentCompany?.id) return;
 
-    console.log('[useActiveModules] Setting up realtime subscription for company_modules:', currentCompany.id);
-    const channelName = `company_modules_realtime_${currentCompany.id}`;
-
-    // Si ya existe un canal con el mismo nombre (por renders previos), eliminarlo
-    const existingChannel = supabase.getChannels().find((ch) => ch.topic === `realtime:${channelName}`);
-    if (existingChannel) {
-      console.log('[useActiveModules] Removing existing realtime channel before creating a new one');
-      supabase.removeChannel(existingChannel);
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
     }
+
+    const channelName = `active_modules_${currentCompany.id}_${Math.random().toString(36).slice(2, 7)}`;
 
     const channel = supabase
       .channel(channelName)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: '*',
-          schema: 'public',
-          table: 'company_modules',
+          event: "*",
+          schema: "public",
+          table: "company_modules",
           filter: `company_id=eq.${currentCompany.id}`,
         },
-        (payload) => {
-          console.log('[useActiveModules] Realtime change detected:', payload);
-          queryClient.invalidateQueries({ queryKey: ['activeModules', currentCompany.id] });
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["activeModules", currentCompany.id] });
         }
       )
-      .subscribe((status) => {
-        console.log('[useActiveModules] Realtime subscription status:', status);
-      });
+      .subscribe();
+
+    channelRef.current = channel;
 
     return () => {
-      console.log('[useActiveModules] Cleaning up realtime subscription');
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [currentCompany?.id, queryClient]);
 
