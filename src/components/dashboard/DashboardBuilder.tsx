@@ -41,6 +41,8 @@ export function DashboardBuilder() {
   const [userId, setUserId] = useState<string | undefined>();
   const [showCSVUploader, setShowCSVUploader] = useState(false);
   const [showMetricBuilder, setShowMetricBuilder] = useState(false);
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
 
   // Get user ID from Supabase session
   useEffect(() => {
@@ -200,14 +202,27 @@ export function DashboardBuilder() {
           />
         </div>
         <DashboardEmptyState
-          onChooseTemplate={() => {
-            // TODO: Implement template selection
-          }}
+          onChooseTemplate={() => setShowTemplateGallery(true)}
           onChooseFreeBuilder={() => {
             // Open widget picker or add first widget
             handleAddWidget("kpi-monthly-sales" as WidgetType);
           }}
         />
+        {showTemplateGallery && (
+          <TemplateGallery
+            onSelectTemplate={async (widgets) => {
+              // Add each widget from template
+              widgets.forEach((widget) => {
+                addWidget({
+                  id: `${widget.type}-${Date.now()}-${Math.random()}`,
+                  type: widget.type,
+                  size: widget.size || 'full',
+                });
+              });
+              setShowTemplateGallery(false);
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -246,6 +261,16 @@ export function DashboardBuilder() {
                 resetLayout();
                 newWidgets.forEach(w => addWidget(w));
               }} />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTemplateGallery(true)}
+                disabled={isSaving}
+                className="gap-2"
+              >
+                <Zap className="h-4 w-4" />
+                Explorar templates
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
