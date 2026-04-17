@@ -49,7 +49,7 @@ export function useMonthlyComparison(
         // Build query with optional filters
         let currentMonthQuery = supabase
           .from("sales")
-          .select("total, sale_items(quantity, unit_price, subtotal, cost)")
+          .select("total, sale_items(quantity, unit_price, subtotal)")
           .eq("company_id", companyId)
           .gte("created_at", currentMonthStart.toISOString())
           .lte("created_at", currentMonthEnd.toISOString());
@@ -119,12 +119,12 @@ export function useMonthlyComparison(
         0
       ) || 0;
 
-      // Calculate gross margin using real cost field
+      // Calculate gross margin using cost estimate (60% of subtotal)
       let totalCost = 0;
       (currentMonth as Sale[] | null)?.forEach((sale) => {
         sale.sale_items?.forEach((item) => {
-          // Use real cost field if available, otherwise use 60% of subtotal as fallback
-          const cost = item.cost || Number(item.subtotal) * 0.6;
+          // Estimate cost as 60% of subtotal (standard fallback)
+          const cost = Number(item.subtotal) * 0.6;
           totalCost += cost;
         });
       });
