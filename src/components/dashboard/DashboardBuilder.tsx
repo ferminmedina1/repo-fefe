@@ -42,7 +42,6 @@ export function DashboardBuilder() {
   const [showCSVUploader, setShowCSVUploader] = useState(false);
   const [showMetricBuilder, setShowMetricBuilder] = useState(false);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
-  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
 
   // Get user ID from Supabase session
   useEffect(() => {
