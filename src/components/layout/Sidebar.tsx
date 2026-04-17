@@ -298,7 +298,6 @@ export function Sidebar() {
               href: "/inventory-alerts",
               icon: AlertCircle,
               module: "inventory_alerts",
-              badge: 5,
             },
             {
               title: "Depósitos",

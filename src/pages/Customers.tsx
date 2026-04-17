@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Search, Receipt, Eye, Printer, DollarSign, CreditCard, AlertCircle, CheckCircle2, Info, Wallet, TrendingUp, TrendingDown, FileText, Truck, BarChart3 } from "lucide-react";
+import { Plus, Edit, Search, Receipt, Eye, Printer, DollarSign, CreditCard, AlertCircle, CheckCircle2, Info, Wallet, TrendingUp, TrendingDown, FileText, FilePlus, Truck, BarChart3, Users, Download, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
@@ -72,6 +72,71 @@ export default function Customers() {
     notes: "",
   });
   const queryClient = useQueryClient();
+  const importFileRef = useRef<HTMLInputElement>(null);
+
+  const exportCustomersCSV = () => {
+    if (!customers || customers.length === 0) {
+      toast.error("No hay clientes para exportar");
+      return;
+    }
+    const headers = ["Nombre", "Email", "Teléfono", "Documento", "Dirección", "Límite de Crédito", "Condiciones de Pago"];
+    const rows = customers.map((c: any) => [
+      c.name || "",
+      c.email || "",
+      c.phone || "",
+      c.document || "",
+      c.address || "",
+      c.credit_limit ?? "",
+      c.payment_terms || "",
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+      .join("
+");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `clientes-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentCompany?.id) return;
+    const text = await file.text();
+    const lines = text.trim().split("
+").slice(1); // skip header
+    const imported: any[] = [];
+    const errors: string[] = [];
+    lines.forEach((line, i) => {
+      const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, "").replace(/""/g, '"'));
+      const [name, email, phone, document, address, credit_limit, payment_terms] = cols;
+      if (!name) { errors.push(`Fila ${i + 2}: nombre requerido`); return; }
+      imported.push({
+        name,
+        email: email || null,
+        phone: phone || null,
+        document: document || null,
+        address: address || null,
+        credit_limit: credit_limit ? parseFloat(credit_limit) : 0,
+        payment_terms: payment_terms || null,
+        company_id: currentCompany.id,
+      });
+    });
+    if (errors.length > 0) {
+      toast.error(`Errores en importación: ${errors.slice(0, 3).join("; ")}${errors.length > 3 ? ` y ${errors.length - 3} más` : ""}`);
+    }
+    if (imported.length === 0) { e.target.value = ""; return; }
+    const { error } = await supabase.from("customers").insert(imported);
+    if (error) { toast.error("Error al importar: " + error.message); }
+    else {
+      toast.success(`${imported.length} cliente(s) importado(s)`);
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+    }
+    e.target.value = "";
+  };
 
   const { data: customers } = useQuery({
     queryKey: ["customers", searchQuery, currentCompany?.id],
@@ -526,6 +591,15 @@ export default function Customers() {
             <p className="text-muted-foreground text-sm sm:text-base">Gestiona tu base de clientes</p>
           </div>
           <div className="flex flex-wrap gap-2 w-full lg:w-auto lg:justify-end">
+            <input ref={importFileRef} type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
+            <Button variant="outline" onClick={() => importFileRef.current?.click()} className="w-full sm:w-auto">
+              <Upload className="h-4 w-4 mr-2" />
+              Importar CSV
+            </Button>
+            <Button variant="outline" onClick={exportCustomersCSV} className="w-full sm:w-auto">
+              <Download className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
             <Button variant="outline" onClick={() => navigate("/reports?tab=customers")} className="w-full sm:w-auto">
               <BarChart3 className="h-4 w-4 mr-2" />
               Ver Reportes

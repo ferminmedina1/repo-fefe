@@ -423,12 +423,10 @@ export function EmployeeRoleAssignment({ standalone = true }: { standalone?: boo
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium">
-                          {employee ? `${employee.first_name} ${employee.last_name}` : "Usuario"}
+                          {employee ? `${employee.first_name} ${employee.last_name}` : (displayEmail || "Sin nombre")}
                         </span>
                         <span className="text-sm text-muted-foreground">
-                          {hasMembership && row.userId
-                            ? `ID: ${row.userId.slice(0, 8)}...`
-                            : displayEmail || "Sin email"}
+                          {displayEmail || "Sin email"}
                         </span>
                       </div>
                     </TableCell>
@@ -610,12 +608,10 @@ export function EmployeeRoleAssignment({ standalone = true }: { standalone?: boo
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium">
-                          {employee ? `${employee.first_name} ${employee.last_name}` : "Usuario"}
+                          {employee ? `${employee.first_name} ${employee.last_name}` : (displayEmail || "Sin nombre")}
                         </span>
                         <span className="text-sm text-muted-foreground">
-                          {hasMembership && row.userId
-                            ? `ID: ${row.userId.slice(0, 8)}...`
-                            : displayEmail || "Sin email"}
+                          {displayEmail || "Sin email"}
                         </span>
                       </div>
                     </TableCell>
