@@ -266,12 +266,6 @@ export function Sidebar() {
               module: "opportunities",
             },
             {
-              title: "Automatizaciones",
-              href: "/crm-automations",
-              icon: Zap,
-              module: "opportunities",
-            },
-            {
               title: "Roles CRM",
               href: "/settings/crm-roles",
               icon: UserCheck,

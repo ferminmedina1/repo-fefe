@@ -1033,7 +1033,9 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity, initi
                   <label className="font-medium">Monto</label>
                   <Input
                     type="number"
-                    {...form.register("value", { valueAsNumber: true })}
+                    {...form.register("value", {
+                      setValueAs: (raw) => (raw === "" || raw == null ? undefined : Number(raw)),
+                    })}
                     placeholder="0"
                   />
                 </div>
@@ -1070,7 +1072,9 @@ export function OpportunityDrawer({ open, onClose, companyId, opportunity, initi
                   <label className="font-medium">Probabilidad (%)</label>
                   <Input
                     type="number"
-                    {...form.register("probability", { valueAsNumber: true })}
+                    {...form.register("probability", {
+                      setValueAs: (raw) => (raw === "" || raw == null ? undefined : Number(raw)),
+                    })}
                     placeholder="50"
                     min="0"
                     max="100"
