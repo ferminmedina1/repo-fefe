@@ -44,6 +44,7 @@ export const useActiveModules = () => {
     refetchOnWindowFocus: false,
     refetchOnMount: true,
     refetchInterval: 60_000,
+
   });
 
   useEffect(() => {
