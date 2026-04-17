@@ -266,12 +266,6 @@ export function Sidebar() {
               module: "opportunities",
             },
             {
-              title: "Automatizaciones",
-              href: "/crm-automations",
-              icon: Zap,
-              module: "opportunities",
-            },
-            {
               title: "Roles CRM",
               href: "/settings/crm-roles",
               icon: UserCheck,
@@ -304,7 +298,6 @@ export function Sidebar() {
               href: "/inventory-alerts",
               icon: AlertCircle,
               module: "inventory_alerts",
-              badge: 5,
             },
             {
               title: "Depósitos",

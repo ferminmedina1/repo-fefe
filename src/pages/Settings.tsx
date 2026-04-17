@@ -472,7 +472,7 @@ export default function Settings() {
             </TabsList>
           </div>
 
-          <TabsContent value="company">
+          <TabsContent value="company" data-tutorial="company-info">
             <CompanySettings />
           </TabsContent>
 
@@ -1026,7 +1026,7 @@ export default function Settings() {
 
               <InvoiceViewer companyId={currentCompany?.id} />
 
-              <PaymentMethodsManager companyId={currentCompany?.id} />
+              <div data-tutorial="payment-methods"><PaymentMethodsManager companyId={currentCompany?.id} /></div>
             </div>
           </TabsContent>
         </Tabs>

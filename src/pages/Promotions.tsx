@@ -392,7 +392,7 @@ export default function Promotions() {
               }}
             >
               <DialogTrigger asChild>
-                <Button>
+                <Button data-tutorial="new-promo">
                   <Plus className="mr-2 h-4 w-4" />
                   Nueva Promoción
                 </Button>
@@ -459,7 +459,7 @@ export default function Promotions() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="percentage">Porcentaje</SelectItem>
+                          <SelectItem value="percentage" data-tutorial="promo-rules">Porcentaje</SelectItem>
                           <SelectItem value="fixed">Monto Fijo</SelectItem>
                           <SelectItem value="volume">Por Volumen</SelectItem>
                         </SelectContent>
@@ -626,7 +626,7 @@ export default function Promotions() {
                       <TableHead className="hidden sm:table-cell">Nombre</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Valor</TableHead>
-                      <TableHead className="hidden md:table-cell">Usos</TableHead>
+                      <TableHead className="hidden md:table-cell" data-tutorial="promo-performance">Usos</TableHead>
                       <TableHead className="hidden lg:table-cell">Válido Hasta</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead className="text-right">Acc.</TableHead>

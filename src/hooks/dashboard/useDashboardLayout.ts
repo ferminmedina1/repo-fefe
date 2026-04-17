@@ -38,30 +38,26 @@ export function useDashboardLayout(companyId: string | undefined, userId: string
           .eq("company_id", companyId)
           .order("is_default", { ascending: false })
           .limit(1)
-          .maybeSingle();
+          .single();
 
         if (error) {
-          // Gracefully handle table doesn't exist or RLS errors
-          if (
-            error.code === '42P01' || 
-            error.code === '42501' ||
-            error.message?.includes('does not exist') ||
-            error.message?.includes('permission')
-          ) {
-            console.warn("Dashboard layouts table may not exist yet, using empty layout");
-            return null;
+          // PGRST116 = no rows found, which is OK
+          // 42P01 = table doesn't exist, return null gracefully
+          if (error.code !== "PGRST116" && error.code !== "42P01") {
+            console.error("Error fetching dashboard layout:", error);
           }
-          console.error("Error fetching dashboard layout:", error);
           return null;
         }
 
         return (data as DashboardLayoutData) || null;
       } catch (err) {
-        console.error("Exception fetching dashboard layout:", err);
+        // Catch any network or other errors
+        console.error("Unexpected error fetching dashboard layout:", err);
         return null;
       }
     },
     enabled: !!userId && !!companyId,
+    retry: false, // Don't retry if table doesn't exist
   });
 
   // Sync layout data to local state

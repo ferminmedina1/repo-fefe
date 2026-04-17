@@ -14,6 +14,7 @@ import { Clock, Plus, LogIn, LogOut, Calendar, Trash2 } from "lucide-react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface TimeEntry {
   id: string;
@@ -311,8 +312,19 @@ export function EmployeeTimeTracking() {
                     <TableCell>
                       {calculateHours(entry.clock_in, entry.clock_out)}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
-                      {entry.notes || "-"}
+                    <TableCell className="text-muted-foreground text-sm max-w-[200px]">
+                      {entry.notes && entry.notes.length > 40 ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="truncate block cursor-default">{entry.notes}</span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs whitespace-pre-wrap">{entry.notes}</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        entry.notes || "-"
+                      )}
                     </TableCell>
                     <TableCell>
                       <Button

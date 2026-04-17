@@ -434,8 +434,8 @@ const AccountantReports = () => {
   return (
     <Layout>
       <div className="space-y-4 md:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="min-w-0">
             <h1 className="text-xl md:text-3xl font-bold flex items-center gap-2">
               <Calculator className="h-6 w-6 md:h-8 md:w-8" />
               Reportes Contador
@@ -446,7 +446,7 @@ const AccountantReports = () => {
           </div>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full sm:w-auto sm:min-w-[200px]">
+              <Button variant="outline" className="w-full lg:w-auto lg:min-w-[200px]">
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {format(selectedMonth, "MMMM yyyy", { locale: es })}
               </Button>
@@ -470,7 +470,7 @@ const AccountantReports = () => {
               <TrendingUp className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent className="p-3 md:p-6 pt-0">
-              <div className="text-lg md:text-2xl font-bold">
+              <div className="text-lg md:text-2xl font-bold break-all leading-tight">
                 {isLoading ? "..." : formatCurrency(reportData?.totals.totalSales || 0)}
               </div>
               <p className="text-[10px] md:text-xs text-muted-foreground">
@@ -485,7 +485,7 @@ const AccountantReports = () => {
               <TrendingDown className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent className="p-3 md:p-6 pt-0">
-              <div className="text-lg md:text-2xl font-bold">
+              <div className="text-lg md:text-2xl font-bold break-all leading-tight">
                 {isLoading ? "..." : formatCurrency(reportData?.totals.totalPurchases || 0)}
               </div>
               <p className="text-[10px] md:text-xs text-muted-foreground">
@@ -494,14 +494,14 @@ const AccountantReports = () => {
             </CardContent>
           </Card>
           
-          <Card>
+          <Card data-tutorial="tax-liability">
             <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 p-3 md:p-6">
               <CardTitle className="text-xs md:text-sm font-medium">IVA</CardTitle>
               <DollarSign className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent className="p-3 md:p-6 pt-0">
               <div className={cn(
-                "text-lg md:text-2xl font-bold",
+                "text-lg md:text-2xl font-bold break-all leading-tight",
                 (reportData?.totals.ivaBalance || 0) >= 0 ? "text-red-600" : "text-green-600"
               )}>
                 {isLoading ? "..." : formatCurrency(Math.abs(reportData?.totals.ivaBalance || 0))}
@@ -519,7 +519,7 @@ const AccountantReports = () => {
             </CardHeader>
             <CardContent className="p-3 md:p-6 pt-0">
               <div className={cn(
-                "text-lg md:text-2xl font-bold",
+                "text-lg md:text-2xl font-bold break-all leading-tight",
                 (reportData?.totals.netResult || 0) >= 0 ? "text-green-600" : "text-red-600"
               )}>
                 {isLoading ? "..." : formatCurrency(reportData?.totals.netResult || 0)}
@@ -541,7 +541,7 @@ const AccountantReports = () => {
           <TabsContent value="downloads" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {/* Libro IVA Ventas */}
-              <Card className="hover:border-primary/50 transition-colors">
+              <Card className="hover:border-primary/50 transition-colors" data-tutorial="book-movements">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <FileSpreadsheet className="h-5 w-5 text-green-600" />
@@ -633,7 +633,7 @@ const AccountantReports = () => {
               </Card>
 
               {/* Resumen Mensual */}
-              <Card className="hover:border-primary/50 transition-colors">
+              <Card className="hover:border-primary/50 transition-colors" data-tutorial="balance-sheet">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <FileText className="h-5 w-5 text-purple-600" />

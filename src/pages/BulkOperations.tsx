@@ -453,8 +453,8 @@ export default function BulkOperations() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="update_prices">Actualizar Precios</SelectItem>
-                        <SelectItem value="update_stock">Actualizar Stock</SelectItem>
+                        <SelectItem value="update_prices" data-tutorial="bulk-price-update">Actualizar Precios</SelectItem>
+                        <SelectItem value="update_stock" data-tutorial="bulk-stock-update">Actualizar Stock</SelectItem>
                         <SelectItem value="activate_products">Activar Productos</SelectItem>
                         <SelectItem value="deactivate_products">Desactivar Productos sin Stock</SelectItem>
                       </SelectContent>
@@ -490,7 +490,7 @@ export default function BulkOperations() {
                   )}
                 </div>
 
-                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4" data-tutorial="preview">
                   <div className="flex items-start gap-2">
                     <AlertCircle className="h-5 w-5 text-primary mt-0.5" />
                     <div className="text-sm">

@@ -299,7 +299,7 @@ export default function CustomerSupport() {
             </Button>
             <Dialog open={isNewTicketOpen} onOpenChange={setIsNewTicketOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button data-tutorial="btn-new-ticket">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo Ticket
                 </Button>
@@ -476,7 +476,7 @@ export default function CustomerSupport() {
                     </Select>
                   </div>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2" data-tutorial="ticket-priority">
                   <Label>Prioridad</Label>
                   <Select 
                     value={ticketForm.priority} 
@@ -614,7 +614,7 @@ export default function CustomerSupport() {
                         <User className="h-3 w-3" />
                         {ticket.customers?.name || 'Sin cliente'}
                       </span>
-                      <Badge {...getPriorityBadge(ticket.priority)} className="text-xs">
+                      <Badge {...getPriorityBadge(ticket.priority)} className="text-xs" data-tutorial="customer-satisfaction">
                         {getPriorityBadge(ticket.priority).label}
                       </Badge>
                     </div>
@@ -644,6 +644,7 @@ export default function CustomerSupport() {
                       </p>
                     </div>
                     <Select 
+                      data-tutorial="ticket-resolution"
                       value={selectedTicket.status}
                       onValueChange={(val) => updateStatusMutation.mutate({ 
                         ticketId: selectedTicket.id, 

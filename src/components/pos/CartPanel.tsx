@@ -94,7 +94,7 @@ export function CartPanel({
 }: CartPanelProps) {
   return (
     <div className="space-y-4 order-1 lg:order-2">
-      <Card>
+      <Card data-tutorial="pos-cart">
         <CardHeader className="p-3 md:p-6">
           <CardTitle className="flex items-center gap-2 text-base md:text-lg">
             <ShoppingCart className="h-4 w-4 md:h-5 md:w-5" />
@@ -283,8 +283,7 @@ export function CartPanel({
                 </div>
 
                 <Separator />
-
-                <div className="space-y-3">
+                <div className="space-y-3" data-tutorial="pos-payment">
                   <div className="flex items-center justify-between">
                     <Label className="text-base font-semibold">Panel de Cobro</Label>
                     {paymentMethods.length > 1 && (
@@ -468,8 +467,7 @@ export function CartPanel({
                     </div>
                   </div>
                 )}
-
-                <div className="flex gap-2 pt-2">
+                <div className="flex gap-2 pt-2" data-tutorial="pos-checkout">
                   <Button variant="outline" onClick={onClearAll} className="flex-1 hover:scale-105 transition-transform">
                     Limpiar
                   </Button>

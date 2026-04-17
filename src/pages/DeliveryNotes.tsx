@@ -272,7 +272,7 @@ export default function DeliveryNotes() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Remitos</h1>
+            <h1 className="text-3xl font-bold" data-tutorial="btn-create-delivery">Remitos</h1>
             <p className="text-muted-foreground">Gestiona entregas y remitos de ventas</p>
           </div>
         </div>
@@ -340,7 +340,7 @@ export default function DeliveryNotes() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
+            <Table data-tutorial="delivery-table">
               <TableHeader>
                 <TableRow>
                   <TableHead>Número</TableHead>
@@ -422,6 +422,7 @@ export default function DeliveryNotes() {
                                     status: "delivered" 
                                   })}
                                   title="Marcar como entregado"
+                                  data-tutorial="track-delivery"
                                 >
                                   <CheckCircle className="h-4 w-4" />
                                 </Button>

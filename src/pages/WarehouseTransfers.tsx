@@ -112,6 +112,8 @@ export default function WarehouseTransfers() {
 
   const createTransfer = useMutation({
     mutationFn: async () => {
+      if (!currentCompany?.id) throw new Error("Empresa no seleccionada");
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autorizado");
 
@@ -125,7 +127,7 @@ export default function WarehouseTransfers() {
         status: "pending",
         requested_by: user.id,
         notes,
-        company_id: currentCompany?.id,
+        company_id: currentCompany.id,
       }));
 
       const { data: createdTransfers, error: transferError } = await supabase
@@ -143,7 +145,7 @@ export default function WarehouseTransfers() {
           product_id: item.product_id,
           product_name: item.product_name,
           quantity: item.quantity,
-          company_id: currentCompany?.id!
+          company_id: currentCompany.id
         }));
         allItems.push(...lineItems);
       });
@@ -169,6 +171,8 @@ export default function WarehouseTransfers() {
 
   const updateTransferStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      if (!currentCompany?.id) throw new Error("Empresa no seleccionada");
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No autorizado");
 
@@ -182,6 +186,7 @@ export default function WarehouseTransfers() {
       const { error } = await supabase
         .from("warehouse_transfers")
         .update(updates)
+        .eq("company_id", currentCompany.id)
         .eq("id", id);
       if (error) throw error;
     },
@@ -311,11 +316,15 @@ export default function WarehouseTransfers() {
 
   const validateAndCreateTransfer = async () => {
     try {
+      const companyId = currentCompany?.id;
+      if (!companyId) throw new Error("Empresa no seleccionada");
+
       // Validate stock for all lines
       for (const line of lines) {
         const { data: warehouseStock, error: stockError } = await supabase
           .from("warehouse_stock")
           .select("product_id, stock")
+          .eq("company_id", companyId)
           .eq("warehouse_id", line.from_warehouse_id);
 
         if (stockError) throw stockError;
@@ -365,7 +374,7 @@ export default function WarehouseTransfers() {
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={resetForm} className="hover:scale-105 transition-transform">
+              <Button onClick={resetForm} className="hover:scale-105 transition-transform" data-tutorial="new-transfer">
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Transferencia
               </Button>
@@ -386,7 +395,7 @@ export default function WarehouseTransfers() {
                 </div>
 
                 {/* Líneas de transferencia */}
-                <div className="border-t pt-4">
+                <div className="border-t pt-4" data-tutorial="transfer-products">
                   <div className="flex justify-between items-center mb-4">
                     <Label className="text-lg">Líneas de Transferencia</Label>
                     <Badge variant="secondary">{lines.length} línea{lines.length !== 1 ? 's' : ''}</Badge>
@@ -522,7 +531,7 @@ export default function WarehouseTransfers() {
                   <Button variant="outline" onClick={() => setDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button onClick={handleSubmit}>
+                  <Button onClick={handleSubmit} data-tutorial="confirm-transfer">
                     Crear Transferencia ({lines.length} línea{lines.length !== 1 ? 's' : ''})
                   </Button>
                 </div>

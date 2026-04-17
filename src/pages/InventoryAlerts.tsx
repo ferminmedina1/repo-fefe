@@ -384,21 +384,23 @@ export default function InventoryAlerts() {
   });
 
   const { data: notifications, refetch: refetchNotifications, isLoading: loadingNotifications } = useQuery({
-    queryKey: ["notifications"],
+    queryKey: ["notifications", currentCompany?.id],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+      if (!user || !currentCompany?.id) return [];
 
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
         .eq("user_id", user.id)
+        .eq("company_id", currentCompany.id)
         .order("created_at", { ascending: false })
         .limit(200);
 
       if (error) throw error;
       return data || [];
     },
+    enabled: !!currentCompany?.id,
     refetchInterval: 30000, // Actualizar cada 30 segundos
   });
 
@@ -423,10 +425,18 @@ export default function InventoryAlerts() {
   });
 
   const markAsRead = async (notificationId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !currentCompany?.id) {
+      toast.error("Error de contexto de empresa");
+      return;
+    }
+
     const { error } = await supabase
       .from("notifications")
       .update({ read: true })
-      .eq("id", notificationId);
+      .eq("id", notificationId)
+      .eq("user_id", user.id)
+      .eq("company_id", currentCompany.id);
 
     if (error) {
       toast.error("Error al marcar como leída");
@@ -438,10 +448,16 @@ export default function InventoryAlerts() {
 
   // Marcar notificación del sistema como leída
   const markSystemAsRead = async (notificationId: string) => {
+    if (!currentCompany?.id) {
+      toast.error("Error de contexto de empresa");
+      return;
+    }
+
     const { error } = await supabase
       .from("platform_notifications")
       .update({ read: true })
-      .eq("id", notificationId);
+      .eq("id", notificationId)
+      .eq("company_id", currentCompany.id);
 
     if (error) {
       toast.error("Error al marcar como leída");
@@ -454,31 +470,79 @@ export default function InventoryAlerts() {
   // Marcar todos como leídos (filtrados)
   const markAllAsRead = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ read: true })
-        .in("id", filteredNotifications.map(n => n.id));
-      if (error) throw error;
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const operationalIds = filteredNotifications
+        .filter((n) => n.origin !== "system" && !n.read)
+        .map((n) => n.id);
+
+      const systemIds = filteredNotifications
+        .filter((n) => n.origin === "system" && !n.read)
+        .map((n) => n.id);
+
+      if (operationalIds.length > 0) {
+        const { error } = await supabase
+          .from("notifications")
+          .update({ read: true })
+          .in("id", operationalIds)
+          .eq("user_id", user.id)
+          .eq("company_id", currentCompany.id);
+        if (error) throw error;
+      }
+
+      if (systemIds.length > 0) {
+        const { error } = await supabase
+          .from("platform_notifications")
+          .update({ read: true })
+          .in("id", systemIds)
+          .eq("company_id", currentCompany.id);
+        if (error) throw error;
+      }
+
+      return operationalIds.length + systemIds.length;
     },
-    onSuccess: () => {
+    onSuccess: (updatedCount) => {
       refetchNotifications();
-      toast.success("Todas las notificaciones marcadas como leídas");
+      refetchSystemNotifications();
+      if (!updatedCount) return;
+      toast.success("Todas las notificaciones marcadas como leidas");
     },
     onError: () => toast.error("Error al marcar notificaciones"),
   });
 
   // Eliminar notificación individual
   const deleteNotification = useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, origin }: { id: string; origin: "operational" | "system" }) => {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
+      if (origin === "system") {
+        const { error } = await supabase
+          .from("platform_notifications")
+          .delete()
+          .eq("id", id)
+          .eq("company_id", currentCompany.id);
+        if (error) throw error;
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
       const { error } = await supabase
         .from("notifications")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .eq("company_id", currentCompany.id);
       if (error) throw error;
     },
     onSuccess: () => {
       refetchNotifications();
-      toast.success("Notificación eliminada");
+      refetchSystemNotifications();
+      toast.success("Notificacion eliminada");
     },
     onError: () => toast.error("Error al eliminar"),
   });
@@ -486,14 +550,44 @@ export default function InventoryAlerts() {
   // Eliminar todas (filtradas)
   const deleteAllFiltered = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
-        .from("notifications")
-        .delete()
-        .in("id", filteredNotifications.map(n => n.id));
-      if (error) throw error;
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
+      const operationalIds = filteredNotifications
+        .filter((n) => n.origin !== "system")
+        .map((n) => n.id);
+
+      const systemIds = filteredNotifications
+        .filter((n) => n.origin === "system")
+        .map((n) => n.id);
+
+      if (operationalIds.length > 0) {
+        const { error } = await supabase
+          .from("notifications")
+          .delete()
+          .in("id", operationalIds)
+          .eq("user_id", user.id)
+          .eq("company_id", currentCompany.id);
+        if (error) throw error;
+      }
+
+      if (systemIds.length > 0) {
+        const { error } = await supabase
+          .from("platform_notifications")
+          .delete()
+          .in("id", systemIds)
+          .eq("company_id", currentCompany.id);
+        if (error) throw error;
+      }
+
+      return operationalIds.length + systemIds.length;
     },
-    onSuccess: () => {
+    onSuccess: (deletedCount) => {
       refetchNotifications();
+      refetchSystemNotifications();
+      if (!deletedCount) return;
       toast.success("Notificaciones eliminadas");
     },
     onError: () => toast.error("Error al eliminar notificaciones"),
@@ -592,7 +686,7 @@ export default function InventoryAlerts() {
               Monitoreo de stock bajo y productos próximos a vencer
             </p>
           </div>
-          <Button onClick={() => setCreateDialogOpen(true)} className="w-full sm:w-auto">
+          <Button onClick={() => setCreateDialogOpen(true)} className="w-full sm:w-auto" data-tutorial="btn-create-order">
             <Plus className="h-4 w-4 mr-2" />
             Agregar Alertas
           </Button>
@@ -660,7 +754,7 @@ export default function InventoryAlerts() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full" data-tutorial="stock-table">
         <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="my-alerts" className="flex-1 min-w-[100px] text-xs sm:text-sm">Mis Alertas</TabsTrigger>
-          <TabsTrigger value="low-stock" className="flex-1 min-w-[100px] text-xs sm:text-sm">Stock Bajo</TabsTrigger>
+          <TabsTrigger value="low-stock" className="flex-1 min-w-[100px] text-xs sm:text-sm" data-tutorial="low-stock">Stock Bajo</TabsTrigger>
           <TabsTrigger value="expiring" className="flex-1 min-w-[100px] text-xs sm:text-sm">Próx. Vencer</TabsTrigger>
           <TabsTrigger value="currency" className="flex-1 min-w-[100px] text-xs sm:text-sm">Monedas</TabsTrigger>
           <TabsTrigger value="notifications" className="flex-1 min-w-[100px] text-xs sm:text-sm flex items-center gap-1">
@@ -674,7 +768,7 @@ export default function InventoryAlerts() {
         </TabsList>
 
         {/* Mis Alertas - custom alert rules */}
-        <TabsContent value="my-alerts" className="space-y-4">
+        <TabsContent value="my-alerts" className="space-y-4" data-tutorial="create-po-alert">
           {loadingAlertRules ? (
             <div className="flex justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -766,7 +860,7 @@ export default function InventoryAlerts() {
           )}
         </TabsContent>
 
-        <TabsContent value="low-stock" className="space-y-4">
+        <TabsContent value="low-stock" className="space-y-4" data-tutorial="critical-stock">
           {loadingLowStock ? (
             <div className="flex justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -1002,7 +1096,7 @@ export default function InventoryAlerts() {
                   {Object.entries(NOTIFICATION_TYPES).map(([typeKey, typeInfo]) => {
                     const Icon = typeInfo.icon;
                     const isChecked = selectedNotificationTypes.has(typeKey);
-                    const count = notifications?.filter(n => n.type === typeKey).length || 0;
+                    const count = allNotifications?.filter((n) => n.type === typeKey).length || 0;
                     
                     return (
                       <DropdownMenuCheckboxItem
@@ -1147,7 +1241,7 @@ export default function InventoryAlerts() {
                 <NotificationSkeleton key={i} />
               ))}
             </div>
-          ) : notifications?.length === 0 ? (
+          ) : allNotifications.length === 0 ? (
             <Card className="p-8 text-center space-y-4">
               <div className="flex justify-center">
                 <Bell className="h-12 w-12 text-muted-foreground/50" />
@@ -1169,6 +1263,7 @@ export default function InventoryAlerts() {
                   setNotificationSearchQuery("");
                   setSelectedNotificationTypes(new Set());
                   setUnreadOnly(false);
+                  setNotificationOriginFilter('all');
                 }}
                 className="mt-2"
               >
@@ -1300,7 +1395,7 @@ export default function InventoryAlerts() {
                                 className="h-8 w-8 text-destructive hover:text-destructive"
                                 onClick={() => {
                                   if (confirm('¿Eliminar esta notificación?')) {
-                                    deleteNotification.mutate(notification.id);
+                                    deleteNotification.mutate({ id: notification.id, origin: notification.origin });
                                   }
                                 }}
                               >
@@ -1354,3 +1449,4 @@ export default function InventoryAlerts() {
     </Layout>
   );
 }
+

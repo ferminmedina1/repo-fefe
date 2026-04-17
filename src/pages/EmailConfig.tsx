@@ -83,7 +83,7 @@ export default function EmailConfig() {
 
               {form.provider === "smtp" && (
                 <>
-                  <div>
+                  <div data-tutorial="email-server">
                     <Label>Host</Label>
                     <Input value={form.host} onChange={(e) => setForm({ ...form, host: e.target.value })} />
                   </div>
@@ -99,7 +99,7 @@ export default function EmailConfig() {
                     <Label>Password</Label>
                     <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
                   </div>
-                  <div>
+                  <div data-tutorial="sender-address">
                     <Label>From address</Label>
                     <Input value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} />
                   </div>
@@ -123,7 +123,7 @@ export default function EmailConfig() {
                 </>
               )}
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" data-tutorial="test-email">
                 <Button type="submit" disabled={loading}>{loading ? "Guardando..." : "Guardar configuración"}</Button>
                 <Button variant="ghost" onClick={() => setForm({ provider: "smtp", host: "", port: 587, user: "", password: "", from: "", secure: false, apiKey: "" })}>Limpiar</Button>
               </div>

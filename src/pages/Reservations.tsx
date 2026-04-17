@@ -556,7 +556,8 @@ export default function Reservations() {
           </div>
           <Dialog open={isNewReservationOpen} onOpenChange={setIsNewReservationOpen}>
             <DialogTrigger asChild>
-              <Button onClick={resetReservationForm} className="w-full sm:w-auto" disabled={!canCreate}>
+
+              <Button onClick={resetReservationForm} className="w-full sm:w-auto" disabled={!canCreate} data-tutorial="btn-reserve">
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Reserva
               </Button>
@@ -582,7 +583,7 @@ export default function Reservations() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2" data-tutorial="expiry-date">
                     <Label>Fecha de Vencimiento</Label>
                     <Input
                       type="date"
@@ -736,7 +737,7 @@ export default function Reservations() {
                     <TableCell className="text-orange-600 font-medium">
                       ${Number(reservation.remaining_amount).toFixed(2)}
                     </TableCell>
-                    <TableCell>{getStatusBadge(reservation.status)}</TableCell>
+                    <TableCell data-tutorial="reservation-status">{getStatusBadge(reservation.status)}</TableCell>
                     <TableCell>{format(new Date(reservation.created_at), "dd/MM/yyyy", { locale: es })}</TableCell>
                     <TableCell className="text-right space-x-2">
                       {reservation.status === "active" && (

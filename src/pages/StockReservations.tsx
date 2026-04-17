@@ -48,6 +48,8 @@ export default function StockReservations() {
   const { data: reservations, isLoading } = useQuery({
     queryKey: ["stock-reservations", currentCompany?.id, searchQuery],
     queryFn: async () => {
+      if (!currentCompany?.id) return [];
+
       let query = supabase
         .from("stock_reservations")
         .select(`
@@ -55,7 +57,7 @@ export default function StockReservations() {
           products(name, sku),
           warehouses(name)
         `)
-        .eq("company_id", currentCompany?.id!)
+        .eq("company_id", currentCompany.id)
         .order("created_at", { ascending: false });
 
       if (searchQuery) {
@@ -72,10 +74,12 @@ export default function StockReservations() {
   const { data: products } = useQuery({
     queryKey: ["products", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return [];
+
       const { data, error } = await supabase
         .from("products")
         .select("id, name, sku, stock_physical, stock_reserved")
-        .eq("company_id", currentCompany?.id!)
+        .eq("company_id", currentCompany.id)
         .eq("active", true)
         .order("name");
       if (error) throw error;
@@ -87,10 +91,12 @@ export default function StockReservations() {
   const { data: warehouses } = useQuery({
     queryKey: ["warehouses", currentCompany?.id],
     queryFn: async () => {
+      if (!currentCompany?.id) return [];
+
       const { data, error } = await supabase
         .from("warehouses")
         .select("id, name")
-        .eq("company_id", currentCompany?.id!)
+        .eq("company_id", currentCompany.id)
         .eq("active", true)
         .order("name");
       if (error) throw error;
@@ -101,11 +107,13 @@ export default function StockReservations() {
 
   const createReservationMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
       const { error } = await supabase.from("stock_reservations").insert({
-        company_id: currentCompany?.id!,
+        company_id: currentCompany.id,
         product_id: data.product_id,
         warehouse_id: data.warehouse_id || null,
         quantity: parseInt(data.quantity),
@@ -141,9 +149,12 @@ export default function StockReservations() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
       const { error } = await supabase
         .from("stock_reservations")
         .update({ status, updated_at: new Date().toISOString() })
+        .eq("company_id", currentCompany.id)
         .eq("id", id);
       if (error) throw error;
     },
@@ -303,7 +314,7 @@ export default function StockReservations() {
           </Dialog>
         </div>
 
-        <Card>
+        <Card data-tutorial="reserved-items">
           <CardHeader>
             <CardTitle>Reservas Activas</CardTitle>
             <Input
@@ -382,6 +393,7 @@ export default function StockReservations() {
                         <Button
                           size="sm"
                           variant="outline"
+                          data-tutorial="confirm-sale"
                           onClick={() =>
                             updateStatusMutation.mutate({ id: reservation.id, status: "completed" })
                           }
@@ -391,6 +403,7 @@ export default function StockReservations() {
                         <Button
                           size="sm"
                           variant="outline"
+                          data-tutorial="release-reservation"
                           onClick={() =>
                             updateStatusMutation.mutate({ id: reservation.id, status: "released" })
                           }

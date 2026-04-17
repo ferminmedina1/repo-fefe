@@ -34,13 +34,15 @@ export const generateQuotationPDF = async (
 ) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 20;
+  const contentWidth = pageWidth - margin * 2;
   let yPos = 20;
 
-  // Header - Company Info
+  // ── Header: company info ──────────────────────────────────────────────────
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
   doc.text(companySettings?.company_name || "Mi Empresa", pageWidth / 2, yPos, { align: "center" });
-  
+
   yPos += 7;
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
@@ -55,131 +57,155 @@ export const generateQuotationPDF = async (
   }
   if (companySettings?.tax_id) {
     doc.text(`CUIT/RUT: ${companySettings.tax_id}`, pageWidth / 2, yPos, { align: "center" });
+    yPos += 5;
   }
 
-  yPos += 10;
+  yPos += 5;
   doc.setDrawColor(200, 200, 200);
-  doc.line(15, yPos, pageWidth - 15, yPos);
+  doc.line(margin, yPos, pageWidth - margin, yPos);
   yPos += 10;
 
-  // Document Title
+  // ── Document title ────────────────────────────────────────────────────────
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
   doc.text("PRESUPUESTO", pageWidth / 2, yPos, { align: "center" });
-  yPos += 10;
+  yPos += 12;
 
-  // Quotation Info
+  // ── Quotation metadata ────────────────────────────────────────────────────
+  const labelX = margin;
+  const valueX = margin + 38;
   doc.setFontSize(10);
+
   doc.setFont("helvetica", "bold");
-  doc.text("Número:", 15, yPos);
+  doc.text("Número:", labelX, yPos);
   doc.setFont("helvetica", "normal");
-  doc.text(quotation.quotation_number, 45, yPos);
-  
+  doc.text(quotation.quotation_number, valueX, yPos);
+
   yPos += 6;
   doc.setFont("helvetica", "bold");
-  doc.text("Fecha:", 15, yPos);
+  doc.text("Fecha:", labelX, yPos);
   doc.setFont("helvetica", "normal");
-  doc.text(new Date(quotation.created_at).toLocaleDateString("es-ES"), 45, yPos);
+  doc.text(new Date(quotation.created_at).toLocaleDateString("es-ES"), valueX, yPos);
 
   if (quotation.valid_until) {
     yPos += 6;
     doc.setFont("helvetica", "bold");
-    doc.text("Válido hasta:", 15, yPos);
+    doc.text("Válido hasta:", labelX, yPos);
     doc.setFont("helvetica", "normal");
-    doc.text(new Date(quotation.valid_until).toLocaleDateString("es-ES"), 45, yPos);
+    doc.text(new Date(quotation.valid_until).toLocaleDateString("es-ES"), valueX, yPos);
   }
 
   yPos += 6;
   doc.setFont("helvetica", "bold");
-  doc.text("Cliente:", 15, yPos);
+  doc.text("Cliente:", labelX, yPos);
   doc.setFont("helvetica", "normal");
-  doc.text(quotation.customer_name, 45, yPos);
+  doc.text(quotation.customer_name, valueX, yPos);
 
   yPos += 15;
 
-  // Items Table Header
+  // ── Items table ───────────────────────────────────────────────────────────
+  // Column positions (right-aligned anchors)
+  const colProduct = margin;
+  const colQtyR   = pageWidth - margin - 85;
+  const colPriceR = pageWidth - margin - 45;
+  const colTotalR = pageWidth - margin;
+
+  // Header row
   doc.setFillColor(240, 240, 240);
-  doc.rect(15, yPos - 5, pageWidth - 30, 8, "F");
+  doc.rect(margin, yPos - 5, contentWidth, 8, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.text("Producto", 17, yPos);
-  doc.text("Cant.", pageWidth - 80, yPos, { align: "right" });
-  doc.text("Precio Unit.", pageWidth - 55, yPos, { align: "right" });
-  doc.text("Subtotal", pageWidth - 20, yPos, { align: "right" });
+  doc.text("Producto", colProduct + 2, yPos);
+  doc.text("Cant.", colQtyR,   yPos, { align: "right" });
+  doc.text("Precio Unit.", colPriceR, yPos, { align: "right" });
+  doc.text("Subtotal", colTotalR, yPos, { align: "right" });
 
   yPos += 8;
   doc.setFont("helvetica", "normal");
 
-  // Items
+  // Rows
   quotation.items.forEach((item) => {
     if (yPos > 270) {
       doc.addPage();
       yPos = 20;
     }
-
-    doc.text(item.product_name.substring(0, 40), 17, yPos);
-    doc.text(item.quantity.toString(), pageWidth - 80, yPos, { align: "right" });
-    doc.text(`$${item.unit_price.toFixed(2)}`, pageWidth - 55, yPos, { align: "right" });
-    doc.text(`$${item.subtotal.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
+    const maxProductWidth = colQtyR - colProduct - 10;
+    const productLines = doc.splitTextToSize(item.product_name, maxProductWidth);
+    doc.text(productLines[0], colProduct + 2, yPos);
+    doc.text(item.quantity.toString(), colQtyR,   yPos, { align: "right" });
+    doc.text(`$${Number(item.unit_price).toFixed(2)}`, colPriceR, yPos, { align: "right" });
+    doc.text(`$${Number(item.subtotal).toFixed(2)}`,   colTotalR, yPos, { align: "right" });
     yPos += 6;
   });
 
   yPos += 5;
   doc.setDrawColor(200, 200, 200);
-  doc.line(15, yPos, pageWidth - 15, yPos);
-  yPos += 8;
+  doc.line(margin, yPos, pageWidth - margin, yPos);
+  yPos += 10;
 
-  // Totals
+  // ── Totals block ──────────────────────────────────────────────────────────
+  // Two fixed columns inside a right-side block
+  const totalsLabelR = pageWidth - margin - 40; // right edge of label
+  const totalsValueR = pageWidth - margin;       // right edge of value
+
   const currency = quotation.currency || "ARS";
   const currencySymbol = currency === "USD" ? "US$" : currency === "EUR" ? "€" : "$";
-  
+
   doc.setFont("helvetica", "normal");
-  doc.text("Subtotal:", pageWidth - 60, yPos);
-  doc.text(`${currencySymbol}${quotation.subtotal.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
+  doc.setFontSize(10);
+
+  doc.text("Subtotal:", totalsLabelR, yPos, { align: "right" });
+  doc.text(`${currencySymbol}${Number(quotation.subtotal).toFixed(2)}`, totalsValueR, yPos, { align: "right" });
 
   if (quotation.discount > 0) {
-    yPos += 6;
-    doc.text(`Descuento (${quotation.discount_rate}%):`, pageWidth - 60, yPos);
-    doc.text(`-${currencySymbol}${quotation.discount.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
+    yPos += 7;
+    doc.text(`Descuento (${quotation.discount_rate}%):`, totalsLabelR, yPos, { align: "right" });
+    doc.text(`-${currencySymbol}${Number(quotation.discount).toFixed(2)}`, totalsValueR, yPos, { align: "right" });
   }
 
   if (quotation.tax > 0) {
-    yPos += 6;
-    doc.text("Impuestos:", pageWidth - 60, yPos);
-    doc.text(`${currencySymbol}${quotation.tax.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
+    yPos += 7;
+    doc.text("Impuestos:", totalsLabelR, yPos, { align: "right" });
+    doc.text(`${currencySymbol}${Number(quotation.tax).toFixed(2)}`, totalsValueR, yPos, { align: "right" });
   }
 
-  yPos += 8;
+  yPos += 5;
+  doc.setDrawColor(180, 180, 180);
+  doc.line(pageWidth - margin - 80, yPos, pageWidth - margin, yPos);
+  yPos += 7;
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text(`TOTAL (${currency}):`, pageWidth - 60, yPos);
-  doc.text(`${currencySymbol}${quotation.total.toFixed(2)}`, pageWidth - 20, yPos, { align: "right" });
-  
-  // Si hay tipo de cambio, mostrar equivalencia en ARS
+  doc.setFontSize(11);
+  doc.text(`TOTAL (${currency}):`, totalsLabelR, yPos, { align: "right" });
+  doc.text(`${currencySymbol}${Number(quotation.total).toFixed(2)}`, totalsValueR, yPos, { align: "right" });
+
   if (currency !== "ARS" && quotation.exchange_rate) {
     yPos += 6;
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(100);
-    const totalARS = quotation.total * quotation.exchange_rate;
-    doc.text(`(Equivalente: $${totalARS.toFixed(2)} ARS - TC: ${quotation.exchange_rate})`, pageWidth - 20, yPos, { align: "right" });
+    doc.setTextColor(120);
+    const totalARS = Number(quotation.total) * quotation.exchange_rate;
+    doc.text(
+      `Equivalente: $${totalARS.toFixed(2)} ARS — TC: ${quotation.exchange_rate}`,
+      totalsValueR, yPos, { align: "right" }
+    );
     doc.setTextColor(0);
   }
 
-  // Notes
+  // ── Notes ─────────────────────────────────────────────────────────────────
   if (quotation.notes) {
     yPos += 15;
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text("Notas:", 15, yPos);
+    doc.text("Notas:", margin, yPos);
     yPos += 5;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
-    const splitNotes = doc.splitTextToSize(quotation.notes, pageWidth - 30);
-    doc.text(splitNotes, 15, yPos);
+    const splitNotes = doc.splitTextToSize(quotation.notes, contentWidth);
+    doc.text(splitNotes, margin, yPos);
   }
 
-  // Footer
+  // ── Footer ────────────────────────────────────────────────────────────────
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -192,8 +218,8 @@ export const generateQuotationPDF = async (
       doc.internal.pageSize.getHeight() - 10,
       { align: "center" }
     );
+    doc.setTextColor(0);
   }
 
-  // Save PDF
   doc.save(`Presupuesto-${quotation.quotation_number}.pdf`);
 };

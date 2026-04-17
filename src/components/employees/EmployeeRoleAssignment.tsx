@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -40,7 +41,7 @@ const ROLE_COLORS: Record<string, string> = {
   employee: "bg-slate-500/10 text-slate-500 border-slate-500/20",
 };
 
-export function EmployeeRoleAssignment() {
+export function EmployeeRoleAssignment({ standalone = true }: { standalone?: boolean }) {
   const { currentCompany } = useCompany();
   const queryClient = useQueryClient();
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -313,15 +314,196 @@ export function EmployeeRoleAssignment() {
   };
 
   if (isLoading) {
+    const spinner = (
+      <div className="animate-pulse space-y-4 py-8 px-6">
+        <div className="h-10 bg-muted rounded" />
+        <div className="h-32 bg-muted rounded" />
+      </div>
+    );
+    return standalone ? <Card><CardContent>{spinner}</CardContent></Card> : spinner;
+  }
+
+  if (!standalone) {
     return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-10 bg-muted rounded" />
-            <div className="h-32 bg-muted rounded" />
+      <>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <UserCog className="h-5 w-5 text-primary shrink-0" />
+            <CardTitle>Asignación de Roles</CardTitle>
           </div>
-        </CardContent>
-      </Card>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Actualizando...' : 'Actualizar'}
+            </Button>
+            <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="w-full sm:w-auto">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Invitar Usuario
+                </Button>
+              </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Invitar Usuario a la Empresa</DialogTitle>
+                <DialogDescription>
+                  Envía una invitación por email para que el usuario se una a la empresa
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="invite-email">Email</Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="empleado@ejemplo.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="invite-role">Rol</Label>
+                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as AppRole)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => inviteMutation.mutate()}
+                  disabled={!inviteEmail || inviteMutation.isPending}
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  {inviteMutation.isPending ? "Enviando..." : "Enviar Invitación"}
+                </Button>
+              </div>
+            </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+        <CardDescription>
+          Asigna roles a los usuarios de la empresa para controlar sus permisos
+        </CardDescription>
+        <Separator />
+        {roleRows.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Usuario</TableHead>
+                <TableHead>Rol Actual</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead>Cambiar Rol</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {roleRows.map((row) => {
+                const employee = row.employee;
+                const displayEmail = row.email || employee?.email || null;
+                const hasMembership = !!row.userId && !!row.role;
+                
+                return (
+                  <TableRow key={row.userId || employee?.id}>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {employee ? `${employee.first_name} ${employee.last_name}` : (displayEmail || "Sin nombre")}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {displayEmail || "Sin email"}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {hasMembership && row.role ? (
+                        <Badge className={ROLE_COLORS[row.role] || ""}>
+                          {ROLE_LABELS[row.role] || row.role}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">Sin rol</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {hasMembership ? (
+                        <Badge variant={row.active ? "default" : "secondary"}>
+                          {row.active ? "Activo" : "Inactivo"}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">Sin usuario</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {hasMembership && row.role ? (
+                        <Select
+                          value={row.role}
+                          onValueChange={(newRole) => {
+                            if (authUserId && authUserId === row.userId) {
+                              toast.error("No puedes cambiar tu propio rol");
+                              return;
+                            }
+                            updateRoleMutation.mutate({
+                              userId: row.userId as string,
+                              newRole: newRole as AppRole,
+                            });
+                          }}
+                          disabled={updateRoleMutation.isPending || (authUserId === row.userId)}
+                        >
+                          <SelectTrigger className="w-40" title={authUserId === row.userId ? "No puedes cambiar tu propio rol" : undefined}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleInviteForEmployee(displayEmail)}
+                        >
+                          Invitar
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        ) : (
+          <div className="text-center py-12">
+            <UserCog className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No hay usuarios en la empresa</h3>
+            <p className="text-muted-foreground mb-4">
+              Invita usuarios para asignarles roles
+            </p>
+            <Button onClick={() => setInviteDialogOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Invitar Usuario
+            </Button>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -426,12 +608,10 @@ export function EmployeeRoleAssignment() {
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="font-medium">
-                          {employee ? `${employee.first_name} ${employee.last_name}` : "Usuario"}
+                          {employee ? `${employee.first_name} ${employee.last_name}` : (displayEmail || "Sin nombre")}
                         </span>
                         <span className="text-sm text-muted-foreground">
-                          {hasMembership && row.userId
-                            ? `ID: ${row.userId.slice(0, 8)}...`
-                            : displayEmail || "Sin email"}
+                          {displayEmail || "Sin email"}
                         </span>
                       </div>
                     </TableCell>
