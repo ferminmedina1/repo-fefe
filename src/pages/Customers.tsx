@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Search, Receipt, Eye, Printer, DollarSign, CreditCard, AlertCircle, CheckCircle2, Info, Wallet, TrendingUp, TrendingDown, FileText, FilePlus, Truck, BarChart3, Users, Download, Upload } from "lucide-react";
+import { Plus, Edit, Search, Receipt, Eye, Printer, DollarSign, CreditCard, AlertCircle, CheckCircle2, Info, Wallet, TrendingUp, TrendingDown, FileText, FilePlus, Truck, BarChart3, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
@@ -250,6 +250,7 @@ export default function Customers() {
         const { data: sales, error: salesError } = await supabase
           .from("sales")
           .select("*")
+          .eq("company_id", currentCompany?.id)
           .eq("customer_id", selectedCustomer.id)
           .order("created_at", { ascending: false });
 
@@ -369,58 +370,6 @@ export default function Customers() {
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al registrar pago");
-    },
-  });
-
-  const applyPaymentToInvoiceMutation = useMutation({
-    mutationFn: async ({ paymentId, saleId, amountApplied }: { 
-      paymentId: string; 
-      saleId: string; 
-      amountApplied: number; 
-    }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuario no autenticado");
-
-      // Usar RPC con casting de tipos para aplicar pago a factura
-      const { error } = await (supabase as any).rpc('apply_payment_to_invoice', {
-        p_payment_id: paymentId,
-        p_sale_id: saleId,
-        p_customer_id: selectedCustomer.id,
-        p_amount_applied: amountApplied,
-        p_user_id: user.id
-      });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Pago aplicado exitosamente");
-      queryClient.invalidateQueries({ queryKey: ["customers"] });
-      queryClient.invalidateQueries({ queryKey: ["invoice-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["customer-movements"] });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Error al aplicar pago");
-    },
-  });
-
-  const checkCreditLimitMutation = useMutation({
-    mutationFn: async ({ customerId, newAmount }: { customerId: string; newAmount: number }) => {
-      const { data: customer, error } = await supabase
-        .from("customers")
-        .select("credit_limit, current_balance")
-        .eq("id", customerId)
-        .single();
-
-      if (error) throw error;
-
-      const projectedBalance = (customer.current_balance || 0) + newAmount;
-      const creditLimit = customer.credit_limit || 0;
-
-      if (projectedBalance > creditLimit) {
-        throw new Error(`Cliente excede límite de crédito. Límite: $${creditLimit}, Proyectado: $${projectedBalance}`);
-      }
-
-      return { approved: true, remainingCredit: creditLimit - projectedBalance };
     },
   });
 
@@ -771,10 +720,12 @@ export default function Customers() {
                         <div>
                           <h3 className="text-lg font-semibold">Sin clientes registrados</h3>
                           <p className="text-sm text-muted-foreground mb-4">Comienza agregando tu primer cliente</p>
-                          <Button onClick={handleOpenDialog} className="gap-2">
+                          {canCreate && (
+                          <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
                             <Plus className="h-4 w-4" />
                             Crear Primer Cliente
                           </Button>
+                          )}
                         </div>
                       </div>
                     </TableCell>
@@ -802,18 +753,29 @@ export default function Customers() {
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button 
-                                size="icon" 
+                              <Button
+                                size="icon"
                                 variant="ghost"
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  navigate(`/quotations?customer=${customer.id}`); 
-                                }}
+                                onClick={(e) => { e.stopPropagation(); navigate(`/quotations?customer=${customer.id}`); }}
                               >
                                 <FileText className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Nuevo presupuesto</TooltipContent>
+                            <TooltipContent>Ver presupuestos</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={(e) => { e.stopPropagation(); navigate(`/quotations?customer=${customer.id}&new=true`); }}
+                              >
+                                <FilePlus className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Crear presupuesto</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                         {Number(customer.current_balance) > 0 && (
@@ -1172,7 +1134,7 @@ export default function Customers() {
                         size="sm"
                         className="w-full sm:w-auto"
                         onClick={() => {
-                          window.open(`/customers/${selectedCustomer.id}/account-statement`, '_blank');
+                          navigate(`/reports?tab=customers&customer=${selectedCustomer?.id}`);
                         }}
                       >
                         Exportar Estado de Cuenta
