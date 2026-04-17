@@ -1,4 +1,4 @@
-import { Bell, CheckCircle2, X, AlertCircle, MoreVertical, Trash2 } from "lucide-react";
+import { Bell, CheckCircle2, X, MoreVertical, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -10,13 +10,14 @@ import {
 import { Badge } from "./ui/badge";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { formatDistanceToNow, isPast, subDays, isAfter } from "date-fns";
+import { formatDistanceToNow, subDays, isAfter } from "date-fns";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ScrollArea } from "./ui/scroll-area";
 import { Boxes, Clock, Users, FileText, Zap } from "lucide-react";
 import { useState } from "react";
+import { useCompany } from "@/contexts/CompanyContext";
 
 const NOTIFICATION_CONFIG: Record<string, any> = {
   low_stock: {
@@ -71,23 +72,26 @@ export function NotificationCenter() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const queryClient = useQueryClient();
+  const { currentCompany } = useCompany();
 
   const { data: notifications } = useQuery({
-    queryKey: ["notifications"],
+    queryKey: ["notifications", currentCompany?.id],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
+      if (!user || !currentCompany?.id) return [];
 
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
         .eq("user_id", user.id)
+        .eq("company_id", currentCompany.id)
         .order("created_at", { ascending: false })
         .limit(10);
 
       if (error) throw error;
       return data;
     },
+    enabled: !!currentCompany?.id,
     refetchInterval: 30000,
   });
 
@@ -96,15 +100,20 @@ export function NotificationCenter() {
   // Mark as read mutation
   const markAsRead = useMutation({
     mutationFn: async (notificationId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !currentCompany?.id) throw new Error("No authenticated company context");
+
       const { error } = await supabase
         .from("notifications")
         .update({ read: true })
-        .eq("id", notificationId);
+        .eq("id", notificationId)
+        .eq("user_id", user.id)
+        .eq("company_id", currentCompany.id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", currentCompany?.id] });
       toast.success("Marcada como leída");
     },
     onError: () => {
@@ -115,16 +124,21 @@ export function NotificationCenter() {
   // Delete notification mutation
   const deleteNotification = useMutation({
     mutationFn: async (notificationId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !currentCompany?.id) throw new Error("No authenticated company context");
+
       const { error } = await supabase
         .from("notifications")
         .delete()
-        .eq("id", notificationId);
+        .eq("id", notificationId)
+        .eq("user_id", user.id)
+        .eq("company_id", currentCompany.id);
 
       if (error) throw error;
       return notificationId;
     },
-    onSuccess: (deletedId) => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications", currentCompany?.id] });
       toast.success("Notificación eliminada");
     },
     onError: (error) => {
@@ -133,16 +147,72 @@ export function NotificationCenter() {
     },
   });
 
+  const markAllAsRead = useMutation({
+    mutationFn: async (notificationIds: string[]) => {
+      if (notificationIds.length === 0) return 0;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !currentCompany?.id) throw new Error("No authenticated company context");
+
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read: true })
+        .in("id", notificationIds)
+        .eq("user_id", user.id)
+        .eq("company_id", currentCompany.id);
+
+      if (error) throw error;
+      return notificationIds.length;
+    },
+    onSuccess: (updatedCount) => {
+      queryClient.invalidateQueries({ queryKey: ["notifications", currentCompany?.id] });
+      if (updatedCount > 0) toast.success(`${updatedCount} notificaciones marcadas como leidas`);
+    },
+    onError: () => {
+      toast.error("Error al marcar notificaciones");
+    },
+  });
+
+  const deleteAllNotifications = useMutation({
+    mutationFn: async (notificationIds: string[]) => {
+      if (notificationIds.length === 0) return 0;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !currentCompany?.id) throw new Error("No authenticated company context");
+
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .in("id", notificationIds)
+        .eq("user_id", user.id)
+        .eq("company_id", currentCompany.id);
+
+      if (error) throw error;
+      return notificationIds.length;
+    },
+    onSuccess: (deletedCount) => {
+      queryClient.invalidateQueries({ queryKey: ["notifications", currentCompany?.id] });
+      if (deletedCount > 0) toast.success(`${deletedCount} notificaciones eliminadas`);
+    },
+    onError: () => {
+      toast.error("Error al eliminar notificaciones");
+    },
+  });
+
   const handleNotificationClick = (notification: any) => {
-    markAsRead.mutate(notification.id);
+    // Mark as read in background (don't await)
+    if (!notification.read) {
+      markAsRead.mutate(notification.id);
+    }
     
+    // Navigate immediately based on type
     if (notification.type === "low_stock" || notification.type === "expiring_product") {
       navigate("/inventory-alerts");
     } else if (notification.type === "inactive_customer") {
       const data = notification.data as any;
       const customerId = data?.customer_id;
       if (customerId) {
-        navigate(`/customer-account/${customerId}`);
+        navigate(`/customer-account?customer=${customerId}`);
       }
     } else if (notification.type === "overdue_invoice") {
       navigate("/accounts-receivable");
@@ -184,13 +254,8 @@ export function NotificationCenter() {
         {/* Delete Button - Top Right */}
         <button
           onClick={(e) => {
-            e.preventDefault();
             e.stopPropagation();
             deleteNotification.mutate(notification.id);
-          }}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
           }}
           disabled={deleteNotification.isPending}
           className="absolute top-1 right-1 p-1.5 z-10 text-muted-foreground hover:text-destructive transition-all duration-200 hover:rotate-90 hover:scale-110 cursor-pointer pointer-events-auto"
@@ -288,9 +353,9 @@ export function NotificationCenter() {
                 className="w-48 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 duration-200"
               >
                 <DropdownMenuItem onClick={() => {
-                  const allUnread = notifications?.filter((n) => !n.read) || [];
-                  allUnread.forEach((n) => markAsRead.mutate(n.id));
-                }}>
+                  const unreadIds = notifications?.filter((n) => !n.read).map((n) => n.id) || [];
+                  markAllAsRead.mutate(unreadIds);
+                }} disabled={markAllAsRead.isPending || unreadCount === 0}>
                   <CheckCircle2 className="h-4 w-4 mr-2" />
                   Marcar todo como leído
                 </DropdownMenuItem>
@@ -298,9 +363,11 @@ export function NotificationCenter() {
                 <DropdownMenuItem 
                   onClick={() => {
                     if (window.confirm("¿Eliminar todas las notificaciones?")) {
-                      notifications?.forEach((n) => deleteNotification.mutate(n.id));
+                      const allIds = notifications?.map((n) => n.id) || [];
+                      deleteAllNotifications.mutate(allIds);
                     }
                   }}
+                  disabled={deleteAllNotifications.isPending || (notifications?.length || 0) === 0}
                   className="text-destructive"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />

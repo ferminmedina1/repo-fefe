@@ -487,7 +487,7 @@ export function TutorialRunner() {
   const location = useLocation();
   const {
     isRunning, tutorialState, getCurrentTutorial,
-    setNavigate, endTutorial, goToStep, nextStep, skipTutorial,
+    setNavigate, endTutorial, goToStep, nextStep, skipTutorial, isTutorialNavigating,
   } = useTutorial();
 
   const [joyrideSteps, setJoyrideSteps] = useState<Step[]>([]);
@@ -531,12 +531,14 @@ export function TutorialRunner() {
     }
 
     // Si hay un cambio real de ruta mientras el tutorial está corriendo,
-    // cerramos por completo el tutorial y cualquier UI asociada.
+    // cerramos SÓLO si la navegación NO fue disparada por el tutorial mismo.
     if (currentPath !== lastPathRef.current) {
       lastPathRef.current = currentPath;
-      endTutorial();
-      setShowCompletion(false);
-      setMinimized(false);
+      if (!isTutorialNavigating()) {
+        endTutorial();
+        setShowCompletion(false);
+        setMinimized(false);
+      }
     }
   }, [location.pathname, isRunning, endTutorial]);
 

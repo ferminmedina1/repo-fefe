@@ -339,7 +339,7 @@ const PurchaseReturns = () => {
           {canCreate && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto" data-tutorial="refund-status">
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Devolución
               </Button>

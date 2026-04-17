@@ -1,8 +1,9 @@
-import { ReactNode } from "react";
-import { Navigate } from "react-router-dom";
+import { ReactNode, useEffect } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useActiveModules } from "@/hooks/useActiveModules";
 import { Permission, usePermissions } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface ModuleProtectedRouteProps {
   children: ReactNode;
@@ -20,9 +21,26 @@ export function ModuleProtectedRoute({
   redirectTo = "/module-not-available",
   permission = "view",
 }: ModuleProtectedRouteProps) {
+  const navigate = useNavigate();
+  const { currentCompany } = useCompany();
   const { data: activeModules = [], isLoading: modulesLoading } = useActiveModules();
-  const { isAdmin, hasPermission, loading: permissionsLoading } = usePermissions();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const { isPlatformAdmin, isLoading: adminLoading } = usePlatformAdmin();
+  
+  // Validate module access on company change
+  useEffect(() => {
+    if (modulesLoading || permissionsLoading || adminLoading) return;
+    
+    const hasRolePermission = hasPermission(moduleCode as any, permission);
+    const isBaseModule = BASE_MODULES.includes(moduleCode);
+    const hasModule = activeModules.includes(moduleCode);
+    const hasAccess = isPlatformAdmin || (hasRolePermission && (isBaseModule || hasModule));
+    
+    if (!hasAccess) {
+      console.log(`[ModuleProtectedRoute] Access denied for module: ${moduleCode} in company: ${currentCompany?.id}`);
+      navigate(redirectTo, { replace: true });
+    }
+  }, [currentCompany?.id, moduleCode, activeModules, permissionsLoading, modulesLoading, adminLoading]);
 
   // Mostrar loading mientras se cargan los datos
   if (modulesLoading || permissionsLoading || adminLoading) {
@@ -33,8 +51,8 @@ export function ModuleProtectedRoute({
     );
   }
 
-  // Platform admins y admins pueden ver todo
-  if (isPlatformAdmin || isAdmin) {
+  // Solo platform admins pueden ver todo
+  if (isPlatformAdmin) {
     return <>{children}</>;
   }
 

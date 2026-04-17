@@ -67,7 +67,9 @@ export default function Warehouses() {
 
   const createWarehouse = useMutation({
     mutationFn: async (data: typeof formData) => {
-      let payload: any = { ...data, company_id: currentCompany?.id };
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
+      let payload: any = { ...data, company_id: currentCompany.id };
       
       // Upload image if provided
       if (imageFile) {
@@ -111,6 +113,8 @@ export default function Warehouses() {
 
   const updateWarehouse = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
       let payload: any = { ...data };
       
       // Upload new image if provided
@@ -139,7 +143,11 @@ export default function Warehouses() {
         }
       }
       
-      const { error } = await supabase.from("warehouses").update(payload).eq("id", id);
+      const { error } = await supabase
+        .from("warehouses")
+        .update(payload)
+        .eq("company_id", currentCompany.id)
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -155,7 +163,13 @@ export default function Warehouses() {
 
   const deleteWarehouse = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("warehouses").delete().eq("id", id);
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
+      const { error } = await supabase
+        .from("warehouses")
+        .delete()
+        .eq("company_id", currentCompany.id)
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -270,6 +284,7 @@ export default function Warehouses() {
               variant="outline"
               size="sm"
               className="flex-1 sm:flex-none text-xs sm:text-sm"
+              data-tutorial="warehouse-stock"
             >
               <Package className="mr-1 sm:mr-2 h-4 w-4" />
               Stock
@@ -279,7 +294,7 @@ export default function Warehouses() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DialogTrigger asChild>
-                      <Button onClick={resetForm} className="hover:scale-105 transition-transform gap-2">
+                      <Button onClick={resetForm} className="hover:scale-105 transition-transform gap-2" data-tutorial="create-warehouse">
                         <Plus className="h-4 w-4" />
                   Nuevo Depósito
                       </Button>
@@ -396,7 +411,7 @@ export default function Warehouses() {
                       <h3 className="text-sm font-semibold">Gestión</h3>
                     </div>
                     <div>
-                      <Label>Encargado</Label>
+                      <Label data-tutorial="warehouse-manager">Encargado</Label>
                       <Input
                         value={formData.manager_name}
                         onChange={(e) => setFormData({ ...formData, manager_name: e.target.value })}

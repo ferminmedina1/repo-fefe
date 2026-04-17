@@ -1,73 +1,88 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useSSEStream } from "@/hooks/useSSEStream";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Sparkles, Loader2, Send, StopCircle } from "lucide-react";
+import { Sparkles, Loader2, Send, StopCircle, Bot, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+}
 
 export const AIAssistantFloating = () => {
   const { currentCompany } = useCompany();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const { text: response, isStreaming, error: streamError, startStream, stopStream } = useSSEStream({
+  const { text: streamingText, isStreaming, error: streamError, startStream, stopStream } = useSSEStream({
     onComplete: (fullText) => {
-      console.log("Streaming completado:", fullText.length, "caracteres");
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant") {
+          return [...prev.slice(0, -1), { role: "assistant", content: fullText }];
+        }
+        return [...prev, { role: "assistant", content: fullText }];
+      });
     },
     onError: (error) => {
       toast.error(error || "Error al procesar tu consulta");
+      setMessages((prev) => prev.filter((m) => !(m.role === "assistant" && m.content === "")));
     },
   });
 
+  useEffect(() => {
+    if (isStreaming && streamingText) {
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant") {
+          return [...prev.slice(0, -1), { role: "assistant", content: streamingText }];
+        }
+        return prev;
+      });
+    }
+  }, [streamingText, isStreaming]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamingText]);
+
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 100);
+  }, [open]);
+
   const handleQuery = async (text?: string) => {
-    const finalQuery = text || query;
-    
-    if (!finalQuery.trim()) {
-      toast.error("Por favor ingresa una consulta");
-      return;
-    }
+    const finalQuery = (text || query).trim();
+    if (!finalQuery) return;
+    if (isStreaming) { stopStream(); return; }
 
-    if (isStreaming) {
-      stopStream();
-      return;
-    }
+    setQuery("");
+    setMessages((prev) => [...prev, { role: "user", content: finalQuery }]);
 
-    setQuery(finalQuery);
-
-    // Auto-detectar el tipo de consulta
     const lq = finalQuery.toLowerCase();
-    const type = lq.includes("empleado") || lq.includes("comision") || lq.includes("nómina") || lq.includes("rrhh") || lq.includes("horas trabajadas")
-      ? "hr-analysis"
-      : lq.includes("banco") || lq.includes("cheque") || lq.includes("tarjeta") || lq.includes("tesorería") || lq.includes("saldo")
-      ? "treasury"
-      : lq.includes("oportunidad") || lq.includes("pipeline") || lq.includes("crm") || lq.includes("lead")
-      ? "crm-pipeline"
-      : lq.includes("cuenta corriente") || lq.includes("vencido") || lq.includes("nota de crédito") || lq.includes("deudor") || lq.includes("cobro")
-      ? "accounts-analysis"
-      : lq.includes("compra") || lq.includes("orden de compra") || lq.includes("proveedor") || lq.includes("abastecimiento")
-      ? "procurement"
-      : lq.includes("ticket") || lq.includes("soporte") || lq.includes("sla") || lq.includes("reclamo")
-      ? "support-analysis"
-      : lq.includes("stock") || lq.includes("inventario") || lq.includes("reponer") || lq.includes("reposición")
-      ? "stock-analysis"
-      : lq.includes("predicción") || lq.includes("proyección") || lq.includes("tendencia")
-      ? "sales-prediction"
-      : lq.includes("cliente") || lq.includes("vip") || lq.includes("abandono")
-      ? "customer-insights"
-      : lq.includes("financ") || lq.includes("margen") || lq.includes("ganancia") || lq.includes("gasto")
-      ? "financial-summary"
-      : lq.includes("suger") || lq.includes("recomend")
-      ? "suggestion"
-      : lq.includes("por qué") || lq.includes("explica") || lq.includes("compar")
-      ? "report"
+    const type = lq.includes("empleado") || lq.includes("comision") || lq.includes("rrhh") ? "hr-analysis"
+      : lq.includes("banco") || lq.includes("tesorería") || lq.includes("saldo") ? "treasury"
+      : lq.includes("oportunidad") || lq.includes("pipeline") || lq.includes("crm") ? "crm-pipeline"
+      : lq.includes("cuenta corriente") || lq.includes("vencido") || lq.includes("cobro") ? "accounts-analysis"
+      : lq.includes("compra") || lq.includes("proveedor") ? "procurement"
+      : lq.includes("ticket") || lq.includes("soporte") ? "support-analysis"
+      : lq.includes("stock") || lq.includes("inventario") ? "stock-analysis"
+      : lq.includes("predicción") || lq.includes("proyección") ? "sales-prediction"
+      : lq.includes("cliente") || lq.includes("vip") ? "customer-insights"
+      : lq.includes("financ") || lq.includes("margen") || lq.includes("gasto") ? "financial-summary"
+      : lq.includes("suger") || lq.includes("recomend") ? "suggestion"
+      : lq.includes("por qué") || lq.includes("explica") ? "report"
       : "search";
 
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
     await startStream("ai-assistant-stream", {
-      query: finalQuery,
-      type,
-      companyId: currentCompany?.id,
+      query: finalQuery, type, companyId: currentCompany?.id,
       context: type === "report" ? finalQuery : undefined,
     });
   };
@@ -77,13 +92,11 @@ export const AIAssistantFloating = () => {
     "Dame sugerencias para mejorar las ventas",
     "¿Qué productos necesito reponer?",
     "¿Cuánto pagué en comisiones este mes?",
-    "¿Cuánto tengo en cuentas bancarias?",
     "Resumen financiero del mes",
-    "¿Cuántas oportunidades abiertas tengo en el CRM?",
-    "¿Tengo movimientos vencidos en cuenta corriente?",
-    "¿Cuántos tickets de soporte están abiertos?",
-    "¿Cuáles son mis órdenes de compra pendientes?",
+    "¿Cuántas oportunidades abiertas tengo?",
   ];
+
+  const isEmpty = messages.length === 0 && !isStreaming;
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -95,100 +108,91 @@ export const AIAssistantFloating = () => {
           <Sparkles className="h-6 w-6" />
         </Button>
       </SheetTrigger>
-      
-      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader>
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <SheetTitle>Asistente IA</SheetTitle>
+
+      <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col p-0 gap-0">
+        <SheetHeader className="px-4 pt-4 pb-3 border-b shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <SheetTitle className="text-base leading-tight">Asistente IA</SheetTitle>
+                <SheetDescription className="text-xs leading-tight">Pregunta sobre tu negocio</SheetDescription>
+              </div>
+            </div>
+            {messages.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-muted-foreground" onClick={() => setMessages([])}>
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Limpiar
+              </Button>
+            )}
           </div>
-          <SheetDescription>
-            Pregunta lo que necesites sobre tu negocio
-          </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-6 space-y-4">
-          {/* Input principal */}
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Escribe tu consulta aquí..."
-                onKeyDown={(e) => e.key === "Enter" && handleQuery()}
-                disabled={isStreaming}
-                className="flex-1"
-              />
-              <Button onClick={() => handleQuery()} disabled={false} size="icon" variant={isStreaming ? "destructive" : "default"}>
-                {isStreaming ? (
-                  <StopCircle className="h-4 w-4" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {/* Ejemplos de consultas */}
-          {!response && !isStreaming && (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Prueba con alguna de estas:</p>
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
+          {isEmpty && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground text-center py-2">
+                Hola, soy tu asistente. Puedo analizar tus datos de negocio.
+              </p>
               <div className="grid gap-2">
                 {exampleQueries.map((example, i) => (
-                  <Button
-                    key={i}
-                    variant="outline"
-                    onClick={() => handleQuery(example)}
-                    className="justify-start text-left h-auto py-3 px-4 whitespace-normal"
-                    disabled={isStreaming}
-                  >
-                    <Sparkles className="h-4 w-4 mr-2 shrink-0" />
-                    <span className="text-sm">{example}</span>
-                  </Button>
+                  <button key={i} onClick={() => handleQuery(example)} disabled={isStreaming}
+                    className="w-full text-left text-sm px-3 py-2.5 rounded-lg border border-border bg-muted/40 hover:bg-muted transition-colors flex items-start gap-2">
+                    <Sparkles className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                    <span>{example}</span>
+                  </button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Respuesta con streaming */}
-          {(response || isStreaming) && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium">
-                  {isStreaming ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Generando respuesta...
-                    </span>
-                  ) : (
-                    "Respuesta:"
-                  )}
-                </label>
-                {!isStreaming && response && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setQuery("");
-                    }}
-                  >
-                    Nueva consulta
-                  </Button>
-                )}
-              </div>
-              <div className="bg-muted p-4 rounded-lg min-h-[200px] whitespace-pre-wrap text-sm relative">
-                {response || ""}
-                {isStreaming && (
-                  <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />
-                )}
-              </div>
-              {streamError && (
-                <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
-                  ⚠️ {streamError}
+          {messages.map((msg, i) => (
+            <div key={i} className={cn("flex gap-2 items-start", msg.role === "user" ? "flex-row-reverse" : "flex-row")}>
+              {msg.role === "assistant" && (
+                <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Bot className="h-3.5 w-3.5 text-primary" />
                 </div>
               )}
+              <div className={cn(
+                "rounded-2xl px-3.5 py-2.5 text-sm max-w-[85%] leading-relaxed break-words",
+                msg.role === "user"
+                  ? "bg-primary text-primary-foreground rounded-tr-sm"
+                  : "bg-muted text-foreground rounded-tl-sm"
+              )}>
+                {msg.role === "assistant" && msg.content === "" && isStreaming && i === messages.length - 1 ? (
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span className="text-xs">Analizando...</span>
+                  </span>
+                ) : (
+                  <span className="whitespace-pre-wrap">{msg.content}</span>
+                )}
+                {msg.role === "assistant" && isStreaming && i === messages.length - 1 && msg.content !== "" && (
+                  <span className="inline-block w-1.5 h-3.5 bg-primary/60 animate-pulse ml-0.5 align-middle" />
+                )}
+              </div>
             </div>
+          ))}
+
+          {streamError && (
+            <div className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-lg">{streamError}</div>
           )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <div className="shrink-0 border-t bg-background px-4 py-3">
+          <div className="flex gap-2">
+            <Input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)}
+              placeholder="Escribe tu consulta..."
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleQuery()}
+              disabled={isStreaming} className="flex-1 h-10 text-sm" />
+            <Button onClick={() => isStreaming ? stopStream() : handleQuery()} size="icon"
+              className="h-10 w-10 shrink-0" variant={isStreaming ? "destructive" : "default"}>
+              {isStreaming ? <StopCircle className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
       </SheetContent>
     </Sheet>
