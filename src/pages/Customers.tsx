@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Edit, Search, Receipt, Eye, Printer, DollarSign, CreditCard, AlertCircle, CheckCircle2, Info, Wallet, TrendingUp, TrendingDown, FileText, FilePlus, Truck, BarChart3, Users } from "lucide-react";
+import { Plus, Edit, Search, Receipt, Eye, Printer, DollarSign, CreditCard, AlertCircle, CheckCircle2, Info, Wallet, TrendingUp, TrendingDown, FileText, FilePlus, Truck, BarChart3, Users, Download, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ReceiptPDF } from "@/components/pos/ReceiptPDF";
@@ -91,8 +91,7 @@ export default function Customers() {
     ]);
     const csv = [headers, ...rows]
       .map((row) => row.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(","))
-      .join("
-");
+      .join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -106,8 +105,7 @@ export default function Customers() {
     const file = e.target.files?.[0];
     if (!file || !currentCompany?.id) return;
     const text = await file.text();
-    const lines = text.trim().split("
-").slice(1); // skip header
+    const lines = text.trim().split("\n").slice(1); // skip header
     const imported: any[] = [];
     const errors: string[] = [];
     lines.forEach((line, i) => {
