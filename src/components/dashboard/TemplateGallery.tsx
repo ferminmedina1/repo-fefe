@@ -49,7 +49,7 @@ export function TemplateGallery({ onSelectTemplate }: TemplateGalleryProps) {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <Wand2 className="w-4 h-4" />
-          Templates
+          Explorar templates
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
@@ -68,9 +68,9 @@ export function TemplateGallery({ onSelectTemplate }: TemplateGalleryProps) {
                 <Skeleton key={i} className="h-24" />
               ))}
           </div>
-        ) : (
+        ) : templates && templates.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 py-4">
-            {templates?.map((template) => (
+            {templates.map((template) => (
               <button
                 key={template.id}
                 onClick={() =>
@@ -86,6 +86,12 @@ export function TemplateGallery({ onSelectTemplate }: TemplateGalleryProps) {
                 </p>
               </button>
             ))}
+          </div>
+        ) : (
+          <div className="py-8 text-center">
+            <p className="text-sm text-gray-500">
+              No templates available yet. Templates will appear here once the database is configured.
+            </p>
           </div>
         )}
       </DialogContent>

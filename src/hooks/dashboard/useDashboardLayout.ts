@@ -30,24 +30,34 @@ export function useDashboardLayout(companyId: string | undefined, userId: string
     queryFn: async () => {
       if (!userId || !companyId) return null;
 
-      const { data, error } = await supabase
-        .from("dashboard_layouts")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("company_id", companyId)
-        .order("is_default", { ascending: false })
-        .limit(1)
-        .single();
+      try {
+        const { data, error } = await supabase
+          .from("dashboard_layouts")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("company_id", companyId)
+          .order("is_default", { ascending: false })
+          .limit(1)
+          .single();
 
-      if (error && error.code !== "PGRST116") {
-        // PGRST116 = no rows found, which is OK
-        console.error("Error fetching dashboard layout:", error);
+        if (error) {
+          // PGRST116 = no rows found, which is OK
+          // 42P01 = table doesn't exist, return null gracefully
+          if (error.code !== "PGRST116" && error.code !== "42P01") {
+            console.error("Error fetching dashboard layout:", error);
+          }
+          return null;
+        }
+
+        return (data as DashboardLayoutData) || null;
+      } catch (err) {
+        // Catch any network or other errors
+        console.error("Unexpected error fetching dashboard layout:", err);
         return null;
       }
-
-      return (data as DashboardLayoutData) || null;
     },
     enabled: !!userId && !!companyId,
+    retry: false, // Don't retry if table doesn't exist
   });
 
   // Sync layout data to local state
