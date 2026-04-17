@@ -653,9 +653,10 @@ export default function Quotations() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {exchangeRates?.map(rate => (
+                          <SelectItem value="ARS">ARS</SelectItem>
+                          {exchangeRates?.filter(r => r.currency !== "ARS").map(rate => (
                             <SelectItem key={rate.currency} value={rate.currency}>
-                              {rate.currency} {rate.currency !== "ARS" && `(${rate.rate})`}
+                              {rate.currency} ({rate.rate})
                             </SelectItem>
                           ))}
                         </SelectContent>
