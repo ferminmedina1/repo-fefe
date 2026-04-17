@@ -76,6 +76,8 @@ const SignupSuccess = lazy(() => import("./pages/SignupSuccess"));
 const SignupCancel = lazy(() => import("./pages/SignupCancel"));
 const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRequests"));
 const LearningCenter = lazy(() => import("./pages/LearningCenter"));
+const DashboardEditor = lazy(() => import("./pages/DashboardEditor"));
+const DashboardExampleBuilder = lazy(() => import("./pages/DashboardExampleBuilder"));
 const KnowledgeBaseCenter = lazy(() => import("./pages/KnowledgeBaseCenter"));
 const SetupWizardPage = lazy(() =>
   import("./pages/SetupWizardPage").then((module) => ({ default: module.SetupWizardPage }))
@@ -88,8 +90,6 @@ const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const Opportunities = lazy(() => import("./pages/Opportunities"));
 const Pipelines = lazy(() => import("./pages/Pipelines"));
 const CrmReports = lazy(() => import("./pages/CrmReports"));
-const CrmAutomations = lazy(() => import("./pages/CrmAutomations"));
-const CrmAutomationEditor = lazy(() => import("./pages/CrmAutomationEditor"));
 const CrmRoles = lazy(() => import("./pages/CrmRoles"));
 const MonthlySalesAnalytics = lazy(() => import("./pages/analytics/MonthlySalesAnalytics"));
 const GrossMarginAnalytics = lazy(() => import("./pages/analytics/GrossMarginAnalytics"));
@@ -346,6 +346,8 @@ const App = () => (
 
                 {/* Dashboard privado en /app */}
                 <Route path="/app" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="dashboard"><Dashboard /></ModuleProtectedRoute></ProtectedRoute>} />
+                <Route path="/dashboard-builder" element={<ProtectedRoute><DashboardExampleBuilder /></ProtectedRoute>} />
+                <Route path="/dashboards/:dashboardId/editor" element={<ProtectedRoute><DashboardEditor /></ProtectedRoute>} />
                 <Route path="/pos" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos"><POS /></ModuleProtectedRoute></ProtectedRoute>} />
                 <Route path="/products" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="products"><Products /></ModuleProtectedRoute></ProtectedRoute>} />
                 <Route path="/customers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customers"><Customers /></ModuleProtectedRoute></ProtectedRoute>} />
@@ -373,8 +375,8 @@ const App = () => (
             <Route path="/opportunities" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><Opportunities /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/pipelines" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pipelines"><Pipelines /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/crm-reports" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmReports /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/crm-automations" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmAutomations /></ModuleProtectedRoute></ProtectedRoute>} />
-            <Route path="/crm-automations/:workflowId" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmAutomationEditor /></ModuleProtectedRoute></ProtectedRoute>} />
+            <Route path="/crm-automations" element={<NotFound />} />
+            <Route path="/crm-automations/:workflowId" element={<NotFound />} />
             <Route path="/settings/crm-roles" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="opportunities"><CrmRoles /></ModuleProtectedRoute></ProtectedRoute>} />
             <Route path="/alliance-market" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="alliance_market"><AllianceMarket /></ModuleProtectedRoute></ProtectedRoute>} />
             

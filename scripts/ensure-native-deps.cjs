@@ -3,6 +3,7 @@ const { spawnSync } = require('node:child_process');
 const dependencies = [
   { name: '@rollup/rollup-linux-x64-gnu', version: '4.59.0' },
   { name: '@swc/core-linux-x64-gnu', version: '1.13.2' },
+  { name: '@esbuild/linux-x64', version: '0.24.0' },
 ];
 
 const isLinuxX64 = process.platform === 'linux' && process.arch === 'x64';

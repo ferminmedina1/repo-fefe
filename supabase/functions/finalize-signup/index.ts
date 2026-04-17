@@ -1,6 +1,7 @@
 // supabase/functions/finalize-signup/index.ts
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { checkRateLimitByIP, extractIP } from "../_shared/rateLimitMiddleware.ts";
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -20,6 +21,24 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // 🔒 RATE LIMITING: Prevenir spam de signup
+    const ip = extractIP(req);
+    const rateLimitCheck = await checkRateLimitByIP(ip, "finalize-signup", "auth");
+    
+    if (!rateLimitCheck.allowed) {
+      const response = new Response(
+        JSON.stringify({
+          error: rateLimitCheck.message || "Demasiados intentos de signup",
+          code: "RATE_LIMIT_EXCEEDED",
+        }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+      Object.entries(rateLimitCheck.headers).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
+      return response;
+    }
+
     const { intent_id, password } = await req.json();
 
     if (!intent_id || !password) {

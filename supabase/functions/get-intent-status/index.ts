@@ -2,6 +2,7 @@
 // Get signup intent status using service role
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { checkRateLimitByIP, extractIP } from "../_shared/rateLimitMiddleware.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,6 +29,17 @@ Deno.serve(async (req: Request) => {
   try {
     if (req.method !== "POST") {
       return json({ error: "Only POST allowed" }, 405);
+    }
+
+    // 🔒 RATE LIMITING: Prevenir intent status enumeration
+    const ip = extractIP(req);
+    const rateLimitCheck = await checkRateLimitByIP(ip, "get-intent-status", "payment");
+    
+    if (!rateLimitCheck.allowed) {
+      return json(
+        { error: rateLimitCheck.message || "Demasiadas solicitudes", code: "RATE_LIMIT_EXCEEDED" },
+        429
+      );
     }
 
     const { intent_id } = await req.json();

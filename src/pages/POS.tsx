@@ -9,6 +9,8 @@ import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { getUserErrorMessage } from "@/lib/errorUtils";
 import { useCompany } from "@/contexts/CompanyContext";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
+import { getUserErrorMessage } from "@/lib/errorUtils";
+import { useCompany } from "@/contexts/CompanyContext";
 
 import { useCartLogic } from "@/hooks/pos/useCartLogic";
 import { usePaymentLogic } from "@/hooks/pos/usePaymentLogic";
@@ -155,6 +157,7 @@ export default function POS() {
 
   const cart = useCartLogic({ companySettings, selectedCustomer });
 
+
   const payment = usePaymentLogic({
     total_base: cart.total_base,
     exchangeRates,
@@ -216,10 +219,6 @@ export default function POS() {
       toast.success("Cliente creado exitosamente");
       setSelectedCustomer(customer);
       setCreateCustomerDialog(false);
-      setNewCustomerName("");
-      setNewCustomerPhone("");
-      setNewCustomerEmail("");
-      setNewCustomerDocument("");
       queryClient.invalidateQueries({ queryKey: ["customers-pos", currentCompany?.id] });
     },
     onError: (error: any) => {
@@ -233,12 +232,14 @@ export default function POS() {
     <Layout>
       <div className="space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
+
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Punto de Venta</h1>
             <p className="text-sm text-muted-foreground hidden sm:block">Sistema de gestión de ventas</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:justify-end">
+
             <Badge variant="outline" className="px-2 py-1 text-xs md:text-sm">
               <DollarSign className="mr-1 h-3 w-3 md:h-4 md:w-4" />
               ${payment.total.toFixed(2)}

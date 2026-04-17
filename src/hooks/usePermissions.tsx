@@ -167,6 +167,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<AppRole, Partial<RolePermissionDef
     ...allowAll(
       [
         "dashboard",
+        "pos",
         "sales",
         "quotations",
         "delivery_notes",
@@ -311,7 +312,8 @@ const normalizePlatformRole = (role?: string | null): AppRole | null => {
   if (!role) return null;
   const normalized = role.trim();
   if (PLATFORM_ROLES.includes(normalized as AppRole)) return normalized as AppRole;
-  if (normalized === "owner" || normalized === "team") return "employee";
+  if (normalized === "owner") return "admin";
+  if (normalized === "team") return "employee";
   return "employee";
 };
 

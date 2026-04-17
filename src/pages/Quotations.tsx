@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +42,7 @@ import { useTutorial } from "@/hooks/useTutorial";
 import { sanitizeSearchQuery } from "@/lib/searchUtils";
 import { getUserErrorMessage } from "@/lib/errorUtils";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useSearchParams } from "react-router-dom";
 
 interface QuotationItem {
   product_id?: string;
@@ -68,12 +69,16 @@ export default function Quotations() {
   const [convertConfirmId, setConvertConfirmId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
+  const [customerIdFilter, setCustomerIdFilter] = useState<string | null>(null);
+  const [customerFilterName, setCustomerFilterName] = useState("");
+  const [searchParams] = useSearchParams();
+  const openNewDone = useRef(false);
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
   const { isRunning } = useTutorial();
 
   const { data: quotationResult, isLoading } = useQuery({
-    queryKey: ["quotations", searchQuery, currentCompany?.id, page, pageSize],
+    queryKey: ["quotations", searchQuery, currentCompany?.id, page, pageSize, customerIdFilter],
     queryFn: async () => {
       const from = page * pageSize;
       const to = from + pageSize - 1;
@@ -89,6 +94,10 @@ export default function Quotations() {
         if (sanitized) {
           query = query.or(`quotation_number.ilike.%${sanitized}%,customer_name.ilike.%${sanitized}%`);
         }
+      }
+
+      if (customerIdFilter) {
+        query = query.eq("customer_id", customerIdFilter);
       }
 
       const { data, error, count } = await query;
@@ -574,6 +583,29 @@ export default function Quotations() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
+  // Initialize from URL params
+  useEffect(() => {
+    const customerId = searchParams.get("customer");
+    if (customerId) setCustomerIdFilter(customerId);
+  }, []);
+
+  // Open new-quotation dialog once customers are loaded
+  useEffect(() => {
+    if (openNewDone.current || !customers) return;
+    const customerId = searchParams.get("customer");
+    const shouldOpen = searchParams.get("new") === "true";
+    if (!customerId) return;
+    const found = customers.find((c: any) => c.id === customerId);
+    if (found) {
+      setCustomerFilterName(found.name);
+      if (shouldOpen) {
+        setSelectedCustomer(customerId);
+        setDialogOpen(true);
+        openNewDone.current = true;
+      }
+    }
+  }, [customers]);
+
   const canCreate = hasPermission("quotations", "create") || isRunning;
   const canEdit = hasPermission("quotations", "edit") || isRunning;
 
@@ -586,7 +618,7 @@ export default function Quotations() {
             <p className="text-muted-foreground text-sm sm:text-base">Gestiona presupuestos para clientes</p>
           </div>
           {canCreate && (
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog open={dialogOpen} onOpenChange={(open) => { if (!createQuotationMutation.isPending) setDialogOpen(open); }}>
               <DialogTrigger asChild>
                 <Button className="w-full sm:w-auto" data-tutorial="btn-create-quotation">
                   <Plus className="h-4 w-4 mr-2" />
@@ -621,9 +653,10 @@ export default function Quotations() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {exchangeRates?.map(rate => (
+                          <SelectItem value="ARS">ARS</SelectItem>
+                          {exchangeRates?.filter(r => r.currency !== "ARS").map(rate => (
                             <SelectItem key={rate.currency} value={rate.currency}>
-                              {rate.currency} {rate.currency !== "ARS" && `(${rate.rate})`}
+                              {rate.currency} ({rate.rate})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -739,8 +772,8 @@ export default function Quotations() {
                   <Button variant="outline" onClick={() => setDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button onClick={() => createQuotationMutation.mutate()}>
-                    Crear Presupuesto
+                  <Button onClick={() => createQuotationMutation.mutate()} disabled={createQuotationMutation.isPending}>
+                    {createQuotationMutation.isPending ? "Creando..." : "Crear Presupuesto"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -748,6 +781,17 @@ export default function Quotations() {
           )}
         </div>
 
+        {customerIdFilter && customerFilterName && (
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Filtrando por cliente:</span>
+            <span className="font-medium">{customerFilterName}</span>
+            <button
+              onClick={() => { setCustomerIdFilter(null); setCustomerFilterName(""); }}
+              className="text-muted-foreground hover:text-destructive transition-colors ml-1 text-base leading-none"
+              title="Quitar filtro"
+            >&#xD7;</button>
+          </div>
+        )}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-4">

@@ -43,9 +43,10 @@ export const useActiveModules = () => {
       return allActiveModules;
     },
     enabled: !!currentCompany?.id,
-    staleTime: 1000 * 5,
+    staleTime: 0, // Always refetch when switching companies
     refetchOnWindowFocus: true,
-    refetchOnMount: true,
+    refetchOnMount: 'stale',
+    refetchInterval: 1000 * 10, // Periodic validation
   });
 
   // Suscribirse a cambios en tiempo real de company_modules

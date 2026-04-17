@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimitByIP, extractIP } from "../_shared/rateLimitMiddleware.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,6 +19,17 @@ serve(async (req: Request) => {
   }
 
   try {
+    // 🔒 RATE LIMITING: Proteger actualizaciones de tickets de soporte
+    const ip = extractIP(req);
+    const rateLimitCheck = await checkRateLimitByIP(ip, "update-platform-support-ticket-status", "admin");
+    
+    if (!rateLimitCheck.allowed) {
+      return new Response(
+        JSON.stringify({ error: rateLimitCheck.message || "Demasiadas solicitudes", code: "RATE_LIMIT_EXCEEDED" }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const body = (await req.json()) as UpdateStatusRequest;
     const { ticket_id, status } = body || {};
 

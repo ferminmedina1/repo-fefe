@@ -556,6 +556,7 @@ export default function Reservations() {
           </div>
           <Dialog open={isNewReservationOpen} onOpenChange={setIsNewReservationOpen}>
             <DialogTrigger asChild>
+
               <Button onClick={resetReservationForm} className="w-full sm:w-auto" disabled={!canCreate} data-tutorial="btn-reserve">
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva Reserva

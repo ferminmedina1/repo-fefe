@@ -2,15 +2,36 @@
 // Learning Center - Página principal de tutoriales
 // ============================================================
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { TutorialSelector } from '@/components/learning/TutorialSelector';
+import { WelcomeOnboarding } from '@/components/learning/WelcomeOnboarding';
 import { useTutorial } from '@/hooks/useTutorial';
 import { BookOpen, Sparkles, Clock, Layers } from 'lucide-react';
 import { TUTORIAL_MODULES } from '@/lib/tutorial/config';
 
 export default function LearningCenterPage() {
-  const { isRunning } = useTutorial();
+  const { isRunning, startTutorial } = useTutorial();
+  // No mostrar onboarding automáticamente
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  const handleWelcomeComplete = () => {
+    setShowWelcome(false);
+  };
+
+  const handleStartTutorial = (moduleId: string) => {
+    startTutorial(moduleId);
+  };
+
+  // Show welcome onboarding if first time
+  if (showWelcome) {
+    return (
+      <WelcomeOnboarding 
+        onComplete={handleWelcomeComplete}
+        onStartTutorial={handleStartTutorial}
+      />
+    );
+  }
 
   const totalTutorials = TUTORIAL_MODULES.length;
   const avgTime = Math.round(

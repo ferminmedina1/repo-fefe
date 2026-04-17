@@ -283,7 +283,6 @@ export function CartPanel({
                 </div>
 
                 <Separator />
-
                 <div className="space-y-3" data-tutorial="pos-payment">
                   <div className="flex items-center justify-between">
                     <Label className="text-base font-semibold">Panel de Cobro</Label>
@@ -468,7 +467,6 @@ export function CartPanel({
                     </div>
                   </div>
                 )}
-
                 <div className="flex gap-2 pt-2" data-tutorial="pos-checkout">
                   <Button variant="outline" onClick={onClearAll} className="flex-1 hover:scale-105 transition-transform">
                     Limpiar

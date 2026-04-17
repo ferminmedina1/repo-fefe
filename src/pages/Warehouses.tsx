@@ -67,7 +67,9 @@ export default function Warehouses() {
 
   const createWarehouse = useMutation({
     mutationFn: async (data: typeof formData) => {
-      let payload: any = { ...data, company_id: currentCompany?.id };
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
+      let payload: any = { ...data, company_id: currentCompany.id };
       
       // Upload image if provided
       if (imageFile) {
@@ -111,6 +113,8 @@ export default function Warehouses() {
 
   const updateWarehouse = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
       let payload: any = { ...data };
       
       // Upload new image if provided
@@ -139,7 +143,11 @@ export default function Warehouses() {
         }
       }
       
-      const { error } = await supabase.from("warehouses").update(payload).eq("id", id);
+      const { error } = await supabase
+        .from("warehouses")
+        .update(payload)
+        .eq("company_id", currentCompany.id)
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -155,7 +163,13 @@ export default function Warehouses() {
 
   const deleteWarehouse = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("warehouses").delete().eq("id", id);
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
+      const { error } = await supabase
+        .from("warehouses")
+        .delete()
+        .eq("company_id", currentCompany.id)
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

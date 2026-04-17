@@ -371,8 +371,8 @@ export default function Suppliers() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold">Proveedores</h1>
             <p className="text-muted-foreground text-sm sm:text-base">Gestión de proveedores y crédito</p>
           </div>
@@ -601,7 +601,7 @@ export default function Suppliers() {
           )}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Proveedores</CardTitle>
@@ -621,7 +621,8 @@ export default function Suppliers() {
               <TrendingDown className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-xl sm:text-2xl font-bold break-all leading-tight">
+
                 ${allSuppliers.reduce((sum, s) => sum + s.current_balance, 0).toFixed(2)}
               </div>
               <p className="text-xs text-muted-foreground">Balance pendiente</p>
@@ -634,7 +635,7 @@ export default function Suppliers() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
+              <div className="text-xl sm:text-2xl font-bold break-all leading-tight">
                 $
                 {allSuppliers
                   .reduce(

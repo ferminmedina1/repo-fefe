@@ -1016,9 +1016,9 @@ export default function OpportunitiesPage() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div className="flex flex-col gap-1 min-w-0">
+            <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold">Oportunidades</h1>
               <Select
               value={savedViewId}
@@ -1058,12 +1058,12 @@ export default function OpportunitiesPage() {
             </div>
             <p className="text-sm text-muted-foreground">Gestioná y filtrá tus oportunidades de venta.</p>
           </div>
-          <div className="flex gap-2 items-center flex-wrap">
+          <div className="flex gap-2 items-center flex-wrap w-full lg:w-auto lg:justify-end">
             <Input
               placeholder="Buscar oportunidad o cliente..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-64"
+              className="w-full sm:w-72 lg:w-64"
               aria-label="Buscar"
             />
             <Button
@@ -1273,7 +1273,7 @@ export default function OpportunitiesPage() {
                 </div>
               </DialogContent>
             </Dialog>
-            <Button onClick={() => setShowDrawer(true)} variant="default">
+            <Button onClick={() => setShowDrawer(true)} variant="default" className="w-full sm:w-auto">
               <LucidePlus className="w-4 h-4 mr-1" /> Nueva oportunidad
             </Button>
           </div>

@@ -426,8 +426,8 @@ export default function TechnicalServices() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold">
               Servicios Técnicos
             </h1>

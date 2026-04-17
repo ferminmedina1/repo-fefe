@@ -1,6 +1,16 @@
 {
   "permissions": {
-    "allow": ["Edit", "Write", "Bash(*)"],
-    "deny": []
+    "allow": [
+      "Bash(git fetch:*)",
+      "Bash(git merge:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(iconv:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)",
+      "Bash(ls:*)",
+      "Bash(npx supabase:*)",
+      "Bash(npm uninstall:*)"
+    ]
   }
 }

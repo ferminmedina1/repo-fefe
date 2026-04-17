@@ -1,6 +1,7 @@
 // supabase/functions/create-intent/index.ts
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { corsHeaders } from "../_shared/cors.ts";
+import { checkRateLimitByIP, extractIP } from "../_shared/rateLimitMiddleware.ts";
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -25,6 +26,24 @@ Deno.serve(async (req: Request) => {
   try {
     if (req.method !== "POST") {
       return json({ error: "Only POST allowed" }, 405);
+    }
+
+    // 🔒 RATE LIMITING: Prevenir creación abusiva de intentos de pago
+    const ip = extractIP(req);
+    const rateLimitCheck = await checkRateLimitByIP(ip, "create-intent", "payment");
+    
+    if (!rateLimitCheck.allowed) {
+      const response = new Response(
+        JSON.stringify({
+          error: rateLimitCheck.message || "Demasiados intentos de pago",
+          code: "RATE_LIMIT_EXCEEDED",
+        }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+      Object.entries(rateLimitCheck.headers).forEach(([key, value]) => {
+        response.headers.set(key, value);
+      });
+      return response;
     }
 
     const body = await req.json();

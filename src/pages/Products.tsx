@@ -30,7 +30,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { auditLogger, AuditActionType } from "@/lib/auditLog";
 import { validateProductUniqueness, validateStockConsistency, validateWarehouseDistribution, validateBulkUpdateData, validatePriceChange } from "@/lib/dataIntegrity";
-import { batchInsertWithValidation, batchUpdateWithValidation, softDeleteBatch, createTransactionContext, upsertWithConflictHandling } from "@/lib/transactionService";
+import { batchInsertWithValidation, batchUpdateWithValidation, createTransactionContext, upsertWithConflictHandling } from "@/lib/transactionService";
 import { createAppError, classifyError, getUserFriendlyError } from "@/lib/errorHandler";
 
 const productSchema = z.object({
@@ -93,6 +93,8 @@ export default function Products() {
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [isAddCategoryDialogOpen, setIsAddCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [isDeleteCategoryDialogOpen, setIsDeleteCategoryDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<any>(null);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const customFieldsSectionRef = useRef<HTMLDivElement>(null);
   const [digitalPriceTier, setDigitalPriceTier] = useState({name: "", price: ""});
@@ -229,6 +231,48 @@ export default function Products() {
     },
     onError: (error: any) => {
       toast.error(error.message || "Error al crear la categoría");
+    },
+  });
+
+  // Delete category mutation
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (categoryId: string) => {
+      if (!currentCompany?.id) throw new Error('Empresa no seleccionada');
+      try {
+        // Primero verificar si hay productos con esta categoría
+        const { data: productsWithCategory } = await supabase
+          .from("products")
+          .select("id")
+          .eq("category_id", categoryId)
+          .eq("company_id", currentCompany.id);
+
+        if (productsWithCategory && productsWithCategory.length > 0) {
+          throw new Error(`No se puede eliminar esta categoría porque tiene ${productsWithCategory.length} producto(s) asociado(s)`);
+        }
+
+        const { error } = await supabase
+          .from("product_categories" as any)
+          .delete()
+          .eq("id", categoryId)
+          .eq("company_id", currentCompany.id);
+
+        if (error) throw error;
+        return categoryId;
+      } catch (err: any) {
+        if (err.message?.includes("404") || err.message?.includes("not found")) {
+          throw new Error("La categoría no existe o ya fue eliminada.");
+        }
+        throw err;
+      }
+    },
+    onSuccess: () => {
+      toast.success("Categoría eliminada exitosamente");
+      queryClient.invalidateQueries({ queryKey: ["product-categories"] });
+      setIsDeleteCategoryDialogOpen(false);
+      setCategoryToDelete(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Error al eliminar la categoría");
     },
   });
 
@@ -385,9 +429,9 @@ export default function Products() {
 
   // Fetch warehouse stock for expanded products
   const { data: warehouseStock } = useQuery({
-    queryKey: ["warehouse-stock-detail", Array.from(expandedProducts)],
+    queryKey: ["warehouse-stock-detail", currentCompany?.id, Array.from(expandedProducts)],
     queryFn: async () => {
-      if (expandedProducts.size === 0) return [];
+      if (!currentCompany?.id || expandedProducts.size === 0) return [];
       
       const { data, error } = await supabase
         .from("warehouse_stock")
@@ -395,12 +439,13 @@ export default function Products() {
           *,
           warehouses (code, name)
         `)
+        .eq("company_id", currentCompany.id)
         .in("product_id", Array.from(expandedProducts));
       
       if (error) throw error;
       return data;
     },
-    enabled: expandedProducts.size > 0,
+    enabled: !!currentCompany?.id && expandedProducts.size > 0,
   });
 
   // Fetch product prices for price list dialog
@@ -827,12 +872,15 @@ export default function Products() {
       toast.error("El nombre del campo es requerido");
       return;
     }
-    const field = {
+    const field: any = {
       id: `field_${Date.now()}`,
       name: newCustomField.name,
       type: newCustomField.type,
-      options: (newCustomField.type === "select") ? newCustomField.options.split(",").map(o => o.trim()) : undefined,
     };
+    // Only add options if it's a select field
+    if (newCustomField.type === "select") {
+      field.options = newCustomField.options.split(",").map(o => o.trim()).filter(o => o.length > 0);
+    }
     setCustomFields([...customFields, field]);
     setNewCustomField({name: "", type: "text", options: ""});
     toast.success(`Campo "${newCustomField.name}" agregado`);
@@ -872,6 +920,14 @@ export default function Products() {
       // Generar SKU automáticamente si no está proporcionado (para mejorar UX)
       const skuValue = formData.sku?.trim() || generateSKU(formData.name);
 
+      // Validar digital prices si es producto digital
+      if (formData.is_digital && formData.digital_prices) {
+        const validDigitalPrices = formData.digital_prices.filter((p: any) => p.name && p.price);
+        if (validDigitalPrices.length === 0) {
+          throw new Error('VALIDATION_ERROR: Debe tener al menos una opción de precio para productos digitales');
+        }
+      }
+
       const validatedData = {
         name: formData.name?.trim() || "",
         price: parseFloat(formData.price),
@@ -886,6 +942,24 @@ export default function Products() {
         expiration_date: formData.expiration_date || undefined,
       };
       productSchema.parse(validatedData);
+
+      // Clean custom field definitions (remove undefined properties)
+      const cleanedCustomFields = customFields.map(field => {
+        const cleanField: any = {
+          id: field.id,
+          name: field.name,
+          type: field.type,
+        };
+        if (field.options && field.options.length > 0) {
+          cleanField.options = field.options;
+        }
+        return cleanField;
+      });
+
+      // Filter digital prices to remove empty entries
+      const cleanedDigitalPrices = formData.digital_prices
+        ? formData.digital_prices.filter((p: any) => p.name && p.price)
+        : [];
 
       const productData = {
         name: validatedData.name,
@@ -903,11 +977,11 @@ export default function Products() {
         expiration_date: validatedData.expiration_date || null,
         is_combo: formData.is_combo,
         is_digital: formData.is_digital,
-        digital_prices: formData.digital_prices || [],
+        digital_prices: cleanedDigitalPrices,
         currency: formData.currency || 'ARS',
         tags: formData.tags,
         custom_fields: formData.custom_fields,
-        custom_field_definitions: customFields,
+        custom_field_definitions: cleanedCustomFields,
         last_restock_date: editingProduct ? undefined : new Date().toISOString(),
         company_id: currentCompany.id,
       };
@@ -962,10 +1036,11 @@ export default function Products() {
       }
       
       // Load warehouse stock data for this product
-      if (warehouses) {
+      if (warehouses && currentCompany?.id) {
         const { data: warehouseStockData, error } = await supabase
           .from("warehouse_stock")
           .select("warehouse_id, stock")
+          .eq("company_id", currentCompany.id)
           .eq("product_id", product.id);
         
         if (error) {
@@ -1047,10 +1122,11 @@ export default function Products() {
     setAdjustingProduct(product);
     
     // Load current warehouse stock values
-    if (warehouses) {
+    if (warehouses && currentCompany?.id) {
       const { data: warehouseStockData } = await supabase
         .from("warehouse_stock")
         .select("warehouse_id, stock")
+        .eq("company_id", currentCompany.id)
         .eq("product_id", product.id);
       
       const initialStockValues: Record<string, string> = {};
@@ -1112,6 +1188,7 @@ export default function Products() {
     if (!adjustingProduct) return;
 
     try {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
@@ -1156,6 +1233,7 @@ export default function Products() {
       const { data: allStocks, error: fetchError } = await supabase
         .from("warehouse_stock")
         .select("stock")
+        .eq("company_id", currentCompany!.id)
         .eq("product_id", adjustingProduct.id);
 
       if (fetchError) throw fetchError;
@@ -1363,10 +1441,10 @@ export default function Products() {
               sku: row.sku?.trim() || undefined,
             });
 
-            const productKey = `${validatedData.barcode || ''}_${validatedData.sku || ''}_${validatedData.name}`;
-            
             // Generar SKU automáticamente si no se proporciona
             const skuForProduct = validatedData.sku || generateSKU(validatedData.name, "");
+            
+            const productKey = `${validatedData.barcode || ''}_${skuForProduct}_${validatedData.name}`;
             
             validProducts.push({
               name: validatedData.name,
@@ -1529,11 +1607,13 @@ export default function Products() {
     }
 
     try {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
       const productIds = Array.from(selectedProducts);
-      const txContext = createTransactionContext(user.id, currentCompany!.id);
+      const txContext = createTransactionContext(user.id, currentCompany.id);
       
       // Actualizar en la base de datos
       const { error } = await supabase
@@ -1580,20 +1660,37 @@ export default function Products() {
     }
 
     try {
+      if (!currentCompany?.id) throw new Error("No hay empresa seleccionada");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
       const productIds = Array.from(selectedProducts);
-      const txContext = createTransactionContext(user.id, currentCompany!.id);
+      const txContext = createTransactionContext(user.id, currentCompany.id);
       
-      // Usar soft delete para mantener integridad histórica
-      const result = await softDeleteBatch('products', productIds, txContext);
+      // Desactivar productos para mantener integridad hist�rica
+      const { error } = await supabase
+        .from("products")
+        .update({ active: false, updated_at: new Date().toISOString() })
+        .in("id", productIds)
+        .eq("company_id", currentCompany.id);
 
-      if (!result.success) {
-        throw new Error(result.error);
-      }
+      if (error) throw error;
 
-      toast.success(`${result.itemsProcessed} productos eliminados exitosamente`);
+      await auditLogger.log({
+        action: AuditActionType.BULK_DELETE,
+        resourceType: 'product',
+        resourceId: productIds.join(','),
+        userId: user.id,
+        companyId: currentCompany.id,
+        metadata: {
+          transactionId: txContext.transactionId,
+          totalDeleted: productIds.length,
+          deleteType: 'deactivate',
+        },
+        status: 'success',
+      });
+
+      toast.success(`${productIds.length} productos eliminados exitosamente`);
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setIsDeleteDialogOpen(false);
       setSelectedProducts(new Set());
@@ -1788,12 +1885,12 @@ export default function Products() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <div>
+        <div className="flex flex-col lg:flex-row justify-between gap-4">
+          <div className="min-w-0">
             <h1 className="text-xl sm:text-3xl font-bold text-foreground">Productos</h1>
             <p className="text-xs sm:text-sm text-muted-foreground">Gestiona tu inventario</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 w-full lg:w-auto lg:justify-end">
             <Button variant="outline" size="sm" onClick={() => navigate("/reports?tab=products")}>
               <BarChart3 className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Ver Reportes</span>
@@ -1876,11 +1973,12 @@ export default function Products() {
                   <span className="sm:hidden">Agregar</span>
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-xl sm:max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-auto">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
+                <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
                   <Package className="h-5 w-5" />
-                  {editingProduct ? "Editar Producto" : "Agregar Nuevo Producto"}
+                  {editingProduct ? "Editar" : "Agregar"}
+                  <span className="hidden sm:inline">{editingProduct ? " Producto" : " Nuevo Producto"}</span>
                 </DialogTitle>
                 <DialogDescription>
                   {editingProduct 
@@ -1899,9 +1997,9 @@ export default function Products() {
                       Información Básica
                     </h3>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="name" className="flex items-center gap-1">
+                      <Label htmlFor="name" className="flex items-center gap-1 text-sm">
                         Nombre del Producto <span className="text-destructive">*</span>
                       </Label>
                     <Input
@@ -1909,20 +2007,37 @@ export default function Products() {
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
+                      className="text-sm"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="category">Categoría</Label>
+                    <Label htmlFor="category" className="text-sm">Categoría</Label>
                     <div className="flex gap-2">
                       <Select value={formData.category_id || ""} onValueChange={(value) => setFormData({ ...formData, category_id: value })}>
                         <SelectTrigger className="flex-1">
                           <SelectValue placeholder="Selecciona una categoría" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-w-xs">
                           {categories?.map((category: any) => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>
+                            <div
+                              key={category.id}
+                              className="flex items-center justify-between px-2 py-2 text-sm hover:bg-accent rounded cursor-pointer group"
+                              onClick={() => setFormData({ ...formData, category_id: category.id })}
+                            >
+                              <span className="flex-1">{category.name}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setCategoryToDelete(category);
+                                  setIsDeleteCategoryDialogOpen(true);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 rounded transition-all text-destructive hover:text-destructive ml-2"
+                                title="Eliminar categoría"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
                           ))}
                         </SelectContent>
                       </Select>
@@ -1944,11 +2059,12 @@ export default function Products() {
                       value={formData.barcode}
                       onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
                       placeholder="Escanea o ingresa manualmente"
+                      className="text-sm"
                     />
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="sku" className="flex items-center gap-2">
+                      <Label htmlFor="sku" className="flex items-center gap-2 text-sm">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -1965,13 +2081,13 @@ export default function Products() {
                         </TooltipProvider>
                       </Label>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Input
                         id="sku"
                         value={formData.sku}
                         onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                         placeholder="Dejar vacío para generar automáticamente"
-                        className="flex-1"
+                        className="flex-1 text-sm"
                       />
                       {formData.name && !formData.sku && (
                         <Button
@@ -1983,7 +2099,7 @@ export default function Products() {
                             setFormData({ ...formData, sku: generated });
                             toast.success(`SKU generado: ${generated}`);
                           }}
-                          className="whitespace-nowrap"
+                          className="whitespace-nowrap w-full sm:w-auto"
                         >
                           Generar
                         </Button>
@@ -1993,9 +2109,9 @@ export default function Products() {
 
                   {/* Etiquetas */}
                   <div className="space-y-2">
-                    <Label htmlFor="tags" className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">Tag</Badge>
-                      Etiquetas
+                    <Label htmlFor="tags" className="flex items-center gap-2 text-sm">
+                      <Badge variant="outline" className="text-xs hidden sm:inline">Tag</Badge>
+                      <span>Etiquetas</span>
                     </Label>
                     <div className="space-y-2">
                       {formData.tags.length > 0 && (
@@ -2025,7 +2141,7 @@ export default function Products() {
                           })}
                         </div>
                       )}
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <Input
                           id="tags"
                           value={tagInput}
@@ -2037,13 +2153,14 @@ export default function Products() {
                             }
                           }}
                           placeholder="Escribe una etiqueta y presiona Enter"
+                          className="text-sm"
                         />
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => addTag(tagInput)}
-                          className="whitespace-nowrap"
+                          className="whitespace-nowrap w-full sm:w-auto"
                         >
                           Agregar
                         </Button>
@@ -2080,13 +2197,13 @@ export default function Products() {
                   
                   {/* Imagen del Producto */}
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
+                    <Label className="flex items-center gap-2 text-sm">
                       <ImageIcon className="h-4 w-4" />
                       Imagen del Producto
                     </Label>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
                       {imagePreview && (
-                        <div className="relative w-24 h-24 border rounded-lg overflow-hidden">
+                        <div className="relative w-20 h-20 sm:w-24 sm:h-24 border rounded-lg overflow-hidden flex-shrink-0">
                           <img 
                             src={imagePreview} 
                             alt="Preview" 
@@ -2103,15 +2220,15 @@ export default function Products() {
                           </Button>
                         </div>
                       )}
-                      <div className="flex-1">
+                      <div className="flex-1 w-full">
                         <Input
                           type="file"
                           accept="image/jpeg,image/jpg,image/png,image/webp"
                           onChange={handleImageSelect}
-                          className="cursor-pointer"
+                          className="cursor-pointer text-xs sm:text-sm"
                           disabled={compressingImage || uploadingImage}
                         />
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                           {compressingImage ? (
                             <span className="text-primary">⏳ Procesando imagen...</span>
                           ) : uploadingImage ? (
@@ -2127,13 +2244,13 @@ export default function Products() {
 
                 {/* Tipo de Producto */}
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg bg-blue-50/50 dark:bg-blue-950/30">
-                    <div className="space-y-1">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-3 sm:p-4 border rounded-lg bg-blue-50/50 dark:bg-blue-950/30">
+                    <div className="space-y-1 flex-1">
                       <Label htmlFor="is_digital" className="text-sm font-medium cursor-pointer">
                         Este es un producto digital
                       </Label>
-                      <p className="text-xs text-muted-foreground">
-                        Los productos digitales no tienen stock físico. Pueden tener múltiples opciones de precios (ej: Basic, Pro, Enterprise).
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Los productos digitales no tienen stock físico. Pueden tener múltiples opciones de precios (ej: Basic, Pro).
                       </p>
                     </div>
                     <Switch
@@ -2187,11 +2304,11 @@ export default function Products() {
                               step="0.01"
                               value={formData.price}
                               onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                              className="w-32"
+                              className="w-20 sm:w-32"
                               required
                             />
                             <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
-                              <SelectTrigger className="w-24">
+                              <SelectTrigger className="w-20 sm:w-24">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -2208,7 +2325,7 @@ export default function Products() {
                       <div className="space-y-2">
                         <p className="text-xs font-medium">Opciones Adicionales (Máximo 2)</p>
                         {formData.digital_prices && formData.digital_prices.map((tier: any, idx: number) => (
-                          <div key={idx} className="flex gap-2 items-center p-3 bg-white dark:bg-slate-950 rounded border">
+                          <div key={idx} className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center p-3 bg-white dark:bg-slate-950 rounded border">
                             <Input
                               placeholder="Nombre (ej: Pro)"
                               value={tier.name}
@@ -2217,7 +2334,7 @@ export default function Products() {
                                 newPrices[idx].name = e.target.value;
                                 setFormData({ ...formData, digital_prices: newPrices });
                               }}
-                              className="flex-1"
+                              className="flex-1 text-sm"
                             />
                             <Input
                               type="number"
@@ -2228,7 +2345,7 @@ export default function Products() {
                                 newPrices[idx].price = e.target.value;
                                 setFormData({ ...formData, digital_prices: newPrices });
                               }}
-                              className="w-32"
+                              className="w-24 sm:w-32 text-sm"
                             />
                             <Button
                               type="button"
@@ -2266,9 +2383,9 @@ export default function Products() {
                     </div>
                   ) : (
                     <>
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="price" className="flex items-center gap-1">
+                          <Label htmlFor="price" className="flex items-center gap-1 text-sm">
                             Precio de Venta <span className="text-destructive">*</span>
                           </Label>
                           <Input
@@ -2279,10 +2396,11 @@ export default function Products() {
                             onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                             required
                             placeholder="0.00"
+                            className="text-sm"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="cost">Costo (Opcional)</Label>
+                          <Label htmlFor="cost" className="text-sm">Costo (Opcional)</Label>
                           <Input
                             id="cost"
                             type="number"
@@ -2290,12 +2408,13 @@ export default function Products() {
                             value={formData.cost}
                             onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
                             placeholder="0.00"
+                            className="text-sm"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="currency">Moneda</Label>
+                          <Label htmlFor="currency" className="text-sm">Moneda</Label>
                           <Select value={formData.currency} onValueChange={(value) => setFormData({ ...formData, currency: value })}>
-                            <SelectTrigger>
+                            <SelectTrigger className="text-sm">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -2322,9 +2441,9 @@ export default function Products() {
                         </Button>
                       )}
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="stock" className="flex items-center gap-1">
+                          <Label htmlFor="stock" className="flex items-center gap-1 text-sm">
                             Cantidad en Stock <span className="text-destructive">*</span>
                           </Label>
                           <Input
@@ -2334,16 +2453,18 @@ export default function Products() {
                             onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                             required
                             placeholder="0"
+                            className="text-sm"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="min_stock">Stock Mínimo</Label>
+                          <Label htmlFor="min_stock" className="text-sm">Stock Mínimo</Label>
                           <Input
                             id="min_stock"
                             type="number"
                             value={formData.min_stock}
                             onChange={(e) => setFormData({ ...formData, min_stock: e.target.value })}
                             placeholder="0"
+                            className="text-sm"
                           />
                         </div>
                       </div>
@@ -2530,12 +2651,12 @@ export default function Products() {
                       <Label className="text-base font-semibold">
                         {editingProduct ? "Gestionar Stock por Depósito" : "Distribución por Depósito (Opcional)"}
                       </Label>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground leading-relaxed">
                         {editingProduct 
                           ? "Asigna o modifica el stock de este producto en cada depósito. El stock total se calculará automáticamente."
                           : "Distribuye el stock total entre los depósitos. Si no distribuyes, el stock quedará sin asignar."}
                       </p>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {warehouses.map((warehouse) => {
                           const existingStock = editingProduct 
                             ? warehouseStockData[editingProduct.id]?.[warehouse.id]
@@ -2543,9 +2664,11 @@ export default function Products() {
                           
                           return (
                             <div key={warehouse.id} className="space-y-2">
-                              <Label htmlFor={`warehouse-${warehouse.id}`}>
-                                {warehouse.code} - {warehouse.name}
-                                {warehouse.is_main && <Badge variant="default" className="ml-2">Principal</Badge>}
+                              <Label htmlFor={`warehouse-${warehouse.id}`} className="text-sm">
+                                <span className="block sm:inline">{warehouse.code}</span>
+                                <span className="hidden sm:inline"> - </span>
+                                <span className="block sm:inline text-xs sm:text-sm text-muted-foreground">{warehouse.name}</span>
+                                {warehouse.is_main && <Badge variant="default" className="ml-2 text-xs">Principal</Badge>}
                               </Label>
                               <Input
                                 id={`warehouse-${warehouse.id}`}
@@ -2566,6 +2689,7 @@ export default function Products() {
                                     }
                                   });
                                 }}
+                                className="text-sm"
                               />
                             </div>
                           );
@@ -2593,24 +2717,26 @@ export default function Products() {
                   </>
                 )}
 
-                <div className="flex justify-end gap-2 pt-4 border-t">
+                <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 border-t">
                   <Button 
                     type="button" 
                     variant="outline" 
                     onClick={() => setIsDialogOpen(false)}
                     disabled={uploadingImage || compressingImage}
+                    className="w-full sm:w-auto"
                   >
                     Cancelar
                   </Button>
                   <Button 
                     type="submit" 
-                    className="gap-2"
+                    className="gap-2 w-full sm:w-auto"
                     disabled={uploadingImage || compressingImage}
                   >
                     {uploadingImage ? (
                       <>
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                        Subiendo imagen...
+                        <span className="hidden sm:inline">Subiendo imagen...</span>
+                        <span className="sm:hidden">Subiendo...</span>
                       </>
                     ) : editingProduct ? (
                       <>
@@ -3860,7 +3986,56 @@ export default function Products() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Category AlertDialog */}
+        <AlertDialog open={isDeleteCategoryDialogOpen} onOpenChange={setIsDeleteCategoryDialogOpen}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-600" />
+                Eliminar Categoría
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3 pt-2">
+                <p>
+                  Se eliminará la categoría <span className="font-semibold text-foreground">"{categoryToDelete?.name}"</span>
+                </p>
+                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded p-3 text-sm">
+                  <p className="text-amber-900 dark:text-amber-100">
+                    <strong>Precaución:</strong> Esta acción no se puede deshacer. Asegúrate de que no hay productos asociados a esta categoría.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel disabled={deleteCategoryMutation.isPending}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (categoryToDelete?.id) {
+                    deleteCategoryMutation.mutate(categoryToDelete.id);
+                  }
+                }}
+                disabled={deleteCategoryMutation.isPending}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteCategoryMutation.isPending ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar
+                  </>
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
 }
+

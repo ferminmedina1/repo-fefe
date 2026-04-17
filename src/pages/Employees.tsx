@@ -499,8 +499,8 @@ const Employees = () => {
           <TabsContent value="list">
             <Card>
               <CardHeader className="p-3 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                  <div className="min-w-0">
                     <CardTitle className="text-base sm:text-lg">Gestion de Empleados</CardTitle>
                     <CardDescription className="text-xs sm:text-sm">
                       Administra la informacion de tus empleados
