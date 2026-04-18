@@ -314,12 +314,10 @@ export const useToggleCompanyModule = () => {
         queryKey: ['company_modules_enhanced', variables.companyId],
         refetchType: 'active'
       });
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['activeModules', variables.companyId],
         refetchType: 'active'
       });
-      // También invalidar sin ID específico para forzar refetch global
-      queryClient.invalidateQueries({ queryKey: ['activeModules'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['platform-companies'] });
       queryClient.invalidateQueries({ queryKey: ['platform_modules_all'] });
       toast({

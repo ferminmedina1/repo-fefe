@@ -113,7 +113,7 @@ export function EnhancedCompanyModuleSelector({ companyId }: EnhancedCompanyModu
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['company_modules_enhanced', companyId] });
       queryClient.invalidateQueries({ queryKey: ['companyModules', companyId] });
-      queryClient.invalidateQueries({ queryKey: ['activeModules'] });
+      queryClient.invalidateQueries({ queryKey: ['activeModules', companyId] });
       toast.success('Módulo activado correctamente');
       setActivationDialogOpen(false);
     },
@@ -134,7 +134,7 @@ export function EnhancedCompanyModuleSelector({ companyId }: EnhancedCompanyModu
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['company_modules_enhanced', companyId] });
       queryClient.invalidateQueries({ queryKey: ['companyModules', companyId] });
-      queryClient.invalidateQueries({ queryKey: ['activeModules'] });
+      queryClient.invalidateQueries({ queryKey: ['activeModules', companyId] });
       toast.success('Módulo desactivado correctamente');
     },
     onError: (error: any) => {
@@ -155,7 +155,7 @@ export function EnhancedCompanyModuleSelector({ companyId }: EnhancedCompanyModu
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['company_modules_enhanced', companyId] });
       queryClient.invalidateQueries({ queryKey: ['companyModules', companyId] });
-      queryClient.invalidateQueries({ queryKey: ['activeModules'] });
+      queryClient.invalidateQueries({ queryKey: ['activeModules', companyId] });
       toast.success('Trial convertido a pago correctamente');
     },
     onError: (error: any) => {

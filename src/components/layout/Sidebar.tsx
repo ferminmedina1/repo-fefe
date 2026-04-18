@@ -50,7 +50,7 @@ import {
   HelpCircle,
   Network,
 } from "lucide-react";
-import { useActiveModules } from "@/hooks/useActiveModules";
+import { useActiveModules, BASE_MODULES } from "@/hooks/useActiveModules";
 import { usePermissions, Module } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -120,19 +120,12 @@ export function Sidebar() {
   };
 
   // Helper function to check if module is active
-  // Solo platform admins ven todo, los admins de empresa ven solo sus módulos activos
   const hasModule = (moduleName: string) => {
-    // Platform admins ven todo para poder navegar y gestionar
     if (isPlatformAdmin) return true;
-    
-    // Si no hay datos cargados aún, solo mostrar módulos base
-    if (!activeModules.data || activeModules.data.length === 0) {
-      const baseModules = ['dashboard', 'pos', 'products', 'sales', 'customers', 'settings', 'reports'];
-      return baseModules.includes(moduleName);
+    // Mientras carga la primera vez, mostrar solo módulos base
+    if (!activeModules.data) {
+      return BASE_MODULES.includes(moduleName);
     }
-    
-    // Verificar si el código del módulo está en la lista de activos
-    // El moduleName viene del item.module en navItems
     return activeModules.data.includes(moduleName);
   };
 
@@ -607,9 +600,6 @@ export function Sidebar() {
   const isNavItemVisible = (item: NavItem) => {
     // Platform admin ve todo
     if (isPlatformAdmin) return true;
-    
-    // Mientras cargan los permisos, no mostrar nada para evitar flash
-    if (permissionsLoading) return false;
     
     // Si tiene módulo, verificar que esté activo
     if (item.module && !hasModule(item.module)) return false;
