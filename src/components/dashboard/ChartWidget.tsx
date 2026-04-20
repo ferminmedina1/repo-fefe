@@ -1,7 +1,7 @@
 import { WidgetWrapper } from "./WidgetWrapper";
 import { useWidgetContext } from "@/contexts/WidgetContext";
 import { WidgetDefinition } from "@/lib/dashboard/widgets";
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -44,9 +44,13 @@ export function ChartWidget({
 
   const [chartError, setChartError] = useState<string | null>(null);
 
+  // ✅ FIXED: Move error clearing to useEffect instead of during render
+  useEffect(() => {
+    setChartError(null);
+  }, [data, isLoading]);
+
   const renderChart = () => {
     try {
-      setChartError(null);
 
       if (isLoading) {
         return (
@@ -136,7 +140,7 @@ export function ChartWidget({
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Error al renderizar el gráfico';
       console.error('ChartWidget render error:', error);
-      setChartError(errorMsg);
+      // ✅ FIXED: Don't call setState during render - log error instead
       return (
         <div className="h-80 flex flex-col items-center justify-center gap-2">
           <p className="text-sm text-red-600 font-medium">Error al renderizar gráfico</p>
