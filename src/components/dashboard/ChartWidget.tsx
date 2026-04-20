@@ -1,7 +1,7 @@
 import { WidgetWrapper } from "./WidgetWrapper";
 import { useWidgetContext } from "@/contexts/WidgetContext";
 import { WidgetDefinition } from "@/lib/dashboard/widgets";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -13,6 +13,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import { LoadingSkeleton } from "@/lib/dashboard/lazyLoading";
 
 interface ChartData {
   producto?: string;
@@ -154,7 +155,10 @@ export function ChartWidget({
       onRemove={onRemove}
       isDragging={isDragging}
     >
-      {renderChart()}
+      {/* ✅ NEW: Wrap chart rendering with Suspense for lazy loading */}
+      <Suspense fallback={<LoadingSkeleton />}>
+        {renderChart()}
+      </Suspense>
     </WidgetWrapper>
   );
 }

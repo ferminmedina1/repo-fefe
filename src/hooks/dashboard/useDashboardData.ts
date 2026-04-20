@@ -10,6 +10,7 @@ import {
 } from './index';
 import { useHistoricalRates } from './useExchangeRates';
 import { DashboardFilters } from '@/contexts/DashboardFilterContext';
+import { CACHE_TIMES } from '@/lib/dashboard/queryOptimization';
 
 /**
  * Consolidated dashboard data hook
@@ -48,11 +49,19 @@ export interface DashboardDataState {
  * ✅ Simplifies DashboardBuilder by consolidating 8+ queries
  * ✅ Provides single source of truth for dashboard state
  * ✅ Easier to add/remove metrics without prop drilling
+ * ✅ All queries run in parallel (not sequential)
+ * ✅ Phase 5: Uses CACHE_TIMES configuration for optimal caching
  *
  * @param companyId - The company ID for filtering data
  * @param permissions - Optional permission flags for conditional fetching
  * @param filters - Optional filters to apply to queries
  * @returns Consolidated dashboard data state
+ *
+ * Performance:
+ * - Request Deduplication: Same queryKey = 1 actual request
+ * - Stale-while-revalidate: Instant load from cache + background updates
+ * - Parallel Execution: All 8 queries fire simultaneously (Promise.all)
+ * - Cache Strategy: DASHBOARD cache (5min stale, 10min retention)
  *
  * @example
  * const dashboard = useDashboardData(companyId, {
