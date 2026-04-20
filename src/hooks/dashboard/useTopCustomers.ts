@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfMonth } from "date-fns";
 import { DashboardFilters } from "@/contexts/DashboardFilterContext";
+import { safeGetDateRange } from "@/lib/dashboard/dateValidation";
 
 interface TopCustomerItem {
   cliente: string;
@@ -17,24 +17,43 @@ export function useTopCustomers(
   return useQuery<TopCustomerItem[]>({
     queryKey: ["dashboard-top-customers", companyId, filters?.dimension, filters?.dimensionValue],
     queryFn: async () => {
-      if (!companyId) throw new Error("Company ID is required");
+      try {
+        if (!companyId) throw new Error("Company ID is required");
 
-      const currentMonthStart = filters?.dateRange?.from || startOfMonth(new Date());
+        const { from: currentMonthStart } = safeGetDateRange(filters);
 
-      let query = supabase
-        .from("sales")
-        .select("customer_id, total, customers(name)")
-        .eq("company_id", companyId)
-        .gte("created_at", currentMonthStart.toISOString())
-        .not("customer_id", "is", null);
+        let query = supabase
+          .from("sales")
+          .select("customer_id, total, customers(name)")
+          .eq("company_id", companyId)
+          .gte("created_at", currentMonthStart.toISOString())
+          .not("customer_id", "is", null);
 
-      if (filters?.dimension && filters?.dimensionValue) {
-        query = query.eq(filters.dimension, filters.dimensionValue);
-      }
+        if (filters?.dimension && filters?.dimensionValue) {
+          query = query.eq(filters.dimension, filters.dimensionValue);
+        }
 
-      const { data, error } = await query;
+        const { data, error } = await query;
 
-      if (error) throw error;
+        if (error) {
+          // Handle various error codes gracefully
+          if (
+            (error as any)?.code === '42P01' ||
+            (error as any)?.code === '42501' ||
+            (error as any)?.code === '400' ||
+            (error as any)?.code === '406' ||
+            (error as any)?.status === 400 ||
+            (error as any)?.status === 406 ||
+            (error as any)?.message?.includes('does not exist') ||
+            (error as any)?.message?.includes('permission')
+          ) {
+            console.warn("Sales table not available yet, using fallback data");
+            return [];
+          }
+          // For unexpected errors, return empty array instead of throwing
+          console.error("Unexpected error in useTopCustomers:", error);
+          return [];
+        }
 
       const customerMap = new Map<string, { name: string; total: number; count: number }>();
 
@@ -50,14 +69,29 @@ export function useTopCustomers(
         });
       });
 
-      return Array.from(customerMap.values())
-        .map((c) => ({
-          cliente: c.name,
-          total: c.total,
-          compras: c.count,
-        }))
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 5);
+        return Array.from(customerMap.values())
+          .map((c) => ({
+            cliente: c.name,
+            total: c.total,
+            compras: c.count,
+          }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 5);
+      } catch (error) {
+        console.error("Error fetching top customers:", error);
+        if (
+          error instanceof Object &&
+          (
+            ((error as any)?.code === '42P01') ||
+            ((error as any)?.code === '42501') ||
+            ((error as any)?.message?.includes('does not exist')) ||
+            ((error as any)?.message?.includes('permission'))
+          )
+        ) {
+          return [];
+        }
+        throw error;
+      }
     },
     enabled: enabled && !!companyId,
   });

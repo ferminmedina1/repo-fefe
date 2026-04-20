@@ -24,6 +24,16 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  /* Hero Scroll Animations */
+  .hero-element {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .hero-element.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
 </style>
 </head>
 <body>
@@ -50,7 +60,13 @@
             </div>
           </nav>
           <div id="w-node-ed1a30f1-6737-bc57-209a-0418d51ae124-d51ae109" class="nav-right">
-            <div class="landscape-hide">
+            <div class="landscape-hide" style="display: flex; gap: 12px; align-items: center;">
+              <a data-wf--button-small--style="secondary" href="https://ventify.space/auth" class="button-main small w-variant-4f1ced44-5afc-4753-1771-3275f473f97b w-inline-block">
+                <div class="button-text-wrap">
+                  <div class="button-text-initial">Mirá una demo</div>
+                  <div class="button-text-reveal">Mirá una demo</div>
+                </div>
+              </a>
               <a data-wf--button-small--style="secondary" href="https://ventify.space/auth" class="button-main small w-variant-4f1ced44-5afc-4753-1771-3275f473f97b w-inline-block">
                 <div class="button-text-wrap">
                   <div class="button-text-initial">Iniciar sesión</div>
@@ -81,34 +97,17 @@
         <div class="section-layout">
           <div class="section-header">
             <div class="section-header-content">
-              <div data-w-id="1ccf3138-f4a8-f438-d24b-08c4b45a6c5f" class="eyebrow-wrap">
+              <div data-w-id="1ccf3138-f4a8-f438-d24b-08c4b45a6c5f" class="eyebrow-wrap hero-element">
                 <div class="eyebrow-layout">
-                  <div class="text-style-eyebrow">Más moderno. Más simple. Más inteligente.</div>
+                  <div class="text-style-eyebrow">Más moderno. Más simple. Más inteligente. Mejor.</div>
                 </div>
               </div>
               <div class="section-header-text-wrap text-align-center">
-                <h1 class="section-header-title text-color-gradient">Ventify<br></h1>
-                <div class="section-header-text text-style-large w-richtext">
-                  <p>Impulsa tu negocio con una plataforma all-in-one que simplifica la gestión, optimiza tu orden y lo lleva al siguiente nivel.</p>
-                </div>
+                <h1 class="section-header-title text-color-gradient hero-element" style="transition-delay: 0.2s;">Ventify<br></h1>
               </div>
             </div>
-            <div data-w-id="8f04e430-f071-508b-694c-634796611343" class="section-button-group">
-              <a data-wf--button-main--style="primary" href="https://ventify.space/auth" class="button-main w-variant-07429406-23c9-2ffa-03eb-adb796a03808 w-inline-block">
-                <div class="button-text-wrap">
-                  <div class="button-text-initial">Prueba Gratuita</div>
-                  <div class="button-text-reveal">Prueba Gratuita</div>
-                </div>
-              </a>
-              <a data-wf--button-main--style="base" href="https://ventify.space/auth" class="button-main w-inline-block">
-                <div class="button-text-wrap">
-                  <div class="button-text-initial">Mirá una demo</div>
-                  <div class="button-text-reveal">Mirá una demo</div>
-                </div>
-              </a>
-            </div>
             <!-- Pricing Text Block -->
-            <div class="pricing-text-block">
+            <div class="pricing-text-block hero-element" style="transition-delay: 0.4s;">
               <p class="pricing-text-main">
                 Empieza gratis. Luego desde
                 <span class="pricing-text-emphasis">$29 USD/mes</span>
@@ -121,6 +120,118 @@
               <div class="image-gradient"></div>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+    <!-- Promotional Banner with Offer Badges -->
+    <section style="background: linear-gradient(135deg, #0da2e7 0%, #00d4ff 100%); padding: 4rem 2rem; position: relative; overflow: hidden;">
+      <!-- Decorative elements -->
+      <div style="position: absolute; width: 400px; height: 400px; background: rgba(255,255,255,0.1); border-radius: 50%; top: -100px; left: -100px;"></div>
+      <div style="position: absolute; width: 300px; height: 300px; background: rgba(255,255,255,0.05); border-radius: 50%; bottom: -80px; right: -80px;"></div>
+      
+      <div class="container" style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 3rem;">
+        <!-- Main promotional content -->
+        <div style="text-align: center; color: white; max-width: 700px;">
+          <h2 style="font-size: 2.5rem; font-weight: 700; margin: 0 0 1rem 0; line-height: 1.2;">
+            Más moderno. Más simple.<br>Más inteligente. Mejor.
+          </h2>
+          <h1 style="font-size: 3.5rem; font-weight: 800; margin: 1rem 0; letter-spacing: -0.02em; text-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            Ventify
+          </h1>
+          <p style="font-size: 1.375rem; font-weight: 500; margin: 1.5rem 0 0 0; opacity: 0.95;">
+            Empieza gratis. Luego desde <span style="font-weight: 700; font-size: 1.5rem;">$29 USD/mes</span>
+          </p>
+        </div>
+
+        <!-- Offer Badges -->
+        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; margin-top: 2rem;">
+          <!-- Badge 1 -->
+          <div style="
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem 2.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            min-width: 260px;
+            text-align: center;
+            flex-direction: column;
+            border: 2px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+          " onmouseover="this.style.transform='translateY(-8px)'; this.style.boxShadow='0 20px 40px rgba(0,0,0,0.15)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 10px 30px rgba(0,0,0,0.1)';">
+            <div style="font-size: 2.5rem;">⚡</div>
+            <div>
+              <div style="font-weight: 700; color: #0da2e7; font-size: 1.25rem; margin-bottom: 0.25rem;">Sin Configuración</div>
+              <div style="color: #717784; font-size: 0.9rem;">Comienza en minutos</div>
+            </div>
+          </div>
+
+          <!-- Badge 2 -->
+          <div style="
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem 2.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            min-width: 260px;
+            text-align: center;
+            flex-direction: column;
+            border: 2px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+          " onmouseover="this.style.transform='translateY(-8px)'; this.style.boxShadow='0 20px 40px rgba(0,0,0,0.15)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 10px 30px rgba(0,0,0,0.1)';">
+            <div style="font-size: 2.5rem;">🤖</div>
+            <div>
+              <div style="font-weight: 700; color: #0da2e7; font-size: 1.25rem; margin-bottom: 0.25rem;">IA Integrada</div>
+              <div style="color: #717784; font-size: 0.9rem;">Decisiones inteligentes</div>
+            </div>
+          </div>
+
+          <!-- Badge 3 -->
+          <div style="
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem 2.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            min-width: 260px;
+            text-align: center;
+            flex-direction: column;
+            border: 2px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+          " onmouseover="this.style.transform='translateY(-8px)'; this.style.boxShadow='0 20px 40px rgba(0,0,0,0.15)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 10px 30px rgba(0,0,0,0.1)';">
+            <div style="font-size: 2.5rem;">🔒</div>
+            <div>
+              <div style="font-weight: 700; color: #0da2e7; font-size: 1.25rem; margin-bottom: 0.25rem;">100% Seguro</div>
+              <div style="color: #717784; font-size: 0.9rem;">Protección empresarial</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CTA Button -->
+        <div style="margin-top: 2rem;">
+          <a href="https://ventify.space/auth" style="
+            display: inline-block;
+            background: white;
+            color: #0da2e7;
+            padding: 1rem 2.5rem;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 1.05rem;
+            text-decoration: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+            border: none;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 15px 40px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 10px 30px rgba(0,0,0,0.15)';">
+            Acceder Ahora →
+          </a>
         </div>
       </div>
     </section>
@@ -219,7 +330,7 @@
                     <div class="heading-style-h5">Operaciones Claras en Tiempo Real</div>
                   </div>
                   <div style="height:0px" class="benefit-content">
-                    <p>Visualizá en tiempo real, desde un solo dashboard, <strong>ventas</strong>, <strong>margen bruto</strong>, <strong>cuentas por cobrar</strong> (vencidas y cantidad de facturas) y <strong>stock</strong> con sus estados: <strong>disponible, reservado, entregado y pendiente</strong>. Además, recibís <strong>alertas de stock bajo</strong> y rankings (top productos por rentabilidad / top clientes). Todo se alimenta del flujo real del sistema (<strong>presupuestos, remitos, entregas parciales, facturas, compras y tesorería</strong>) con datos y sin planillas.</p>
+                    <p>Visualizá en tiempo real, desde un solo Panel de Control, <strong>ventas</strong>, <strong>margen bruto</strong>, <strong>cuentas por cobrar</strong> (vencidas y cantidad de facturas) y <strong>stock</strong> con sus estados: <strong>disponible, reservado, entregado y pendiente</strong>. Además, recibís <strong>alertas de stock bajo</strong> y rankings (top productos por rentabilidad / top clientes). Todo se alimenta del flujo real del sistema (<strong>presupuestos, remitos, entregas parciales, facturas, compras y tesorería</strong>) con datos y sin planillas.</p>
                   </div>
                 </div>
                 <div class="benefit-divider"></div>
@@ -1356,6 +1467,34 @@
       btn.style.opacity = '1';
     }
   }
+</script>
+<script>
+  // Hero scroll animations with IntersectionObserver
+  (function() {
+    const heroElements = document.querySelectorAll('.hero-element');
+    
+    const observerOptions = {
+      root: null,
+      rootMargin: '0px 0px -50px 0px',
+      threshold: 0.1
+    };
+    
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          // Add visible class when element enters viewport
+          entry.target.classList.add('visible');
+          // Stop observing this element once it's animated
+          observer.unobserve(entry.target);
+        }
+      });
+    }, observerOptions);
+    
+    // Start observing all hero elements
+    heroElements.forEach(element => {
+      observer.observe(element);
+    });
+  })();
 </script>
 </body>
 </html>

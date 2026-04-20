@@ -77,7 +77,7 @@ export function WidgetPicker({ addedWidgetIds, onAddWidget, disabled = false }: 
       </SheetTrigger>
       <SheetContent side="right" className="flex flex-col w-full sm:max-w-2xl">
         <SheetHeader>
-          <SheetTitle>Agregar Widget al Dashboard</SheetTitle>
+          <SheetTitle>Agregar Widget al Panel de Control</SheetTitle>
           <SheetDescription>
             Selecciona un widget para agregarlo a tu dashboard personalizado
           </SheetDescription>

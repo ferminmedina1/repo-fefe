@@ -1,4 +1,5 @@
 import { WidgetWrapper } from "./WidgetWrapper";
+import { useWidgetContext } from "@/contexts/WidgetContext";
 import { WidgetDefinition } from "@/lib/dashboard/widgets";
 import { CheckCircle2 } from "lucide-react";
 
@@ -10,19 +11,20 @@ interface ListItem {
 
 interface ListWidgetProps {
   definition: WidgetDefinition;
-  data?: ListItem[] | null;
-  isLoading?: boolean;
-  onRemove?: () => void;
-  isDragging?: boolean;
+  // ✅ Removed: data, isLoading, onRemove, isDragging (now come from context)
 }
 
 export function ListWidget({
   definition,
-  data,
-  isLoading = false,
-  onRemove,
-  isDragging,
 }: ListWidgetProps) {
+  // ✅ NEW: Get data from context instead of props
+  const context = useWidgetContext();
+  const widgetData = context.dataMap[definition.id];
+  const data = widgetData?.data;
+  const isLoading = widgetData?.isLoading ?? false;
+  const onRemove = () => context.onWidgetRemove(definition.id);
+  const isDragging = context.isDragging;
+
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -47,6 +49,9 @@ export function ListWidget({
       );
     }
 
+    // Standard rendering for all lists
+    // Note: Virtual scrolling optimization disabled due to react-window build issues
+    // Can be re-enabled in future when react-window export issue is resolved
     return (
       <div className="space-y-3">
         {data.map((item, idx) => (

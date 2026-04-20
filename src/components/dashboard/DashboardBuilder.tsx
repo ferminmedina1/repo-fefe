@@ -1,10 +1,16 @@
 import { useMemo, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useCompany } from "@/contexts/CompanyContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useDashboardFilters } from "@/contexts/DashboardFilterContext";
+import { WidgetProvider } from "@/contexts/WidgetContext";
+import { WidgetErrorBoundary } from "./WidgetErrorBoundary";
 import {
   useDashboardLayout,
+  useMultipleDashboards,
+  useCreateDashboard,
+  useDeleteDashboard,
   useMonthlyComparison,
   useTopProducts,
   useTopCustomers,
@@ -30,6 +36,8 @@ import { ShareModal } from "./ShareModal";
 import { RefreshButton } from "./RefreshButton";
 import { CSVUploader } from "./CSVUploader";
 import { MetricBuilderModal } from "./MetricBuilderModal";
+import { DashboardSelector } from "./DashboardSelector";
+import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, RefreshCw, Upload, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,9 +46,25 @@ export function DashboardBuilder() {
   const { currentCompany } = useCompany();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const { filters } = useDashboardFilters();
+  const { toast } = useToast();
+  const [searchParams] = useSearchParams(); // ✅ NEW: Get URL search params
   const [userId, setUserId] = useState<string | undefined>();
+  const [selectedDashboardId, setSelectedDashboardId] = useState<string | undefined>(() => {
+    // ✅ NEW: Initialize from URL parameter if provided
+    return searchParams.get("dashboard") || undefined;
+  });
   const [showCSVUploader, setShowCSVUploader] = useState(false);
   const [showMetricBuilder, setShowMetricBuilder] = useState(false);
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // ✅ NEW: Update selectedDashboardId when URL changes
+  useEffect(() => {
+    const dashboardParam = searchParams.get("dashboard");
+    if (dashboardParam) {
+      setSelectedDashboardId(dashboardParam);
+    }
+  }, [searchParams]);
 
   // Get user ID from Supabase session
   useEffect(() => {
@@ -51,9 +75,23 @@ export function DashboardBuilder() {
     getUser();
   }, []);
 
-  // Load dashboard layout
+  // ✅ NEW: Fetch all dashboards for the user
+  const { 
+    data: dashboards = [], 
+    isLoading: dashboardsLoading 
+  } = useMultipleDashboards(currentCompany?.id, userId);
+
+  // ✅ NEW: Mutation to create new dashboard
+  const createDashboardMutation = useCreateDashboard();
+
+  // ✅ NEW: Mutation to delete dashboard
+  const deleteDashboardMutation = useDeleteDashboard();
+
+  // ✅ NEW: Load selected dashboard or default
   const {
     widgets,
+    dashboardName,
+    dashboardId,
     isLoading: layoutLoading,
     isSaving,
     addWidget,
@@ -62,7 +100,52 @@ export function DashboardBuilder() {
     resetLayout,
     hasLayout,
     layoutId,
-  } = useDashboardLayout(currentCompany?.id, userId);
+  } = useDashboardLayout(currentCompany?.id, userId, selectedDashboardId);
+
+  // ✅ NEW: Handle dashboard changes
+  const handleDashboardChange = (newDashboardId: string) => {
+    setSelectedDashboardId(newDashboardId);
+  };
+
+  // ✅ NEW: Handle create new dashboard
+  const handleCreateNewDashboard = async (name: string) => {
+    if (!userId || !currentCompany?.id) return;
+    
+    const newDashboard = await createDashboardMutation.mutateAsync({
+      userId,
+      companyId: currentCompany.id,
+      name,
+    });
+    
+    setSelectedDashboardId(newDashboard.id);
+  };
+
+  // ✅ NEW: Handle delete dashboard
+  const handleDeleteDashboard = async (dashboardId: string) => {
+    await deleteDashboardMutation.mutateAsync(dashboardId);
+    // Switch to first available dashboard or default
+    if (selectedDashboardId === dashboardId) {
+      const remainingDashboards = dashboards.filter(d => d.id !== dashboardId);
+      setSelectedDashboardId(remainingDashboards[0]?.id);
+    }
+  };
+
+  // ✅ NEW: Handle duplicate dashboard
+  const handleDuplicateDashboard = async (sourceDashboardId: string) => {
+    const sourceDashboard = dashboards.find(d => d.id === sourceDashboardId);
+    if (!sourceDashboard) return;
+
+    if (!userId || !currentCompany?.id) return;
+
+    const newDashboard = await createDashboardMutation.mutateAsync({
+      userId,
+      companyId: currentCompany.id,
+      name: `${sourceDashboard.name} (Copia)`,
+    });
+
+    // TODO: Copy widgets from source to new dashboard
+    // For now, just create empty dashboard
+  };
 
   // Fetch all data with filters
   const monthlyComparisonQuery = useMonthlyComparison(
@@ -98,57 +181,86 @@ export function DashboardBuilder() {
     filters
   );
 
-  // Get data map for easy access
-  const dataMap = useMemo(
+  // ✅ NEW: Create centralized dataMap with WidgetData structure
+  // Each widget gets {data, isLoading, error} - no more prop drilling!
+  const contextDataMap = useMemo(
     () => ({
-      "kpi-monthly-sales": monthlyComparisonQuery.data,
-      "kpi-gross-margin": monthlyComparisonQuery.data,
-      "kpi-receivables": receivablesQuery.data,
-      "kpi-sales-today": monthlyComparisonQuery.data ? { today: monthlyComparisonQuery.data.currentMonth } : null,
-      "chart-top-products": topProductsQuery.data,
-      "chart-top-customers": topCustomersQuery.data,
-      "chart-sales-7days": sevenDaysSalesChartQuery.data,
-      "list-critical-stock": criticalStockQuery.data,
-      "currency-rates": historicalRatesQuery.data,
-      "currency-summary": exchangeRatesQuery.data?.map((rate) => ({
-        isLoading: false,
-      })),
+      "kpi-monthly-sales": {
+        data: monthlyComparisonQuery.data,
+        isLoading: monthlyComparisonQuery.isLoading,
+        error: monthlyComparisonQuery.error,
+      },
+      "kpi-gross-margin": {
+        data: monthlyComparisonQuery.data,
+        isLoading: monthlyComparisonQuery.isLoading,
+        error: monthlyComparisonQuery.error,
+      },
+      "kpi-receivables": {
+        data: receivablesQuery.data,
+        isLoading: receivablesQuery.isLoading,
+        error: receivablesQuery.error,
+      },
+      "kpi-sales-today": {
+        data: monthlyComparisonQuery.data ? { today: monthlyComparisonQuery.data.currentMonth } : null,
+        isLoading: monthlyComparisonQuery.isLoading,
+        error: monthlyComparisonQuery.error,
+      },
+      "chart-top-products": {
+        data: topProductsQuery.data,
+        isLoading: topProductsQuery.isLoading,
+        error: topProductsQuery.error,
+      },
+      "chart-top-customers": {
+        data: topCustomersQuery.data,
+        isLoading: topCustomersQuery.isLoading,
+        error: topCustomersQuery.error,
+      },
+      "chart-sales-7days": {
+        data: sevenDaysSalesChartQuery.data,
+        isLoading: sevenDaysSalesChartQuery.isLoading,
+        error: sevenDaysSalesChartQuery.error,
+      },
+      "list-critical-stock": {
+        data: criticalStockQuery.data,
+        isLoading: criticalStockQuery.isLoading,
+        error: criticalStockQuery.error,
+      },
+      "currency-rates": {
+        data: historicalRatesQuery.data,
+        isLoading: historicalRatesQuery.isLoading,
+        error: historicalRatesQuery.error,
+      },
+      "currency-summary": {
+        data: exchangeRatesQuery.data || [],
+        isLoading: exchangeRatesQuery.isLoading,
+        error: exchangeRatesQuery.error,
+      },
     }),
     [
       monthlyComparisonQuery.data,
-      receivablesQuery.data,
-      topProductsQuery.data,
-      topCustomersQuery.data,
-      sevenDaysSalesChartQuery.data,
-      criticalStockQuery.data,
-      historicalRatesQuery.data,
-      exchangeRatesQuery.data,
-    ]
-  );
-
-  // Get loading state map
-  const loadingMap = useMemo(
-    () => ({
-      "kpi-monthly-sales": monthlyComparisonQuery.isLoading,
-      "kpi-gross-margin": monthlyComparisonQuery.isLoading,
-      "kpi-receivables": receivablesQuery.isLoading,
-      "kpi-sales-today": monthlyComparisonQuery.isLoading,
-      "chart-top-products": topProductsQuery.isLoading,
-      "chart-top-customers": topCustomersQuery.isLoading,
-      "chart-sales-7days": sevenDaysSalesChartQuery.isLoading,
-      "list-critical-stock": criticalStockQuery.isLoading,
-      "currency-rates": historicalRatesQuery.isLoading,
-      "currency-summary": exchangeRatesQuery.isLoading,
-    }),
-    [
       monthlyComparisonQuery.isLoading,
+      monthlyComparisonQuery.error,
+      receivablesQuery.data,
       receivablesQuery.isLoading,
+      receivablesQuery.error,
+      topProductsQuery.data,
       topProductsQuery.isLoading,
+      topProductsQuery.error,
+      topCustomersQuery.data,
       topCustomersQuery.isLoading,
+      topCustomersQuery.error,
+      sevenDaysSalesChartQuery.data,
       sevenDaysSalesChartQuery.isLoading,
+      sevenDaysSalesChartQuery.error,
+      criticalStockQuery.data,
       criticalStockQuery.isLoading,
+      criticalStockQuery.error,
+      historicalRatesQuery.data,
       historicalRatesQuery.isLoading,
+      historicalRatesQuery.error,
+      exchangeRatesQuery.data,
       exchangeRatesQuery.isLoading,
+      exchangeRatesQuery.error,
     ]
   );
 
@@ -156,10 +268,19 @@ export function DashboardBuilder() {
   const canViewProducts = hasPermission("products", "view");
   const hasAnyPermission = canViewSales || hasPermission("customers", "view");
 
+  // Wrapper for addWidget to match WidgetPicker's interface
+  const handleAddWidget = (widgetType: WidgetType, size?: 'full' | 'half' | 'quarter') => {
+    addWidget({
+      id: `${widgetType}-${Date.now()}`, // Generate unique ID
+      type: widgetType,
+      size: size || 'full',
+    });
+  };
+
   if (permissionsLoading || layoutLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-muted-foreground">Cargando dashboard...</p>
+        <p className="text-muted-foreground">Cargando Panel de Control...</p>
       </div>
     );
   }
@@ -182,8 +303,8 @@ export function DashboardBuilder() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Dashboard Personalizado</h1>
-            <p className="text-muted-foreground">Crea tu dashboard agregando widgets</p>
+            <h1 className="text-3xl font-bold text-foreground">Panel de Control Personalizado</h1>
+            <p className="text-muted-foreground">Crea tu Panel de Control agregando widgets</p>
           </div>
           <WidgetPicker
             addedWidgetIds={widgets.map((w) => w.type)}
@@ -191,14 +312,32 @@ export function DashboardBuilder() {
           />
         </div>
         <DashboardEmptyState
-          onChooseTemplate={() => {
-            // TODO: Implement template selection
-          }}
+          onChooseTemplate={() => setShowTemplateGallery(true)}
           onChooseFreeBuilder={() => {
             // Open widget picker or add first widget
             handleAddWidget("kpi-monthly-sales" as WidgetType);
           }}
         />
+        {showTemplateGallery && (
+          <TemplateGallery
+            onSelectTemplate={async (widgets) => {
+              // ✅ FIXED: Preserve all widget data from template, not just type/size
+              widgets.forEach((widget) => {
+                addWidget({
+                  id: `${widget.type}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                  type: widget.type,
+                  size: widget.size || 'full',
+                  // ✅ Preserve template configuration if it exists
+                  ...(widget.config && { config: widget.config }),
+                  ...(widget.description && { description: widget.description }),
+                  ...(widget.title && { title: widget.title }),
+                });
+              });
+              setShowTemplateGallery(false);
+            }}
+            onClose={() => setShowTemplateGallery(false)}
+          />
+        )}
       </div>
     );
   }
@@ -206,30 +345,48 @@ export function DashboardBuilder() {
   const addedWidgetTypes = widgets.map((w) => w.type);
   const availableWidgets = getAvailableWidgets(addedWidgetTypes);
 
-  // Wrapper for addWidget to match WidgetPicker's interface
-  const handleAddWidget = (widgetType: WidgetType, size?: 'full' | 'half' | 'quarter') => {
-    addWidget({
-      id: `${widgetType}-${Date.now()}`, // Generate unique ID
-      type: widgetType,
-      size: size || 'full',
-    });
-  };
-
   return (
-    <div className="space-y-6">
+    <WidgetProvider
+      dataMap={contextDataMap}
+      definitions={WIDGET_CATALOG}
+      onWidgetRemove={removeWidget}
+      onWidgetUpdate={(widgetId, config) => {
+        // TODO: Implement widget config updates if needed
+        console.log("Widget update requested:", widgetId, config);
+      }}
+      isDragging={isDragging}
+      setIsDragging={setIsDragging}
+    >
+      <div className="space-y-6">
       {/* Global Filters */}
       <DashboardFilters />
 
+      {/* ✅ NEW: Dashboard Selector - Always visible at top */}
+      {dashboards.length > 0 && (
+        <div className="flex items-center justify-between gap-4 p-3 bg-muted/30 rounded-lg border border-border">
+          <span className="text-sm font-medium text-muted-foreground">Panel de Control:</span>
+          <DashboardSelector
+            currentDashboardId={selectedDashboardId || dashboardId}
+            dashboards={dashboards}
+            isLoading={dashboardsLoading}
+            onDashboardChange={handleDashboardChange}
+            onCreateNew={handleCreateNewDashboard}
+            onDeleteDashboard={handleDeleteDashboard}
+            onDuplicateDashboard={handleDuplicateDashboard}
+          />
+        </div>
+      )}
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard Personalizado</h1>
+          <h1 className="text-3xl font-bold text-foreground">Panel de Control Personalizado</h1>
           <p className="text-muted-foreground">
             {widgets.length} widget{widgets.length !== 1 ? "s" : ""} agregado
             {widgets.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {isSaving && (
             <div className="text-xs text-muted-foreground flex items-center gap-2">
               <div className="animate-spin">
@@ -249,27 +406,36 @@ export function DashboardBuilder() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setShowTemplateGallery(true)}
+                disabled={isSaving}
+                className="gap-2 whitespace-nowrap"
+              >
+                <Zap className="h-4 w-4" />
+                <span className="hidden sm:inline">Explorar templates</span>
+                <span className="sm:hidden">Templates</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setShowCSVUploader(true)}
                 disabled={isSaving}
-                className="gap-2"
+                className="gap-2 whitespace-nowrap"
               >
                 <Upload className="h-4 w-4" />
-                Importar datos CSV
+                <span className="hidden sm:inline">Importar CSV</span>
+                <span className="sm:hidden">CSV</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowMetricBuilder(true)}
                 disabled={isSaving}
-                className="gap-2"
+                className="gap-2 whitespace-nowrap"
               >
                 <Zap className="h-4 w-4" />
-                Crear métrica
+                <span className="hidden sm:inline">Crear métrica</span>
+                <span className="sm:hidden">Métrica</span>
               </Button>
-              <TemplateGallery onSelectTemplate={async (templateWidgets) => {
-                resetLayout();
-                templateWidgets.forEach(w => addWidget(w));
-              }} />
               {layoutId && <ShareModal layoutId={layoutId} />}
             </>
           )}
@@ -286,10 +452,11 @@ export function DashboardBuilder() {
               size="sm"
               onClick={resetLayout}
               disabled={isSaving}
-              className="gap-2"
+              className="gap-2 whitespace-nowrap"
             >
               <RefreshCw className="h-4 w-4" />
-              Resetear
+              <span className="hidden sm:inline">Resetear</span>
+              <span className="sm:hidden">Reset</span>
             </Button>
           )}
         </div>
@@ -300,38 +467,49 @@ export function DashboardBuilder() {
         widgets={widgets}
         onReorder={reorderWidgets}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min">
           {widgets.map((widget) => {
             const definition = WIDGET_CATALOG[widget.type as WidgetType];
-            const data = dataMap[widget.type as WidgetType];
-            const isLoading = loadingMap[widget.type as WidgetType];
 
+            // ✅ FIXED: Show error instead of silently failing if widget type not found
             if (!definition) {
-              return null;
+              return (
+                <SortableWidget key={widget.id} id={widget.id}>
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-6 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-red-900">Widget no encontrado</h4>
+                        <p className="text-sm text-red-700 mt-1">
+                          Tipo de widget desconocido: <code className="bg-red-100 px-2 py-1 rounded text-xs">{widget.type}</code>
+                        </p>
+                        <button
+                          onClick={() => removeWidget(widget.id)}
+                          className="text-xs text-red-600 hover:text-red-700 hover:underline mt-2"
+                        >
+                          Eliminar widget →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </SortableWidget>
+              );
             }
 
-            const commonProps = {
-              definition,
-              data,
-              isLoading,
-              onRemove: () => removeWidget(widget.id),
-              isDragging: false,
-            };
-
-            // Render widget based on category
+            // ✅ All widgets now get data from context - no more prop drilling!
             const widgetContent = (() => {
               switch (definition.category) {
                 case "kpi":
-                  return <KpiWidget {...commonProps} />;
+                  return <KpiWidget definition={definition} />;
 
                 case "chart":
-                  return <ChartWidget {...commonProps} />;
+                  return <ChartWidget definition={definition} />;
 
                 case "list":
-                  return <ListWidget {...commonProps} />;
+                  return <ListWidget definition={definition} />;
 
                 case "currency":
-                  return <CurrencyWidget {...commonProps} />;
+                  return <CurrencyWidget definition={definition} />;
 
                 default:
                   return null;
@@ -344,10 +522,14 @@ export function DashboardBuilder() {
               <SortableWidget key={widget.id} id={widget.id}>
                 <div
                   className={cn(
-                    widget.size === "half" ? "md:col-span-1 lg:col-span-1" : "col-span-1 md:col-span-2 lg:col-span-3"
+                    "rounded-lg border bg-card p-6 shadow-sm",
+                    widget.size === "half" ? "col-span-1" : "col-span-1 md:col-span-2 lg:col-span-3"
                   )}
                 >
-                  {widgetContent}
+                  {/* ✅ Wrap widget with error boundary to prevent cascade failures */}
+                  <WidgetErrorBoundary widgetName={definition.name}>
+                    {widgetContent}
+                  </WidgetErrorBoundary>
                 </div>
               </SortableWidget>
             );
@@ -379,6 +561,7 @@ export function DashboardBuilder() {
       {showMetricBuilder && (
         <MetricBuilderModal onClose={() => setShowMetricBuilder(false)} />
       )}
-    </div>
+      </div>
+    </WidgetProvider>
   );
 }

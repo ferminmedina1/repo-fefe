@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, AlertCircle, CheckCircle, X, Download } from 'lucide-react';
 import { useCSVUpload } from '@/hooks/dashboard/useCSVUpload';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -18,6 +18,14 @@ export const CSVUploader = ({ onSuccess, onClose }: CSVUploaderProps) => {
   const [preview, setPreview] = useState<any[]>([]);
   const [result, setResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -49,11 +57,27 @@ export const CSVUploader = ({ onSuccess, onClose }: CSVUploaderProps) => {
   };
 
   const handleFile = async (selectedFile: File) => {
-    setFile(selectedFile);
-    setResult(null);
+    // Validate file size (max 10MB)
+    const maxFileSize = 10 * 1024 * 1024; // 10MB
+    if (selectedFile.size > maxFileSize) {
+      alert('Archivo demasiado grande (máximo 10 MB)');
+      return;
+    }
+
+    // Validate file type
+    if (selectedFile.type !== 'text/csv' && !selectedFile.name.endsWith('.csv')) {
+      alert('Por favor selecciona un archivo CSV válido');
+      return;
+    }
+
+    if (isMountedRef.current) {
+      setFile(selectedFile);
+      setResult(null);
+    }
 
     const parsed = await parseCSV(selectedFile);
-    if (parsed) {
+    // Only update state if component is still mounted
+    if (isMountedRef.current && parsed) {
       setPreview(parsed.rows.slice(0, 5)); // Show first 5 rows
     }
   };
@@ -61,8 +85,15 @@ export const CSVUploader = ({ onSuccess, onClose }: CSVUploaderProps) => {
   const handleUpload = async () => {
     if (!file || !currentCompany) return;
 
+    if (!isMountedRef.current) return;
     setLoading(true);
+
     const parsed = await parseCSV(file);
+
+    if (!isMountedRef.current) {
+      setLoading(false);
+      return;
+    }
 
     if (!parsed) {
       setResult({
@@ -76,6 +107,12 @@ export const CSVUploader = ({ onSuccess, onClose }: CSVUploaderProps) => {
     }
 
     const uploadResult = await uploadSalesData(currentCompany.id, parsed.rows, parsed.headers);
+    
+    if (!isMountedRef.current) {
+      setLoading(false);
+      return;
+    }
+
     setResult(uploadResult);
 
     if (uploadResult.success) {
@@ -101,16 +138,16 @@ export const CSVUploader = ({ onSuccess, onClose }: CSVUploaderProps) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-auto">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-full sm:max-w-2xl w-full max-h-[90vh] overflow-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <Upload className="w-5 h-5" />
-              Importar datos CSV
+        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-start sm:items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base sm:text-xl font-bold text-white flex items-center gap-2">
+              <Upload className="w-4 sm:w-5 h-4 sm:h-5 shrink-0" />
+              <span className="truncate">Importar CSV</span>
             </h2>
-            <p className="text-blue-100 text-sm mt-1">Carga datos de ventas en lote</p>
+            <p className="text-blue-100 text-xs sm:text-sm mt-1 hidden sm:block">Carga datos de ventas en lote</p>
           </div>
           <button
             onClick={onClose}
@@ -121,7 +158,7 @@ export const CSVUploader = ({ onSuccess, onClose }: CSVUploaderProps) => {
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           {!result ? (
             <>
               {/* Drop Zone */}
@@ -160,7 +197,7 @@ export const CSVUploader = ({ onSuccess, onClose }: CSVUploaderProps) => {
 
                   <button
                     onClick={downloadTemplate}
-                    className="ml-3 inline-block bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition font-medium flex items-center gap-2"
+                    className="ml-3 flex items-center gap-2 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition font-medium"
                   >
                     <Download className="w-4 h-4" />
                     Descargar plantilla

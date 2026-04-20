@@ -1,14 +1,11 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { Wand2 } from "lucide-react";
 import { useTemplates } from "@/hooks/dashboard";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardWidget } from "@/lib/dashboard/widgets";
@@ -16,27 +13,28 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 interface TemplateGalleryProps {
   onSelectTemplate: (widgets: DashboardWidget[]) => Promise<void>;
+  onClose: () => void;
 }
 
-export function TemplateGallery({ onSelectTemplate }: TemplateGalleryProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function TemplateGallery({ onSelectTemplate, onClose }: TemplateGalleryProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { data: templates, isLoading: isTemplatesLoading } = useTemplates(false); // Only presets
+  const { data: templates, isLoading: isTemplatesLoading, error: templatesError } = useTemplates(false);
 
   const handleSelectTemplate = async (widgets: DashboardWidget[]) => {
     setIsLoading(true);
     try {
       await onSelectTemplate(widgets);
       toast({
-        title: "✓ Template applied",
-        description: `Loaded ${widgets.length} widgets`,
+        title: "✓ Template aplicado",
+        description: `Cargados ${widgets.length} widgets`,
       });
-      setIsOpen(false);
+      onClose();
     } catch (error) {
+      console.error('[TemplateGallery] Error:', error);
       toast({
-        title: "Failed to apply template",
-        description: error instanceof Error ? error.message : "Unknown error",
+        title: "Error al aplicar template",
+        description: error instanceof Error ? error.message : "Error desconocido",
         variant: "destructive",
       });
     } finally {
@@ -45,55 +43,77 @@ export function TemplateGallery({ onSelectTemplate }: TemplateGalleryProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Wand2 className="w-4 h-4" />
-          Explorar templates
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+    <Dialog open={true} onOpenChange={(open) => {
+      if (!open) onClose();
+    }}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Dashboard Templates</DialogTitle>
-          <DialogDescription>
-            Choose a template to quickly set up your dashboard
+          <DialogTitle className="text-2xl">Plantillas de Panel de Control</DialogTitle>
+          <DialogDescription className="text-base">
+            Elige una plantilla prediseñada y comienza al instante
           </DialogDescription>
         </DialogHeader>
 
-        {isTemplatesLoading ? (
-          <div className="grid grid-cols-2 gap-3 py-4">
-            {Array(4)
-              .fill(0)
-              .map((_, i) => (
-                <Skeleton key={i} className="h-24" />
+        <div className="w-full">
+          {isTemplatesLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 py-6">
+              {Array(6)
+                .fill(0)
+                .map((_, i) => (
+                  <Skeleton key={i} className="h-32 rounded-lg" />
+                ))}
+            </div>
+          ) : templates && templates.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 py-6">
+              {templates.map((template) => (
+                <button
+                  key={template.id}
+                  onClick={() => {
+                    handleSelectTemplate(template.widgets_data?.widgets || [])
+                  }}
+                  disabled={isLoading}
+                  className={`
+                    relative p-4 rounded-lg border-2 text-left transition-all duration-200
+                    ${isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary hover:shadow-lg hover:bg-primary/5 cursor-pointer'}
+                    border-border
+                  `}
+                >
+                  {/* Template Icon/Badge */}
+                  <div className="mb-3 inline-block px-2 py-1 bg-primary/10 rounded-md">
+                    <span className="text-xs font-semibold text-primary">
+                      {template.widgets_data?.widgets?.length || 0} widgets
+                    </span>
+                  </div>
+                  
+                  <h4 className="font-bold text-sm text-foreground">{template.name}</h4>
+                  <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                    {template.description}
+                  </p>
+                  
+                  {/* Hover arrow */}
+                  <div className="mt-3 text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-sm font-medium">Aplicar →</span>
+                  </div>
+                </button>
               ))}
-          </div>
-        ) : templates && templates.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 py-4">
-            {templates.map((template) => (
-              <button
-                key={template.id}
-                onClick={() =>
-                  handleSelectTemplate(template.widgets_data.widgets)
-                }
-                disabled={isLoading}
-                className="p-3 border rounded-lg hover:bg-gray-50 text-left transition-colors disabled:opacity-50"
-              >
-                <h4 className="font-semibold text-sm">{template.name}</h4>
-                <p className="text-xs text-gray-500 mt-1">{template.description}</p>
-                <p className="text-xs text-gray-400 mt-2">
-                  {template.widgets_data.widgets.length} widgets
+            </div>
+          ) : (
+            <div className="py-12 text-center">
+              <div className="mb-4 text-4xl">📋</div>
+              <p className="text-base font-medium text-foreground mb-2">
+                No hay templates disponibles
+              </p>
+              {templatesError && (
+                <p className="text-sm text-destructive font-medium mt-2">
+                  Error: {templatesError.message || 'No se pudieron cargar los templates'}
                 </p>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="py-8 text-center">
-            <p className="text-sm text-gray-500">
-              No templates available yet. Templates will appear here once the database is configured.
-            </p>
-          </div>
-        )}
+              )}
+              <p className="text-sm text-muted-foreground mt-3">
+                Los templates aparecerán aquí una vez que se configure la base de datos.
+              </p>
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

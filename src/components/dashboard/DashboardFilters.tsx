@@ -12,7 +12,7 @@ import { X } from 'lucide-react';
 
 // Available dimensions for filtering
 const DIMENSIONS = [
-  { value: '', label: 'All Dimensions' },
+  { value: 'all', label: 'All Dimensions' },
   { value: 'country', label: 'Country' },
   { value: 'product_category', label: 'Product Category' },
   { value: 'region', label: 'Region' },
@@ -37,10 +37,10 @@ export function DashboardFilters() {
     });
   };
 
-  const handleDimensionChange = (dimension: string) => {
+  const handleDimensionChange = (dimension: string | undefined) => {
     setFilters({
       ...filters,
-      dimension: dimension || undefined,
+      dimension,
       dimensionValue: undefined, // Reset value when dimension changes
     });
   };
@@ -65,12 +65,13 @@ export function DashboardFilters() {
       {/* Dimension Filter */}
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-muted-foreground">Filter by:</span>
-        <Select value={filters.dimension || ''} onValueChange={handleDimensionChange}>
+        <Select value={filters.dimension || 'all'} onValueChange={(value) => handleDimensionChange(value === 'all' ? undefined : value)}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Choose dimension..." />
           </SelectTrigger>
           <SelectContent>
-            {DIMENSIONS.map((dim) => (
+            <SelectItem value="all">All Dimensions</SelectItem>
+            {DIMENSIONS.filter(d => d.value !== 'all').map((dim) => (
               <SelectItem key={dim.value} value={dim.value}>
                 {dim.label}
               </SelectItem>

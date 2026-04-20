@@ -54,7 +54,8 @@ import { useActiveModules, BASE_MODULES } from "@/hooks/useActiveModules";
 import { usePermissions, Module } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useCompany } from "@/contexts/CompanyContext";
-import { useState, useMemo } from "react";
+import { useMultipleDashboards } from "@/hooks/dashboard";
+import { useState, useMemo, useEffect } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -88,10 +89,23 @@ export function Sidebar() {
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showModulesDialog, setShowModulesDialog] = useState(false);
+  const [userId, setUserId] = useState<string | undefined>();
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('sidebar-favorites');
     return saved ? JSON.parse(saved) : ['/pos', '/sales', '/products'];
   });
+
+  // ✅ NEW: Get user ID from session
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getSession();
+      setUserId(data?.session?.user?.id);
+    };
+    getUser();
+  }, []);
+
+  // ✅ NEW: Fetch dashboards
+  const { data: dashboards = [], isLoading: dashboardsLoading } = useMultipleDashboards(currentCompany?.id, userId);
 
   // Función para verificar si una ruta pertenece a un grupo
   const isRouteInSection = (sectionHref: string, children?: NavItem[]) => {
@@ -129,16 +143,27 @@ export function Sidebar() {
     return activeModules.data.includes(moduleName);
   };
 
+  // ✅ NEW: Create dynamic dashboard items from dashboards list
+  const dashboardItems: NavItem[] = useMemo(() => {
+    return dashboards.map((dashboard) => ({
+      title: dashboard.name,
+      href: `/app?dashboard=${dashboard.id}`,
+      icon: LayoutDashboard,
+      module: "dashboard",
+    }));
+  }, [dashboards]);
+
   const navItems: (NavItem | { section: string; items: NavItem[] })[] = [
     // General
     {
       section: "General",
       items: [
         {
-          title: "Dashboard",
+          title: "Panel de Control",
           href: "/app",
           icon: LayoutDashboard,
           module: "dashboard",
+          children: dashboardItems.length > 0 ? dashboardItems : undefined,
         },
         {
           title: "Punto de Venta",

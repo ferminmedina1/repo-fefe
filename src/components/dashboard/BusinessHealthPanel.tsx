@@ -84,31 +84,35 @@ export function BusinessHealthPanel({ companyId }: BusinessHealthPanelProps) {
     enabled: !!companyId,
   });
 
-  // Salud de clientes
+  // Salud de clientes - Optimized with parallel queries
   const { data: customerHealth } = useQuery({
     queryKey: ["customer-health", companyId],
     queryFn: async () => {
       const threeMonthsAgo = new Date();
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
-      const { data: customers, error: custError } = await supabase
-        .from("customers")
-        .select("id")
-        .eq("company_id", companyId);
+      // Execute both queries in parallel instead of series (N+1 fix)
+      const [customersResult, salesResult] = await Promise.all([
+        supabase
+          .from("customers")
+          .select("id")
+          .eq("company_id", companyId),
+        supabase
+          .from("sales")
+          .select("customer_id")
+          .eq("company_id", companyId)
+          .gte("created_at", threeMonthsAgo.toISOString())
+          .not("customer_id", "is", null)
+      ]);
 
-      if (custError) throw custError;
+      if (customersResult.error) throw customersResult.error;
+      if (salesResult.error) throw salesResult.error;
 
-      const { data: sales, error: salesError } = await supabase
-        .from("sales")
-        .select("customer_id, created_at")
-        .eq("company_id", companyId)
-        .gte("created_at", threeMonthsAgo.toISOString())
-        .not("customer_id", "is", null);
+      const customers = customersResult.data || [];
+      const sales = salesResult.data || [];
 
-      if (salesError) throw salesError;
-
-      const activeCustomers = new Set(sales?.map(s => s.customer_id));
-      const totalCustomers = customers?.length || 0;
+      const activeCustomers = new Set(sales.map(s => s.customer_id));
+      const totalCustomers = customers.length;
       const inactiveCount = totalCustomers - activeCustomers.size;
       const inactivePercentage = totalCustomers > 0 ? (inactiveCount / totalCustomers) * 100 : 0;
 
