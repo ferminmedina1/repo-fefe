@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useCompany } from "@/contexts/CompanyContext";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -46,12 +47,24 @@ export function DashboardBuilder() {
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const { filters } = useDashboardFilters();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams(); // ✅ NEW: Get URL search params
   const [userId, setUserId] = useState<string | undefined>();
-  const [selectedDashboardId, setSelectedDashboardId] = useState<string | undefined>();
+  const [selectedDashboardId, setSelectedDashboardId] = useState<string | undefined>(() => {
+    // ✅ NEW: Initialize from URL parameter if provided
+    return searchParams.get("dashboard") || undefined;
+  });
   const [showCSVUploader, setShowCSVUploader] = useState(false);
   const [showMetricBuilder, setShowMetricBuilder] = useState(false);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // ✅ NEW: Update selectedDashboardId when URL changes
+  useEffect(() => {
+    const dashboardParam = searchParams.get("dashboard");
+    if (dashboardParam) {
+      setSelectedDashboardId(dashboardParam);
+    }
+  }, [searchParams]);
 
   // Get user ID from Supabase session
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -48,6 +49,7 @@ export function DashboardSelector({
   onDeleteDashboard,
   onDuplicateDashboard,
 }: DashboardSelectorProps) {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newDashboardName, setNewDashboardName] = useState("");
@@ -106,6 +108,8 @@ export function DashboardSelector({
         description: `"${dashboard.name}" ha sido eliminado`,
       });
       setDeleteConfirm(null);
+      // ✅ NEW: Navigate back to default when delete
+      navigate("/app");
     } catch (error) {
       toast({
         title: "Error al eliminar panel",
@@ -156,6 +160,8 @@ export function DashboardSelector({
           if (value === "__new__") {
             setShowCreateDialog(true);
           } else {
+            // ✅ NEW: Navigate with dashboard parameter
+            navigate(`/app?dashboard=${value}`);
             onDashboardChange(value);
           }
         }}
