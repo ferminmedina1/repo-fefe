@@ -58,14 +58,13 @@ export function DashboardEmptyState({
           {/* Template Card */}
           <Card 
             className={`
-              group relative overflow-hidden cursor-pointer
+              group relative overflow-hidden
               border border-primary/20 hover:border-primary/50
               bg-gradient-to-br ${DASHBOARD_DESIGN.gradients.primary}
               backdrop-blur-sm
               hover:shadow-lg ${DASHBOARD_DESIGN.transitions.base}
               p-6 md:p-8
             `}
-            onClick={onChooseTemplate}
           >
             {/* Animated gradient overlay on hover */}
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -94,6 +93,7 @@ export function DashboardEmptyState({
 
               {/* CTA with arrow animation */}
               <Button 
+                onClick={onChooseTemplate}
                 className={`
                   w-full mt-2
                   bg-primary hover:bg-primary/90
@@ -111,13 +111,12 @@ export function DashboardEmptyState({
           {/* Free Builder Card */}
           <Card 
             className={`
-              group relative overflow-hidden cursor-pointer
+              group relative overflow-hidden
               border border-border/50 hover:border-border
               bg-card hover:bg-card/80
               hover:shadow-lg ${DASHBOARD_DESIGN.transitions.base}
               p-6 md:p-8
             `}
-            onClick={onChooseFreeBuilder}
           >
             {/* Subtle animated border gradient */}
             <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-10 bg-gradient-to-r from-primary via-emerald-500 to-primary transition-opacity duration-300" />
@@ -145,6 +144,7 @@ export function DashboardEmptyState({
 
               {/* CTA */}
               <Button 
+                onClick={onChooseFreeBuilder}
                 variant="outline"
                 className={`
                   w-full mt-2

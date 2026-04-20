@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { useCompany } from "@/contexts/CompanyContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useDashboardFilters } from "@/contexts/DashboardFilterContext";
+import { WidgetProvider } from "@/contexts/WidgetContext";
+import { WidgetErrorBoundary } from "./WidgetErrorBoundary";
 import {
   useDashboardLayout,
   useMonthlyComparison,
@@ -42,6 +44,7 @@ export function DashboardBuilder() {
   const [showCSVUploader, setShowCSVUploader] = useState(false);
   const [showMetricBuilder, setShowMetricBuilder] = useState(false);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [isDragging, setIsDragging] = useState(false); // ✅ For WidgetProvider
 
   // Get user ID from Supabase session
   useEffect(() => {
@@ -99,57 +102,86 @@ export function DashboardBuilder() {
     filters
   );
 
-  // Get data map for easy access
-  const dataMap = useMemo(
+  // ✅ NEW: Create centralized dataMap with WidgetData structure
+  // Each widget gets {data, isLoading, error} - no more prop drilling!
+  const contextDataMap = useMemo(
     () => ({
-      "kpi-monthly-sales": monthlyComparisonQuery.data,
-      "kpi-gross-margin": monthlyComparisonQuery.data,
-      "kpi-receivables": receivablesQuery.data,
-      "kpi-sales-today": monthlyComparisonQuery.data ? { today: monthlyComparisonQuery.data.currentMonth } : null,
-      "chart-top-products": topProductsQuery.data,
-      "chart-top-customers": topCustomersQuery.data,
-      "chart-sales-7days": sevenDaysSalesChartQuery.data,
-      "list-critical-stock": criticalStockQuery.data,
-      "currency-rates": historicalRatesQuery.data,
-      "currency-summary": exchangeRatesQuery.data?.map((rate) => ({
-        isLoading: false,
-      })),
+      "kpi-monthly-sales": {
+        data: monthlyComparisonQuery.data,
+        isLoading: monthlyComparisonQuery.isLoading,
+        error: monthlyComparisonQuery.error,
+      },
+      "kpi-gross-margin": {
+        data: monthlyComparisonQuery.data,
+        isLoading: monthlyComparisonQuery.isLoading,
+        error: monthlyComparisonQuery.error,
+      },
+      "kpi-receivables": {
+        data: receivablesQuery.data,
+        isLoading: receivablesQuery.isLoading,
+        error: receivablesQuery.error,
+      },
+      "kpi-sales-today": {
+        data: monthlyComparisonQuery.data ? { today: monthlyComparisonQuery.data.currentMonth } : null,
+        isLoading: monthlyComparisonQuery.isLoading,
+        error: monthlyComparisonQuery.error,
+      },
+      "chart-top-products": {
+        data: topProductsQuery.data,
+        isLoading: topProductsQuery.isLoading,
+        error: topProductsQuery.error,
+      },
+      "chart-top-customers": {
+        data: topCustomersQuery.data,
+        isLoading: topCustomersQuery.isLoading,
+        error: topCustomersQuery.error,
+      },
+      "chart-sales-7days": {
+        data: sevenDaysSalesChartQuery.data,
+        isLoading: sevenDaysSalesChartQuery.isLoading,
+        error: sevenDaysSalesChartQuery.error,
+      },
+      "list-critical-stock": {
+        data: criticalStockQuery.data,
+        isLoading: criticalStockQuery.isLoading,
+        error: criticalStockQuery.error,
+      },
+      "currency-rates": {
+        data: historicalRatesQuery.data,
+        isLoading: historicalRatesQuery.isLoading,
+        error: historicalRatesQuery.error,
+      },
+      "currency-summary": {
+        data: exchangeRatesQuery.data || [],
+        isLoading: exchangeRatesQuery.isLoading,
+        error: exchangeRatesQuery.error,
+      },
     }),
     [
       monthlyComparisonQuery.data,
-      receivablesQuery.data,
-      topProductsQuery.data,
-      topCustomersQuery.data,
-      sevenDaysSalesChartQuery.data,
-      criticalStockQuery.data,
-      historicalRatesQuery.data,
-      exchangeRatesQuery.data,
-    ]
-  );
-
-  // Get loading state map
-  const loadingMap = useMemo(
-    () => ({
-      "kpi-monthly-sales": monthlyComparisonQuery.isLoading,
-      "kpi-gross-margin": monthlyComparisonQuery.isLoading,
-      "kpi-receivables": receivablesQuery.isLoading,
-      "kpi-sales-today": monthlyComparisonQuery.isLoading,
-      "chart-top-products": topProductsQuery.isLoading,
-      "chart-top-customers": topCustomersQuery.isLoading,
-      "chart-sales-7days": sevenDaysSalesChartQuery.isLoading,
-      "list-critical-stock": criticalStockQuery.isLoading,
-      "currency-rates": historicalRatesQuery.isLoading,
-      "currency-summary": exchangeRatesQuery.isLoading,
-    }),
-    [
       monthlyComparisonQuery.isLoading,
+      monthlyComparisonQuery.error,
+      receivablesQuery.data,
       receivablesQuery.isLoading,
+      receivablesQuery.error,
+      topProductsQuery.data,
       topProductsQuery.isLoading,
+      topProductsQuery.error,
+      topCustomersQuery.data,
       topCustomersQuery.isLoading,
+      topCustomersQuery.error,
+      sevenDaysSalesChartQuery.data,
       sevenDaysSalesChartQuery.isLoading,
+      sevenDaysSalesChartQuery.error,
+      criticalStockQuery.data,
       criticalStockQuery.isLoading,
+      criticalStockQuery.error,
+      historicalRatesQuery.data,
       historicalRatesQuery.isLoading,
+      historicalRatesQuery.error,
+      exchangeRatesQuery.data,
       exchangeRatesQuery.isLoading,
+      exchangeRatesQuery.error,
     ]
   );
 
@@ -220,6 +252,7 @@ export function DashboardBuilder() {
               });
               setShowTemplateGallery(false);
             }}
+            onClose={() => setShowTemplateGallery(false)}
           />
         )}
       </div>
@@ -230,7 +263,18 @@ export function DashboardBuilder() {
   const availableWidgets = getAvailableWidgets(addedWidgetTypes);
 
   return (
-    <div className="space-y-6">
+    <WidgetProvider
+      dataMap={contextDataMap}
+      definitions={WIDGET_CATALOG}
+      onWidgetRemove={removeWidget}
+      onWidgetUpdate={(widgetId, config) => {
+        // TODO: Implement widget config updates if needed
+        console.log("Widget update requested:", widgetId, config);
+      }}
+      isDragging={isDragging}
+      setIsDragging={setIsDragging}
+    >
+      <div className="space-y-6">
       {/* Global Filters */}
       <DashboardFilters />
 
@@ -290,10 +334,6 @@ export function DashboardBuilder() {
                 <Zap className="h-4 w-4" />
                 Crear métrica
               </Button>
-              <TemplateGallery onSelectTemplate={async (templateWidgets) => {
-                resetLayout();
-                templateWidgets.forEach(w => addWidget(w));
-              }} />
               {layoutId && <ShareModal layoutId={layoutId} />}
             </>
           )}
@@ -327,35 +367,25 @@ export function DashboardBuilder() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max">
           {widgets.map((widget) => {
             const definition = WIDGET_CATALOG[widget.type as WidgetType];
-            const data = dataMap[widget.type as WidgetType];
-            const isLoading = loadingMap[widget.type as WidgetType];
 
             if (!definition) {
               return null;
             }
 
-            const commonProps = {
-              definition,
-              data,
-              isLoading,
-              onRemove: () => removeWidget(widget.id),
-              isDragging: false,
-            };
-
-            // Render widget based on category
+            // ✅ All widgets now get data from context - no more prop drilling!
             const widgetContent = (() => {
               switch (definition.category) {
                 case "kpi":
-                  return <KpiWidget {...commonProps} />;
+                  return <KpiWidget definition={definition} />;
 
                 case "chart":
-                  return <ChartWidget {...commonProps} />;
+                  return <ChartWidget definition={definition} />;
 
                 case "list":
-                  return <ListWidget {...commonProps} />;
+                  return <ListWidget definition={definition} />;
 
                 case "currency":
-                  return <CurrencyWidget {...commonProps} />;
+                  return <CurrencyWidget definition={definition} />;
 
                 default:
                   return null;
@@ -371,7 +401,10 @@ export function DashboardBuilder() {
                     widget.size === "half" ? "md:col-span-1 lg:col-span-1" : "col-span-1 md:col-span-2 lg:col-span-3"
                   )}
                 >
-                  {widgetContent}
+                  {/* ✅ Wrap widget with error boundary to prevent cascade failures */}
+                  <WidgetErrorBoundary widgetName={definition.name}>
+                    {widgetContent}
+                  </WidgetErrorBoundary>
                 </div>
               </SortableWidget>
             );
@@ -403,6 +436,7 @@ export function DashboardBuilder() {
       {showMetricBuilder && (
         <MetricBuilderModal onClose={() => setShowMetricBuilder(false)} />
       )}
-    </div>
+      </div>
+    </WidgetProvider>
   );
 }

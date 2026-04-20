@@ -1,4 +1,5 @@
 import { WidgetWrapper } from "./WidgetWrapper";
+import { useWidgetContext } from "@/contexts/WidgetContext";
 import { WidgetDefinition } from "@/lib/dashboard/widgets";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,19 +28,20 @@ interface CurrencyData {
 
 interface CurrencyWidgetProps {
   definition: WidgetDefinition;
-  data?: CurrencyData[] | null;
-  isLoading?: boolean;
-  onRemove?: () => void;
-  isDragging?: boolean;
+  // ✅ Removed: data, isLoading, onRemove, isDragging (now come from context)
 }
 
 export function CurrencyWidget({
   definition,
-  data,
-  isLoading = false,
-  onRemove,
-  isDragging,
 }: CurrencyWidgetProps) {
+  // ✅ NEW: Get data from context instead of props
+  const context = useWidgetContext();
+  const widgetData = context.dataMap[definition.id];
+  const data = widgetData?.data;
+  const isLoading = widgetData?.isLoading ?? false;
+  const onRemove = () => context.onWidgetRemove(definition.id);
+  const isDragging = context.isDragging;
+
   const renderContent = () => {
     if (isLoading) {
       return <div className="h-80 bg-muted animate-pulse rounded" />;

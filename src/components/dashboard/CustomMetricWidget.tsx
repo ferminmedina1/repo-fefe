@@ -12,9 +12,28 @@ export const CustomMetricWidget = ({ metric }: CustomMetricWidgetProps) => {
   const { evaluateFormula, isLoading } = useMetricFormula();
   const { data: history } = useMetricHistory(metric.id);
 
-  // Calculate current value
+  // Calculate current value - with error handling
   const currentValue = useMemo(() => {
-    return evaluateFormula(metric.formula);
+    try {
+      if (!metric.formula || typeof metric.formula !== 'string') {
+        console.warn('Invalid formula provided to CustomMetricWidget:', metric.formula);
+        return null;
+      }
+      const result = evaluateFormula(metric.formula);
+      // Validate result is a number
+      if (typeof result !== 'number' && result !== null) {
+        console.warn('Formula did not return a valid number:', result);
+        return null;
+      }
+      return result;
+    } catch (error) {
+      console.error('Error evaluating formula:', {
+        formula: metric.formula,
+        error: error instanceof Error ? error.message : String(error),
+        fullError: error
+      });
+      return null;
+    }
   }, [metric.formula, evaluateFormula]);
 
   // Calculate trend
@@ -65,7 +84,12 @@ export const CustomMetricWidget = ({ metric }: CustomMetricWidgetProps) => {
       {/* Value Display */}
       <div className="flex-1 flex items-center justify-center py-4">
         {isLoading ? (
-          <div className="w-8 h-8 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin" />
+          <div 
+            className="w-8 h-8 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin"
+            role="status"
+            aria-label="Cargando métrica"
+            aria-busy="true"
+          />
         ) : currentValue === null ? (
           <div className="text-center">
             <p className="text-sm text-red-600">Error al calcular</p>
