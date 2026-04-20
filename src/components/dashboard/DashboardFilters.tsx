@@ -65,12 +65,12 @@ export function DashboardFilters() {
       {/* Dimension Filter */}
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-muted-foreground">Filter by:</span>
-        <Select value={filters.dimension || ''} onValueChange={(value) => handleDimensionChange(value === '' ? undefined : value)}>
+        <Select value={filters.dimension || 'all'} onValueChange={(value) => handleDimensionChange(value === 'all' ? undefined : value)}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Choose dimension..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Dimensions</SelectItem>
+            <SelectItem value="all">All Dimensions</SelectItem>
             {DIMENSIONS.filter(d => d.value !== 'all').map((dim) => (
               <SelectItem key={dim.value} value={dim.value}>
                 {dim.label}
