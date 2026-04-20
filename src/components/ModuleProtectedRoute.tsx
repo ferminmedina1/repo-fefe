@@ -1,7 +1,6 @@
 import { ReactNode, useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useActiveModules, BASE_MODULES } from "@/hooks/useActiveModules";
-
 import { Permission, usePermissions } from "@/hooks/usePermissions";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { useCompany } from "@/contexts/CompanyContext";
