@@ -154,18 +154,6 @@ export function Sidebar() {
   }, [dashboards]);
 
   const navItems: (NavItem | { section: string; items: NavItem[] })[] = [
-    // ✅ NEW: Mis Paneles section (only if user has dashboards)
-    ...(dashboardItems.length > 0 ? [{
-      section: "Mis Paneles",
-      items: [{
-        title: "Mis Paneles",
-        href: "/app",
-        icon: LayoutDashboard,
-        module: "dashboard",
-        children: dashboardItems,
-      }],
-    }] : []),
-
     // General
     {
       section: "General",
@@ -175,6 +163,7 @@ export function Sidebar() {
           href: "/app",
           icon: LayoutDashboard,
           module: "dashboard",
+          children: dashboardItems.length > 0 ? dashboardItems : undefined,
         },
         {
           title: "Punto de Venta",
