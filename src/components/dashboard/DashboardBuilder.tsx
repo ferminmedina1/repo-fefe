@@ -56,6 +56,7 @@ export function DashboardBuilder() {
   const [showCSVUploader, setShowCSVUploader] = useState(false);
   const [showMetricBuilder, setShowMetricBuilder] = useState(false);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [showFilters, setShowFilters] = useState(false); // ✅ NEW: Collapsible filters state
   const [isDragging, setIsDragging] = useState(false);
 
   // ✅ NEW: Update selectedDashboardId when URL changes
@@ -358,8 +359,8 @@ export function DashboardBuilder() {
       setIsDragging={setIsDragging}
     >
       <div className="space-y-6">
-      {/* Global Filters */}
-      <DashboardFilters />
+      {/* ✅ IMPROVED: Collapsible Filters - Integrated with controls */}
+      {showFilters && <DashboardFilters />}
 
       {/* ✅ NEW: Dashboard Selector - Always visible at top */}
       {dashboards.length > 0 && (
@@ -397,6 +398,16 @@ export function DashboardBuilder() {
           )}
           {widgets.length > 0 && (
             <>
+              {/* ✅ NEW: Toggle Filters Button - Integrated in button bar */}
+              <Button
+                variant={showFilters ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                disabled={isSaving}
+                className="gap-2 whitespace-nowrap"
+              >
+                <span>🔍 Filtros</span>
+              </Button>
               <RefreshButton disabled={isSaving} />
               <ExportButton widgets={widgets} dashboardName="My Dashboard" />
               <ImportButton onImport={async (newWidgets) => {
