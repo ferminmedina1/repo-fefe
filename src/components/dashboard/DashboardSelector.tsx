@@ -205,7 +205,7 @@ export function DashboardSelector({
               {/* Action Buttons - Hidden by default, shown on hover */}
               <div
                 data-actions
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 hidden"
+                className="absolute right-2 top-1/2 -translate-y-1/2 hidden gap-1"
               >
                 <button
                   onClick={(e) => {

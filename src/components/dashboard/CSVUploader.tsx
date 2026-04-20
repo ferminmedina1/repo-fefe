@@ -197,7 +197,7 @@ export const CSVUploader = ({ onSuccess, onClose }: CSVUploaderProps) => {
 
                   <button
                     onClick={downloadTemplate}
-                    className="ml-3 inline-block bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition font-medium flex items-center gap-2"
+                    className="ml-3 flex items-center gap-2 bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition font-medium"
                   >
                     <Download className="w-4 h-4" />
                     Descargar plantilla
