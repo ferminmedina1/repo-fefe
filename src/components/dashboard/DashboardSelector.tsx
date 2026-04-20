@@ -25,9 +25,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Copy } from "lucide-react";
+import { Plus, Trash2, Copy, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { DashboardLayoutData } from "@/hooks/dashboard/useDashboardLayout";
+import { DashboardLayoutData, useRenameDashboard } from "@/hooks/dashboard";
 import { cn } from "@/lib/utils";
 
 interface DashboardSelectorProps {
@@ -51,11 +51,18 @@ export function DashboardSelector({
 }: DashboardSelectorProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const renameMutation = useRenameDashboard();
+  
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newDashboardName, setNewDashboardName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [isDuplicating, setIsDuplicating] = useState(false);
+  
+  // ✅ NEW: Edit name modal state
+  const [editingDashboardId, setEditingDashboardId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
 
   const handleCreateDashboard = async () => {
     if (!newDashboardName.trim()) {
@@ -108,7 +115,6 @@ export function DashboardSelector({
         description: `"${dashboard.name}" ha sido eliminado`,
       });
       setDeleteConfirm(null);
-      // ✅ NEW: Navigate back to default when delete
       navigate("/app");
     } catch (error) {
       toast({
@@ -139,6 +145,46 @@ export function DashboardSelector({
     } finally {
       setIsDuplicating(false);
     }
+  };
+
+  // ✅ NEW: Handle dashboard rename
+  const handleRenameDashboard = async () => {
+    if (!editingDashboardId || !editingName.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre no puede estar vacío",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsRenaming(true);
+    try {
+      await renameMutation.mutateAsync({
+        dashboardId: editingDashboardId,
+        newName: editingName,
+      });
+      toast({
+        title: "✓ Nombre actualizado",
+        description: `Panel renombrado a "${editingName}"`,
+      });
+      setEditingDashboardId(null);
+      setEditingName("");
+    } catch (error) {
+      toast({
+        title: "Error al renombrar panel",
+        description: error instanceof Error ? error.message : "Error desconocido",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+  // ✅ NEW: Open edit modal
+  const openEditModal = (dashboardId: string, currentName: string) => {
+    setEditingDashboardId(dashboardId);
+    setEditingName(currentName);
   };
 
   if (isLoading) {
@@ -210,10 +256,20 @@ export function DashboardSelector({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    openEditModal(dashboard.id, dashboard.name);
+                  }}
+                  className="p-1 hover:bg-primary/10 hover:text-primary rounded transition-colors"
+                  title="Editar configuración"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
                     handleDuplicateDashboard(dashboard.id);
                   }}
                   disabled={isDuplicating}
-                  className="p-1 hover:bg-muted rounded"
+                  className="p-1 hover:bg-muted rounded transition-colors"
                   title="Duplicar panel"
                 >
                   <Copy className="w-4 h-4" />
@@ -224,7 +280,7 @@ export function DashboardSelector({
                       e.stopPropagation();
                       setDeleteConfirm(dashboard.id);
                     }}
-                    className="p-1 hover:bg-destructive/10 hover:text-destructive rounded"
+                    className="p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-colors"
                     title="Eliminar panel"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -318,6 +374,56 @@ export function DashboardSelector({
           </div>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ✅ NEW: Edit Name Dialog */}
+      <Dialog open={!!editingDashboardId} onOpenChange={(open) => {
+        if (!open) {
+          setEditingDashboardId(null);
+          setEditingName("");
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Panel de Control</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-dashboard-name">Nombre del panel</Label>
+              <Input
+                id="edit-dashboard-name"
+                placeholder="Ej: Ventas Principales, Análisis Financiero..."
+                value={editingName}
+                onChange={(e) => setEditingName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleRenameDashboard();
+                  }
+                }}
+                disabled={isRenaming}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditingDashboardId(null);
+                  setEditingName("");
+                }}
+                disabled={isRenaming}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleRenameDashboard}
+                disabled={isRenaming || !editingName.trim()}
+              >
+                {isRenaming ? "Guardando..." : "Guardar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
