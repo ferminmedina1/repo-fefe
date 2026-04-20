@@ -321,12 +321,16 @@ export function DashboardBuilder() {
         {showTemplateGallery && (
           <TemplateGallery
             onSelectTemplate={async (widgets) => {
-              // Add each widget from template
+              // ✅ FIXED: Preserve all widget data from template, not just type/size
               widgets.forEach((widget) => {
                 addWidget({
-                  id: `${widget.type}-${Date.now()}-${Math.random()}`,
+                  id: `${widget.type}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
                   type: widget.type,
                   size: widget.size || 'full',
+                  // ✅ Preserve template configuration if it exists
+                  ...(widget.config && { config: widget.config }),
+                  ...(widget.description && { description: widget.description }),
+                  ...(widget.title && { title: widget.title }),
                 });
               });
               setShowTemplateGallery(false);
@@ -467,8 +471,29 @@ export function DashboardBuilder() {
           {widgets.map((widget) => {
             const definition = WIDGET_CATALOG[widget.type as WidgetType];
 
+            // ✅ FIXED: Show error instead of silently failing if widget type not found
             if (!definition) {
-              return null;
+              return (
+                <SortableWidget key={widget.id} id={widget.id}>
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-6 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-red-900">Widget no encontrado</h4>
+                        <p className="text-sm text-red-700 mt-1">
+                          Tipo de widget desconocido: <code className="bg-red-100 px-2 py-1 rounded text-xs">{widget.type}</code>
+                        </p>
+                        <button
+                          onClick={() => removeWidget(widget.id)}
+                          className="text-xs text-red-600 hover:text-red-700 hover:underline mt-2"
+                        >
+                          Eliminar widget →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </SortableWidget>
+              );
             }
 
             // ✅ All widgets now get data from context - no more prop drilling!
