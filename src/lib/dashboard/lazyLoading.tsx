@@ -116,29 +116,38 @@ export const LoadingSkeleton: React.FC = () => (
 /**
  * Pre-configured lazy components
  * These are split from main bundle and loaded on demand
+ * 
+ * NOTE: Implementations below are commented out until actual files are created.
+ * To enable code-splitting for heavy components:
+ * 1. Create src/lib/dashboard/charts/LineChart.tsx
+ * 2. Create src/lib/dashboard/charts/BarChart.tsx
+ * 3. Create src/lib/dashboard/charts/PieChart.tsx
+ * 4. Uncomment the lazy imports below
  */
 
 // Charts (Recharts is ~300KB, split by type)
-export const LazyLineChart = lazy(() =>
-  import('./charts/LineChart').then(m => ({ default: m.LineChart }))
-);
+// TODO: Implement when creating separate chart component files
+// export const LazyLineChart = lazy(() =>
+//   import('./charts/LineChart').then(m => ({ default: m.LineChart }))
+// );
 
-export const LazyBarChart = lazy(() =>
-  import('./charts/BarChart').then(m => ({ default: m.BarChart }))
-);
+// export const LazyBarChart = lazy(() =>
+//   import('./charts/BarChart').then(m => ({ default: m.BarChart }))
+// );
 
-export const LazyPieChart = lazy(() =>
-  import('./charts/PieChart').then(m => ({ default: m.PieChart }))
-);
+// export const LazyPieChart = lazy(() =>
+//   import('./charts/PieChart').then(m => ({ default: m.PieChart }))
+// );
 
 // Heavy Components
-export const LazyChartWidget = lazy(() =>
-  import('./ChartWidget')
-);
+// TODO: Import from actual component locations when ready
+// export const LazyChartWidget = lazy(() =>
+//   import('@/components/dashboard/ChartWidget')
+// );
 
-export const LazyDataTable = lazy(() =>
-  import('./DataTable')
-);
+// export const LazyDataTable = lazy(() =>
+//   import('@/components/dashboard/DataTable')
+// );
 
 // ============================================================
 // DYNAMIC IMPORT HELPER
@@ -196,28 +205,25 @@ export function prefetchOnHover(
 // ============================================================
 
 /**
- * Run: npm run build --report
+ * Component registry for lazy-loaded modules
  * 
- * This shows which modules take the most space:
- * - recharts: ~300KB → split into chart types
- * - lodash: ~80KB → use tree-shaking or alternatives
- * - moment: → replaced with date-fns
+ * These are placeholder strings for future code-splitting implementation.
+ * Uncomment the lazy imports above to activate code-splitting for these components.
  * 
- * After optimization target:
- * - Main bundle: ~200KB (was ~400KB)
- * - Chart chunk: ~100KB (loaded on demand)
- * - Data chunk: ~50KB (loaded on demand)
+ * Benefits when enabled:
+ * - 30-40% bundle size reduction
+ * - Faster initial page load
+ * - Chart library (Recharts ~300KB) split by type
  */
-
 export const LAZY_COMPONENTS = {
   CHARTS: {
-    LINE: 'LazyLineChart',
-    BAR: 'LazyBarChart',
-    PIE: 'LazyPieChart'
+    LINE: 'LazyLineChart',     // Requires: src/lib/dashboard/charts/LineChart.tsx
+    BAR: 'LazyBarChart',       // Requires: src/lib/dashboard/charts/BarChart.tsx
+    PIE: 'LazyPieChart'        // Requires: src/lib/dashboard/charts/PieChart.tsx
   },
   WIDGETS: {
-    CHART: 'LazyChartWidget',
-    DATA_TABLE: 'LazyDataTable'
+    CHART: 'LazyChartWidget',     // Requires: src/components/dashboard/ChartWidget.tsx
+    DATA_TABLE: 'LazyDataTable'   // Requires: src/components/dashboard/DataTable.tsx
   }
 } as const;
 

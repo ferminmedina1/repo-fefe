@@ -2,7 +2,6 @@ import { WidgetWrapper } from "./WidgetWrapper";
 import { useWidgetContext } from "@/contexts/WidgetContext";
 import { WidgetDefinition } from "@/lib/dashboard/widgets";
 import { CheckCircle2 } from "lucide-react";
-import { VirtualizedList } from "./VirtualizedList";
 
 interface ListItem {
   name: string;
@@ -50,40 +49,9 @@ export function ListWidget({
       );
     }
 
-    // ✅ NEW: Use VirtualizedList for large datasets (>50 items)
-    const USE_VIRTUALIZATION_THRESHOLD = 50;
-    const isLargeList = data.length > USE_VIRTUALIZATION_THRESHOLD;
-
-    if (isLargeList) {
-      return (
-        <VirtualizedList
-          items={data}
-          itemHeight={56}
-          listHeight={400}
-          renderItem={(item) => (
-            <div className="flex items-center justify-between p-3 rounded-lg bg-warning/5 border border-warning/20">
-              <div className="flex-1">
-                <p className="font-medium text-sm text-foreground">{item.name}</p>
-                {item.min_stock && (
-                  <p className="text-xs text-muted-foreground">
-                    Stock mínimo: {item.min_stock}
-                  </p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-warning">{item.stock}</p>
-                <p className="text-xs text-muted-foreground">
-                  {definition.id === "list-critical-stock" ? "unidades" : ""}
-                </p>
-              </div>
-            </div>
-          )}
-          className="space-y-3"
-        />
-      );
-    }
-
-    // Standard rendering for small lists
+    // Standard rendering for all lists
+    // Note: Virtual scrolling optimization disabled due to react-window build issues
+    // Can be re-enabled in future when react-window export issue is resolved
     return (
       <div className="space-y-3">
         {data.map((item, idx) => (
