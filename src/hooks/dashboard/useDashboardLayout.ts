@@ -13,37 +13,53 @@ export interface DashboardLayoutData {
   id: string;
   user_id: string;
   company_id: string;
+  name: string; // ✅ NEW: Nombre del dashboard
   widgets: DashboardWidget[];
   is_default: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export function useDashboardLayout(companyId: string | undefined, userId: string | undefined) {
+/**
+ * Hook to manage a specific dashboard or the default one
+ * @param companyId - Company ID
+ * @param userId - User ID
+ * @param dashboardId - Optional: Load a specific dashboard. If not provided, loads the default.
+ */
+export function useDashboardLayout(
+  companyId: string | undefined,
+  userId: string | undefined,
+  dashboardId?: string
+) {
   const queryClient = useQueryClient();
   const [localWidgets, setLocalWidgets] = useState<DashboardWidget[]>([]);
+  const [dashboardName, setDashboardName] = useState("Mi Panel de Control");
   const autoSaveTimeout = useAutoSaveTimeout();
 
-  // Fetch user's dashboard layout for this company
+  // ✅ NEW: Fetch a specific dashboard or the default one
   const { data: layoutData, isLoading } = useQuery<DashboardLayoutData | null>({
-    queryKey: ["dashboard-layout", userId, companyId],
+    queryKey: ["dashboard-layout", userId, companyId, dashboardId],
     queryFn: async () => {
       if (!userId || !companyId) return null;
 
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from("dashboard_layouts")
           .select("*")
           .eq("user_id", userId)
-          .eq("company_id", companyId)
-          .order("is_default", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .eq("company_id", companyId);
+
+        // If dashboardId provided, load that specific one
+        // Otherwise load the default one
+        if (dashboardId) {
+          query = query.eq("id", dashboardId);
+        } else {
+          query = query.eq("is_default", true);
+        }
+
+        const { data, error } = await query.maybeSingle();
 
         if (error) {
-          // PGRST116 = no rows found, which is OK
-          // 42P01 = table doesn't exist, return null gracefully
-          // 406 = Not Acceptable (table structure issue), return null gracefully
           if (error.code !== "PGRST116" && error.code !== "42P01" && error.code !== "406") {
             console.error("Error fetching dashboard layout:", error);
           }
@@ -52,21 +68,21 @@ export function useDashboardLayout(companyId: string | undefined, userId: string
 
         return (data as DashboardLayoutData) || null;
       } catch (err) {
-        // Catch any network or other errors
         console.error("Unexpected error fetching dashboard layout:", err);
         return null;
       }
     },
     enabled: !!userId && !!companyId,
-    retry: false, // Don't retry if table doesn't exist
+    retry: false,
   });
 
   // Sync layout data to local state
   useEffect(() => {
     if (layoutData?.widgets) {
       setLocalWidgets(layoutData.widgets);
+      setDashboardName(layoutData.name);
     }
-  }, [layoutData?.widgets]);
+  }, [layoutData?.widgets, layoutData?.name]);
 
   // Mutation: Save layout to Supabase
   const saveLayoutMutation = useMutation({
@@ -77,18 +93,19 @@ export function useDashboardLayout(companyId: string | undefined, userId: string
         // Update existing layout
         const { error } = await supabase
           .from("dashboard_layouts")
-          .update({ widgets })
+          .update({ widgets, updated_at: new Date().toISOString() })
           .eq("id", layoutData.id);
 
         if (error) throw error;
         return { id: layoutData.id, widgets };
       } else {
-        // Create new layout
+        // Create new layout (only happens if no default exists)
         const { data, error } = await supabase
           .from("dashboard_layouts")
           .insert({
             user_id: userId,
             company_id: companyId,
+            name: "Mi Panel de Control",
             widgets,
             is_default: true,
           })
@@ -101,14 +118,18 @@ export function useDashboardLayout(companyId: string | undefined, userId: string
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["dashboard-layout", userId, companyId],
+        queryKey: ["dashboard-layout", userId, companyId, dashboardId],
+      });
+      // Also invalidate the list of dashboards
+      queryClient.invalidateQueries({
+        queryKey: ["dashboards-list", userId, companyId],
       });
     },
   });
 
   // Auto-save with debounce
   useEffect(() => {
-    if (!layoutData?.id && localWidgets.length === 0) return; // Skip if no layout and no widgets
+    if (!layoutData?.id && localWidgets.length === 0) return;
 
     autoSaveTimeout.debounce(() => {
       saveLayoutMutation.mutate(localWidgets);
@@ -133,7 +154,7 @@ export function useDashboardLayout(companyId: string | undefined, userId: string
     setLocalWidgets((prev) =>
       prev
         .filter((w) => w.id !== widgetId)
-        .map((w, idx) => ({ ...w, order: idx })) // Re-order
+        .map((w, idx) => ({ ...w, order: idx }))
     );
   };
 
@@ -155,13 +176,15 @@ export function useDashboardLayout(companyId: string | undefined, userId: string
     }
   };
 
-  // Manually save (for urgent saves)
+  // Manually save
   const save = async () => {
     await saveLayoutMutation.mutateAsync(localWidgets);
   };
 
   return {
     widgets: localWidgets,
+    dashboardName,
+    dashboardId: layoutData?.id,
     isLoading: isLoading,
     isSaving: saveLayoutMutation.isPending,
     hasLayout: !!layoutData,
@@ -172,6 +195,178 @@ export function useDashboardLayout(companyId: string | undefined, userId: string
     save,
     layoutId: layoutData?.id,
   };
+}
+
+/**
+ * ✅ NEW: Hook to fetch all dashboards for a user-company
+ * Returns a list of dashboards to display in the selector
+ */
+export function useMultipleDashboards(
+  companyId: string | undefined,
+  userId: string | undefined
+) {
+  return useQuery<DashboardLayoutData[]>({
+    queryKey: ["dashboards-list", userId, companyId],
+    queryFn: async () => {
+      if (!userId || !companyId) return [];
+
+      try {
+        const { data, error } = await supabase
+          .from("dashboard_layouts")
+          .select("id, name, is_default, created_at, updated_at")
+          .eq("user_id", userId)
+          .eq("company_id", companyId)
+          .order("is_default", { ascending: false })
+          .order("updated_at", { ascending: false });
+
+        if (error) {
+          if (error.code !== "PGRST116" && error.code !== "42P01" && error.code !== "406") {
+            console.error("Error fetching dashboards list:", error);
+          }
+          return [];
+        }
+
+        return (data as DashboardLayoutData[]) || [];
+      } catch (err) {
+        console.error("Unexpected error fetching dashboards list:", err);
+        return [];
+      }
+    },
+    enabled: !!userId && !!companyId,
+    retry: false,
+  });
+}
+
+/**
+ * ✅ NEW: Create a new dashboard for a user-company
+ */
+export function useCreateDashboard() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      userId,
+      companyId,
+      name,
+    }: {
+      userId: string;
+      companyId: string;
+      name: string;
+    }) => {
+      if (!userId || !companyId) throw new Error("User ID and Company ID are required");
+
+      const { data, error } = await supabase
+        .from("dashboard_layouts")
+        .insert({
+          user_id: userId,
+          company_id: companyId,
+          name,
+          widgets: [],
+          is_default: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as DashboardLayoutData;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({
+        queryKey: ["dashboards-list", data.user_id, data.company_id],
+      });
+    },
+  });
+}
+
+/**
+ * ✅ NEW: Delete a dashboard
+ */
+export function useDeleteDashboard() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (dashboardId: string) => {
+      const { error } = await supabase
+        .from("dashboard_layouts")
+        .delete()
+        .eq("id", dashboardId);
+
+      if (error) throw error;
+      return dashboardId;
+    },
+    onSuccess: () => {
+      // Invalidate all dashboard queries
+      queryClient.invalidateQueries({
+        queryKey: ["dashboard-layout"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["dashboards-list"],
+      });
+    },
+  });
+}
+
+/**
+ * ✅ NEW: Set a dashboard as default
+ */
+export function useSetDefaultDashboard() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (dashboardId: string) => {
+      const { error } = await supabase
+        .from("dashboard_layouts")
+        .update({ is_default: true })
+        .eq("id", dashboardId);
+
+      if (error) throw error;
+      return dashboardId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["dashboard-layout"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["dashboards-list"],
+      });
+    },
+  });
+}
+
+/**
+ * ✅ NEW: Rename a dashboard
+ */
+export function useRenameDashboard() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      dashboardId,
+      newName,
+    }: {
+      dashboardId: string;
+      newName: string;
+    }) => {
+      if (!newName.trim()) throw new Error("El nombre no puede estar vacío");
+      if (newName.length > 255) throw new Error("El nombre es demasiado largo (máx 255 caracteres)");
+
+      const { error } = await supabase
+        .from("dashboard_layouts")
+        .update({ name: newName, updated_at: new Date().toISOString() })
+        .eq("id", dashboardId);
+
+      if (error) throw error;
+      return dashboardId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["dashboard-layout"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["dashboards-list"],
+      });
+    },
+  });
 }
 
 // Helper hook for debounce

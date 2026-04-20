@@ -7,6 +7,9 @@ import { WidgetProvider } from "@/contexts/WidgetContext";
 import { WidgetErrorBoundary } from "./WidgetErrorBoundary";
 import {
   useDashboardLayout,
+  useMultipleDashboards,
+  useCreateDashboard,
+  useDeleteDashboard,
   useMonthlyComparison,
   useTopProducts,
   useTopCustomers,
@@ -32,6 +35,8 @@ import { ShareModal } from "./ShareModal";
 import { RefreshButton } from "./RefreshButton";
 import { CSVUploader } from "./CSVUploader";
 import { MetricBuilderModal } from "./MetricBuilderModal";
+import { DashboardSelector } from "./DashboardSelector";
+import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, RefreshCw, Upload, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,11 +45,13 @@ export function DashboardBuilder() {
   const { currentCompany } = useCompany();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const { filters } = useDashboardFilters();
+  const { toast } = useToast();
   const [userId, setUserId] = useState<string | undefined>();
+  const [selectedDashboardId, setSelectedDashboardId] = useState<string | undefined>();
   const [showCSVUploader, setShowCSVUploader] = useState(false);
   const [showMetricBuilder, setShowMetricBuilder] = useState(false);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
-  const [isDragging, setIsDragging] = useState(false); // ✅ For WidgetProvider
+  const [isDragging, setIsDragging] = useState(false);
 
   // Get user ID from Supabase session
   useEffect(() => {
@@ -55,9 +62,23 @@ export function DashboardBuilder() {
     getUser();
   }, []);
 
-  // Load dashboard layout
+  // ✅ NEW: Fetch all dashboards for the user
+  const { 
+    data: dashboards = [], 
+    isLoading: dashboardsLoading 
+  } = useMultipleDashboards(currentCompany?.id, userId);
+
+  // ✅ NEW: Mutation to create new dashboard
+  const createDashboardMutation = useCreateDashboard();
+
+  // ✅ NEW: Mutation to delete dashboard
+  const deleteDashboardMutation = useDeleteDashboard();
+
+  // ✅ NEW: Load selected dashboard or default
   const {
     widgets,
+    dashboardName,
+    dashboardId,
     isLoading: layoutLoading,
     isSaving,
     addWidget,
@@ -66,7 +87,52 @@ export function DashboardBuilder() {
     resetLayout,
     hasLayout,
     layoutId,
-  } = useDashboardLayout(currentCompany?.id, userId);
+  } = useDashboardLayout(currentCompany?.id, userId, selectedDashboardId);
+
+  // ✅ NEW: Handle dashboard changes
+  const handleDashboardChange = (newDashboardId: string) => {
+    setSelectedDashboardId(newDashboardId);
+  };
+
+  // ✅ NEW: Handle create new dashboard
+  const handleCreateNewDashboard = async (name: string) => {
+    if (!userId || !currentCompany?.id) return;
+    
+    const newDashboard = await createDashboardMutation.mutateAsync({
+      userId,
+      companyId: currentCompany.id,
+      name,
+    });
+    
+    setSelectedDashboardId(newDashboard.id);
+  };
+
+  // ✅ NEW: Handle delete dashboard
+  const handleDeleteDashboard = async (dashboardId: string) => {
+    await deleteDashboardMutation.mutateAsync(dashboardId);
+    // Switch to first available dashboard or default
+    if (selectedDashboardId === dashboardId) {
+      const remainingDashboards = dashboards.filter(d => d.id !== dashboardId);
+      setSelectedDashboardId(remainingDashboards[0]?.id);
+    }
+  };
+
+  // ✅ NEW: Handle duplicate dashboard
+  const handleDuplicateDashboard = async (sourceDashboardId: string) => {
+    const sourceDashboard = dashboards.find(d => d.id === sourceDashboardId);
+    if (!sourceDashboard) return;
+
+    if (!userId || !currentCompany?.id) return;
+
+    const newDashboard = await createDashboardMutation.mutateAsync({
+      userId,
+      companyId: currentCompany.id,
+      name: `${sourceDashboard.name} (Copia)`,
+    });
+
+    // TODO: Copy widgets from source to new dashboard
+    // For now, just create empty dashboard
+  };
 
   // Fetch all data with filters
   const monthlyComparisonQuery = useMonthlyComparison(
@@ -277,6 +343,22 @@ export function DashboardBuilder() {
       <div className="space-y-6">
       {/* Global Filters */}
       <DashboardFilters />
+
+      {/* ✅ NEW: Dashboard Selector - Always visible at top */}
+      {dashboards.length > 0 && (
+        <div className="flex items-center justify-between gap-4 p-3 bg-muted/30 rounded-lg border border-border">
+          <span className="text-sm font-medium text-muted-foreground">Panel de Control:</span>
+          <DashboardSelector
+            currentDashboardId={selectedDashboardId || dashboardId}
+            dashboards={dashboards}
+            isLoading={dashboardsLoading}
+            onDashboardChange={handleDashboardChange}
+            onCreateNew={handleCreateNewDashboard}
+            onDeleteDashboard={handleDeleteDashboard}
+            onDuplicateDashboard={handleDuplicateDashboard}
+          />
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
