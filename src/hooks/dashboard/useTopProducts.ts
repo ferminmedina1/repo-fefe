@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfMonth } from "date-fns";
 import { DashboardFilters } from "@/contexts/DashboardFilterContext";
+import { safeGetDateRange } from "@/lib/dashboard/dateValidation";
 
 interface TopProductItem {
   producto: string;
@@ -20,7 +20,7 @@ export function useTopProducts(
       try {
         if (!companyId) throw new Error("Company ID is required");
 
-        const currentMonthStart = filters?.dateRange?.from || startOfMonth(new Date());
+        const { from: currentMonthStart } = safeGetDateRange(filters);
 
         let query = supabase
           .from("sale_items")

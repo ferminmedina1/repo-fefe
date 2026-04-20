@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { DashboardFilters } from "@/contexts/DashboardFilterContext";
+import { safeGetDateRange } from "@/lib/dashboard/dateValidation";
 
 interface SaleItem {
   quantity: number;
@@ -35,14 +36,8 @@ export function useMonthlyComparison(
       try {
         if (!companyId) throw new Error("Company ID is required");
 
-        // Use provided date range from filters, or default to current/last month
-        const { from, to } = filters?.dateRange || {
-          from: startOfMonth(new Date()),
-          to: endOfMonth(new Date()),
-        };
-
-        const currentMonthStart = from;
-        const currentMonthEnd = to;
+        // Get safe date range - always returns valid Date objects
+        const { from: currentMonthStart, to: currentMonthEnd } = safeGetDateRange(filters);
         const lastMonthStart = startOfMonth(subMonths(currentMonthStart, 1));
         const lastMonthEnd = endOfMonth(subMonths(currentMonthStart, 1));
 
