@@ -53,7 +53,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const DEFAULT_MODULES: PermissionModule[] = [
-  { code: "dashboard", name: "Dashboard", category: "Dashboard" },
+  { code: "dashboard", name: "Panel de Control", category: "Panel de Control" },
   { code: "pos", name: "Punto de Venta", category: "General" },
   { code: "sales", name: "Ventas", category: "Ventas" },
   { code: "quotations", name: "Presupuestos", category: "Ventas" },

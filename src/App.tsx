@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { useEffect, useState, lazy, Suspense } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
+import { DashboardFilterProvider } from "@/contexts/DashboardFilterContext";
 import { User, Session } from "@supabase/supabase-js";
 import { usePlatformAdmin } from "@/hooks/usePlatformAdmin";
 import { ModuleProtectedRoute } from "./components/ModuleProtectedRoute";
@@ -78,6 +79,7 @@ const BotImplementationRequests = lazy(() => import("./pages/BotImplementationRe
 const LearningCenter = lazy(() => import("./pages/LearningCenter"));
 const DashboardEditor = lazy(() => import("./pages/DashboardEditor"));
 const DashboardExampleBuilder = lazy(() => import("./pages/DashboardExampleBuilder"));
+const SharedDashboard = lazy(() => import("./pages/SharedDashboard"));
 const KnowledgeBaseCenter = lazy(() => import("./pages/KnowledgeBaseCenter"));
 const SetupWizardPage = lazy(() =>
   import("./pages/SetupWizardPage").then((module) => ({ default: module.SetupWizardPage }))
@@ -329,8 +331,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <TutorialProvider>
-          <CompanyProvider>
-            <Suspense fallback={<PageLoader />}>
+          <DashboardFilterProvider>
+            <CompanyProvider>
+              <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/signup" element={<SignupWizard />} />
                 {/*<Route path="/signup" element={<SignupMaintenance />}  ONLY FOR MAINTENANCE MODE */}
@@ -348,6 +351,7 @@ const App = () => (
                 <Route path="/app" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="dashboard"><Dashboard /></ModuleProtectedRoute></ProtectedRoute>} />
                 <Route path="/dashboard-builder" element={<ProtectedRoute><DashboardExampleBuilder /></ProtectedRoute>} />
                 <Route path="/dashboards/:dashboardId/editor" element={<ProtectedRoute><DashboardEditor /></ProtectedRoute>} />
+                <Route path="/dashboard/shared/:token" element={<Suspense fallback={<PageLoader/>}><SharedDashboard /></Suspense>} />
                 <Route path="/pos" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="pos"><POS /></ModuleProtectedRoute></ProtectedRoute>} />
                 <Route path="/products" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="products"><Products /></ModuleProtectedRoute></ProtectedRoute>} />
                 <Route path="/customers" element={<ProtectedRoute><ModuleProtectedRoute moduleCode="customers"><Customers /></ModuleProtectedRoute></ProtectedRoute>} />
@@ -451,6 +455,7 @@ const App = () => (
           <TutorialRunner />
             </Suspense>
           </CompanyProvider>
+            </DashboardFilterProvider>
         </TutorialProvider>
       </BrowserRouter>
     </TooltipProvider>
