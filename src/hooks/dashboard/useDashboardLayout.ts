@@ -2,6 +2,27 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useRef } from "react";
 
+// ✅ NEW: Normalize widget types from database (migrate old naming to new format)
+const normalizeWidgetType = (type: string): string => {
+  const typeMap: Record<string, string> = {
+    // Old short names → new prefixed names
+    "critical-stock": "list-critical-stock",
+    "top-customers": "chart-top-customers",
+    "sales-today": "kpi-sales-today",
+    // Add more mappings as needed
+  };
+
+  return typeMap[type] || type; // Return mapped type or original if not found
+};
+
+// ✅ NEW: Normalize all widgets in a layout
+const normalizeLayoutWidgets = (widgets: DashboardWidget[]): DashboardWidget[] => {
+  return widgets.map((w) => ({
+    ...w,
+    type: normalizeWidgetType(w.type),
+  }));
+};
+
 export interface DashboardWidget {
   id: string;
   type: string;
@@ -79,7 +100,9 @@ export function useDashboardLayout(
   // Sync layout data to local state
   useEffect(() => {
     if (layoutData?.widgets) {
-      setLocalWidgets(layoutData.widgets);
+      // ✅ Normalize widget types from database
+      const normalizedWidgets = normalizeLayoutWidgets(layoutData.widgets);
+      setLocalWidgets(normalizedWidgets);
       setDashboardName(layoutData.name);
     }
   }, [layoutData?.widgets, layoutData?.name]);
@@ -89,15 +112,18 @@ export function useDashboardLayout(
     mutationFn: async (widgets: DashboardWidget[]) => {
       if (!userId || !companyId) throw new Error("User ID and Company ID are required");
 
+      // ✅ Normalize widget types before saving to database
+      const normalizedWidgets = normalizeLayoutWidgets(widgets);
+
       if (layoutData?.id) {
         // Update existing layout
         const { error } = await supabase
           .from("dashboard_layouts")
-          .update({ widgets, updated_at: new Date().toISOString() })
+          .update({ widgets: normalizedWidgets, updated_at: new Date().toISOString() })
           .eq("id", layoutData.id);
 
         if (error) throw error;
-        return { id: layoutData.id, widgets };
+        return { id: layoutData.id, widgets: normalizedWidgets };
       } else {
         // Create new layout (only happens if no default exists)
         const { data, error } = await supabase
@@ -106,7 +132,7 @@ export function useDashboardLayout(
             user_id: userId,
             company_id: companyId,
             name: "Mi Panel de Control",
-            widgets,
+            widgets: normalizedWidgets,
             is_default: true,
           })
           .select()
