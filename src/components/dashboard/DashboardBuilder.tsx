@@ -279,7 +279,7 @@ export function DashboardBuilder() {
       <DashboardFilters />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Panel de Control Personalizado</h1>
           <p className="text-muted-foreground">
@@ -287,7 +287,7 @@ export function DashboardBuilder() {
             {widgets.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {isSaving && (
             <div className="text-xs text-muted-foreground flex items-center gap-2">
               <div className="animate-spin">
@@ -309,30 +309,33 @@ export function DashboardBuilder() {
                 size="sm"
                 onClick={() => setShowTemplateGallery(true)}
                 disabled={isSaving}
-                className="gap-2"
+                className="gap-2 whitespace-nowrap"
               >
                 <Zap className="h-4 w-4" />
-                Explorar templates
+                <span className="hidden sm:inline">Explorar templates</span>
+                <span className="sm:hidden">Templates</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowCSVUploader(true)}
                 disabled={isSaving}
-                className="gap-2"
+                className="gap-2 whitespace-nowrap"
               >
                 <Upload className="h-4 w-4" />
-                Importar datos CSV
+                <span className="hidden sm:inline">Importar CSV</span>
+                <span className="sm:hidden">CSV</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowMetricBuilder(true)}
                 disabled={isSaving}
-                className="gap-2"
+                className="gap-2 whitespace-nowrap"
               >
                 <Zap className="h-4 w-4" />
-                Crear métrica
+                <span className="hidden sm:inline">Crear métrica</span>
+                <span className="sm:hidden">Métrica</span>
               </Button>
               {layoutId && <ShareModal layoutId={layoutId} />}
             </>
@@ -350,10 +353,11 @@ export function DashboardBuilder() {
               size="sm"
               onClick={resetLayout}
               disabled={isSaving}
-              className="gap-2"
+              className="gap-2 whitespace-nowrap"
             >
               <RefreshCw className="h-4 w-4" />
-              Resetear
+              <span className="hidden sm:inline">Resetear</span>
+              <span className="sm:hidden">Reset</span>
             </Button>
           )}
         </div>
@@ -364,7 +368,7 @@ export function DashboardBuilder() {
         widgets={widgets}
         onReorder={reorderWidgets}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min">
           {widgets.map((widget) => {
             const definition = WIDGET_CATALOG[widget.type as WidgetType];
 
@@ -398,7 +402,8 @@ export function DashboardBuilder() {
               <SortableWidget key={widget.id} id={widget.id}>
                 <div
                   className={cn(
-                    widget.size === "half" ? "md:col-span-1 lg:col-span-1" : "col-span-1 md:col-span-2 lg:col-span-3"
+                    "rounded-lg border bg-card p-6 shadow-sm",
+                    widget.size === "half" ? "col-span-1" : "col-span-1 md:col-span-2 lg:col-span-3"
                   )}
                 >
                   {/* ✅ Wrap widget with error boundary to prevent cascade failures */}
