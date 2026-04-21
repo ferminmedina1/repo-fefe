@@ -187,14 +187,6 @@ export function DashboardSelector({
     setEditingName(currentName);
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2">
-        <div className="h-10 w-64 bg-muted rounded-md animate-pulse" />
-      </div>
-    );
-  }
-
   const currentDashboard = dashboards.find((d) => d.id === currentDashboardId);
 
   return (
@@ -222,22 +214,13 @@ export function DashboardSelector({
           {dashboards.map((dashboard) => (
             <div
               key={dashboard.id}
-              className="relative"
-              onMouseEnter={(e) => {
-                // Show action buttons on hover
-                const actions = e.currentTarget.querySelector(
-                  "[data-actions]"
-                ) as HTMLElement;
-                if (actions) actions.style.display = "flex";
-              }}
-              onMouseLeave={(e) => {
-                const actions = e.currentTarget.querySelector(
-                  "[data-actions]"
-                ) as HTMLElement;
-                if (actions) actions.style.display = "none";
+              className="flex items-center justify-between px-2 py-2 text-sm hover:bg-accent rounded cursor-pointer group"
+              onClick={() => {
+                navigate(`/app?dashboard=${dashboard.id}`);
+                onDashboardChange(dashboard.id);
               }}
             >
-              <SelectItem value={dashboard.id} className="pr-24">
+              <SelectItem value={dashboard.id} className="flex-1 p-0">
                 <div className="flex items-center gap-2">
                   {dashboard.is_default && (
                     <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">
@@ -248,11 +231,8 @@ export function DashboardSelector({
                 </div>
               </SelectItem>
 
-              {/* Action Buttons - Hidden by default, shown on hover */}
-              <div
-                data-actions
-                className="absolute right-2 top-1/2 -translate-y-1/2 hidden gap-1"
-              >
+              {/* Action Buttons - Visible on hover */}
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -424,6 +404,14 @@ export function DashboardSelector({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Loading indicator at the end - doesn't interfere with button positioning */}
+      {isLoading && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="h-4 w-4 border-2 border-muted-foreground border-t-foreground rounded-full animate-spin" />
+          <span>Cargando...</span>
+        </div>
+      )}
     </div>
   );
 }

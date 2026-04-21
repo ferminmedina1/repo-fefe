@@ -1,6 +1,13 @@
 import { useMemo, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useCompany } from "@/contexts/CompanyContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useDashboardFilters } from "@/contexts/DashboardFilterContext";
@@ -359,8 +366,20 @@ export function DashboardBuilder() {
       setIsDragging={setIsDragging}
     >
       <div className="space-y-6">
-      {/* ✅ IMPROVED: Collapsible Filters - Integrated with controls */}
-      {showFilters && <DashboardFilters />}
+      {/* ✅ IMPROVED: Filters Modal Dialog - Opens with button */}
+      <Dialog open={showFilters} onOpenChange={setShowFilters}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Filtros Avanzados</DialogTitle>
+            <DialogDescription>
+              Personaliza los filtros para ajustar los datos mostrados en tu panel
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            <DashboardFilters />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ✅ NEW: Dashboard Selector - Always visible at top */}
       {dashboards.length > 0 && (
@@ -398,13 +417,13 @@ export function DashboardBuilder() {
           )}
           {widgets.length > 0 && (
             <>
-              {/* ✅ NEW: Toggle Filters Button - Integrated in button bar */}
+              {/* ✅ NEW: Toggle Filters Button - Opens modal dialog */}
               <Button
-                variant={showFilters ? "default" : "outline"}
+                variant="outline"
                 size="sm"
-                onClick={() => setShowFilters(!showFilters)}
+                onClick={() => setShowFilters(true)}
                 disabled={isSaving}
-                className="gap-2 whitespace-nowrap"
+                className="gap-2 whitespace-nowrap hover:bg-primary/10 transition-colors"
               >
                 <span>🔍 Filtros</span>
               </Button>
