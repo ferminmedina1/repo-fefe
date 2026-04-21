@@ -140,7 +140,6 @@ export function KpiWidget({
       description={definition.description}
       icon={<definition.icon className="h-5 w-5" />}
       accentColor={definition.color}
-      onRemove={onRemove}
       isDragging={isDragging}
     >
       {renderContent()}

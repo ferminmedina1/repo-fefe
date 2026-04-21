@@ -156,7 +156,6 @@ export function ChartWidget({
       description={definition.description}
       icon={<definition.icon className="h-5 w-5" />}
       accentColor={definition.color}
-      onRemove={onRemove}
       isDragging={isDragging}
     >
       {/* ✅ NEW: Wrap chart rendering with Suspense for lazy loading */}
