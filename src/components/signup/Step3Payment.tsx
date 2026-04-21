@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -45,7 +45,7 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
   const isArgentina = billingCountry === "AR";
   const provider = isArgentina ? "mercadopago" : "stripe";
 
-  const handlePaymentSuccess = async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => {
+  const handlePaymentSuccess = useCallback(async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => {
     try {
       setLoading(true);
       const { data, error } = await supabase.functions.invoke("signup-save-payment-method", {
@@ -79,7 +79,7 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
       toast.error(e?.message ?? "Error al guardar el método de pago");
       setLoading(false);
     }
-  };
+  }, [billingCountry, formData.email, formData.full_name, nextStep, provider, updateFormData]);
 
   return (
     <div className="space-y-6">

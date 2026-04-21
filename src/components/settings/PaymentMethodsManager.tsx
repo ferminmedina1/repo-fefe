@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -79,7 +79,7 @@ export function PaymentMethodsManager({
     },
   });
 
-  const handlePaymentSuccess = async (
+  const handlePaymentSuccess = useCallback(async (
     paymentMethodRef: string,
     metadata: { brand: string; last4: string; exp_month: number; exp_year: number }
   ) => {
@@ -114,7 +114,7 @@ export function PaymentMethodsManager({
       console.error(e);
       toast.error(e?.message ?? "Error al guardar el método de pago");
     }
-  };
+  }, [billingCountry, companyId, effectiveProvider, paymentMethods, queryClient]);
 
   const handleSetDefault = async (methodId: string) => {
     try {
