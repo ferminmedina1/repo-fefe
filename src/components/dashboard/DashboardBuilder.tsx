@@ -30,7 +30,7 @@ import { useHistoricalRates } from "@/hooks/dashboard/useExchangeRates";
 import { WIDGET_CATALOG, WidgetType, getAvailableWidgets } from "@/lib/dashboard/widgets";
 import { WidgetPicker } from "./WidgetPicker";
 import { DashboardEmptyState } from "./DashboardEmptyState";
-import { DragDropWidgetContainer, SortableWidget } from "./DragDropWidgetContainer";
+import { EnterpriseDragDropContainer, EnterpriseSortableWidget } from "./EnhancedDragDropContainer";
 import { KpiWidget } from "./KpiWidget";
 import { ChartWidget } from "./ChartWidget";
 import { ListWidget } from "./ListWidget";
@@ -45,7 +45,7 @@ import { CSVUploader } from "./CSVUploader";
 import { MetricBuilderModal } from "./MetricBuilderModal";
 import { DashboardSelector } from "./DashboardSelector";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, RefreshCw, Upload, Zap } from "lucide-react";
+import { AlertTriangle, RefreshCw, Upload, Zap, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -493,9 +493,11 @@ export function DashboardBuilder() {
       </div>
 
       {/* Widgets Grid */}
-      <DragDropWidgetContainer
+      <EnterpriseDragDropContainer
         widgets={widgets}
         onReorder={reorderWidgets}
+        enableLogging={true}
+        maxReordersPerMinute={60}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min">
           {widgets.map((widget) => {
@@ -504,8 +506,8 @@ export function DashboardBuilder() {
             // ✅ FIXED: Show error instead of silently failing if widget type not found
             if (!definition) {
               return (
-                <SortableWidget key={widget.id} id={widget.id}>
-                  <div className="rounded-lg border border-red-200 bg-red-50 p-6 shadow-sm">
+                <EnterpriseSortableWidget key={widget.id} id={widget.id}>
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-6 shadow-sm relative group">
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                       <div>
@@ -522,7 +524,7 @@ export function DashboardBuilder() {
                       </div>
                     </div>
                   </div>
-                </SortableWidget>
+                </EnterpriseSortableWidget>
               );
             }
 
@@ -549,23 +551,33 @@ export function DashboardBuilder() {
             if (!widgetContent) return null;
 
             return (
-              <SortableWidget key={widget.id} id={widget.id}>
+              <EnterpriseSortableWidget key={widget.id} id={widget.id}>
                 <div
                   className={cn(
-                    "rounded-lg border bg-card p-6 shadow-sm",
+                    "rounded-lg border bg-card p-6 shadow-sm relative group",
                     widget.size === "half" ? "col-span-1" : "col-span-1 md:col-span-2 lg:col-span-3"
                   )}
                 >
+                  {/* ✅ Delete Button - Appears on hover */}
+                  <button
+                    onClick={() => removeWidget(widget.id)}
+                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded"
+                    title="Eliminar widget"
+                    aria-label="Eliminar widget"
+                  >
+                    <X className="h-4 w-4 text-destructive" />
+                  </button>
+
                   {/* ✅ Wrap widget with error boundary to prevent cascade failures */}
                   <WidgetErrorBoundary widgetName={definition.name}>
                     {widgetContent}
                   </WidgetErrorBoundary>
                 </div>
-              </SortableWidget>
+              </EnterpriseSortableWidget>
             );
           })}
         </div>
-      </DragDropWidgetContainer>
+      </EnterpriseDragDropContainer>
 
       {/* Footer info */}
       <div className="text-xs text-muted-foreground text-center py-4">
