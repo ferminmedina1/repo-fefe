@@ -76,11 +76,32 @@ export function DashboardBuilder() {
 
   // Get user ID from Supabase session
   useEffect(() => {
+    let isMounted = true;
+    
     const getUser = async () => {
-      const { data } = await supabase.auth.getSession();
-      setUserId(data?.session?.user?.id);
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.warn("[Dashboard] Session error:", error);
+          // If token refresh fails, that's okay - user may be logging in
+          return;
+        }
+        
+        if (isMounted && data?.session?.user?.id) {
+          setUserId(data.session.user.id);
+        }
+      } catch (err) {
+        console.warn("[Dashboard] Error getting user session:", err);
+        // Silently continue - auth errors are handled by ProtectedRoute
+      }
     };
+    
     getUser();
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // ✅ NEW: Fetch all dashboards for the user

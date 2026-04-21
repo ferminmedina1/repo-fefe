@@ -289,21 +289,56 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAdmin } = usePermissions();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+    let isMounted = true;
+
+    const initSession = async () => {
+      try {
+        // Listen for auth state changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          (event, session) => {
+            if (isMounted) {
+              setSession(session);
+              setUser(session?.user ?? null);
+              setLoading(false);
+            }
+          }
+        );
+
+        // Try to get session with error handling
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (isMounted) {
+            if (error) {
+              console.warn("[Auth] Session error (will retry):", error.message);
+              // Session error is normal if user is not logged in or token is invalid
+              // onAuthStateChange will handle the proper state
+            } else {
+              setSession(session);
+              setUser(session?.user ?? null);
+            }
+            setLoading(false);
+          }
+        } catch (err) {
+          if (isMounted) {
+            console.warn("[Auth] Error getting session:", err);
+            setLoading(false);
+          }
+        }
+
+        return () => subscription.unsubscribe();
+      } catch (err) {
+        if (isMounted) {
+          console.error("[Auth] Fatal error during init:", err);
+          setLoading(false);
+        }
       }
-    );
+    };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    initSession();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   if (loading) {
