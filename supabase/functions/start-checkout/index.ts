@@ -104,6 +104,7 @@ Deno.serve(async (req: Request) => {
     if (provider === "mercadopago") {
       const mpToken = Deno.env.get("MP_ACCESS_TOKEN");
       if (!mpToken) return json({ error: "MP_ACCESS_TOKEN no configurado" }, 500);
+      const webhookUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/mercadopago-webhook`;
       
       // For MercadoPago, create preapproval with immediate billing
       const usdArs = Number(Deno.env.get("DEFAULT_USD_ARS_RATE") ?? "1000");
@@ -115,6 +116,7 @@ Deno.serve(async (req: Request) => {
         payer_email: intent.email,
         external_reference: intent.id,
         back_url: success_url,
+        notification_url: webhookUrl,
         auto_recurring: {
           frequency: 1,
           frequency_type: "months",

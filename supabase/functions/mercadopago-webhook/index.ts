@@ -175,6 +175,11 @@ Deno.serve(async (req: Request) => {
       url.searchParams.get("id");
 
     if (!dataId) {
+      console.warn("Webhook ignored: missing data.id", {
+        topic,
+        query: Object.fromEntries(url.searchParams.entries()),
+        body,
+      });
       return json({ ok: true, note: "No data.id" }, 200);
     }
 
@@ -189,7 +194,10 @@ Deno.serve(async (req: Request) => {
       });
 
     if (evtErr) {
-      return json({ ok: true, note: "Duplicate" }, 200);
+      if (evtErr.code === "23505") {
+        return json({ ok: true, note: "Duplicate" }, 200);
+      }
+      throw evtErr;
     }
 
     const mpObj = await fetchMpResource(topic, dataId, mpToken);
