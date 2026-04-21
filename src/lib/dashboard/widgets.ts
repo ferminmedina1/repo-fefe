@@ -148,6 +148,20 @@ export const WIDGET_CATALOG: Record<WidgetType, WidgetDefinition> = {
   },
 };
 
+// Migration map for legacy widget IDs
+const LEGACY_WIDGET_ID_MAP: Record<string, WidgetType> = {
+  "monthly-sales": "kpi-monthly-sales",
+  "gross-margin": "kpi-gross-margin",
+  "receivables": "kpi-receivables",
+  "sales-today": "kpi-sales-today",
+  "top-products": "chart-top-products",
+  "top-customers": "chart-top-customers",
+  "sales-7days": "chart-sales-7days",
+  "critical-stock": "list-critical-stock",
+  "currency-summary": "currency-summary",
+  "rates": "currency-rates",
+};
+
 // Available widgets by category
 export const WIDGET_CATEGORIES = {
   kpi: Object.values(WIDGET_CATALOG).filter((w) => w.category === "kpi"),
@@ -159,9 +173,18 @@ export const WIDGET_CATEGORIES = {
 // Export DashboardWidget from dashboard hooks for convenience
 export type { DashboardWidget } from '@/hooks/dashboard/useDashboardLayout';
 
-// Type guard
+// Type guard with legacy ID support
 export function isValidWidgetType(type: any): type is WidgetType {
-  return type in WIDGET_CATALOG;
+  if (type in WIDGET_CATALOG) return true;
+  return type in LEGACY_WIDGET_ID_MAP;
+}
+
+// Migrate legacy widget ID to current format
+export function migrateWidgetId(type: string): WidgetType {
+  if (type in WIDGET_CATALOG) return type as WidgetType;
+  if (type in LEGACY_WIDGET_ID_MAP) return LEGACY_WIDGET_ID_MAP[type];
+  // Fallback: return as-is (will fail validation later)
+  return type as WidgetType;
 }
 
 // Get available widgets (not already added)

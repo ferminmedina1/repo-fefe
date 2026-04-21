@@ -1,18 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, useRef } from "react";
+import { migrateWidgetId } from "@/lib/dashboard/widgets";
 
 // ✅ NEW: Normalize widget types from database (migrate old naming to new format)
 const normalizeWidgetType = (type: string): string => {
-  const typeMap: Record<string, string> = {
-    // Old short names → new prefixed names
-    "critical-stock": "list-critical-stock",
-    "top-customers": "chart-top-customers",
-    "sales-today": "kpi-sales-today",
-    // Add more mappings as needed
-  };
-
-  return typeMap[type] || type; // Return mapped type or original if not found
+  // Use the migration function from widgets.ts for consistency
+  try {
+    return migrateWidgetId(type);
+  } catch {
+    return type; // Fallback to original type if migration fails
+  }
 };
 
 // ✅ NEW: Normalize all widgets in a layout
