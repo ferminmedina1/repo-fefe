@@ -1,22 +1,83 @@
 'use client';
 
 import React from 'react';
-import { Grid3x3, Zap, Plus } from 'lucide-react';
+import { Grid3x3, Zap, Plus, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { DASHBOARD_DESIGN } from '@/lib/dashboard/design-tokens';
+import { DashboardLayoutData } from '@/hooks/dashboard';
 
 interface DashboardEmptyStateProps {
   onChooseTemplate: () => void;
   onChooseFreeBuilder: () => void;
+  dashboards?: DashboardLayoutData[];
+  selectedDashboardId?: string;
+  onDashboardChange?: (dashboardId: string) => void;
+  onCreateNewDashboard?: () => void;
+  isLoadingDashboards?: boolean;
 }
 
 export function DashboardEmptyState({ 
   onChooseTemplate, 
-  onChooseFreeBuilder 
+  onChooseFreeBuilder,
+  dashboards = [],
+  selectedDashboardId,
+  onDashboardChange,
+  onCreateNewDashboard,
+  isLoadingDashboards = false
 }: DashboardEmptyStateProps) {
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden px-4">
+    <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-4">
+      {/* Dashboard Selector - Top Bar */}
+      {dashboards && dashboards.length > 0 && (
+        <div className="absolute top-6 right-6 flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-foreground">Panel de Control:</label>
+            <Select
+              value={selectedDashboardId || ''}
+              onValueChange={(value) => {
+                if (value === '__new__') {
+                  onCreateNewDashboard?.();
+                } else if (onDashboardChange) {
+                  onDashboardChange(value);
+                }
+              }}
+              disabled={isLoadingDashboards}
+            >
+              <SelectTrigger className="w-48 bg-white/50 backdrop-blur-sm border-primary/20 hover:border-primary/50 transition-colors">
+                <SelectValue placeholder="Selecciona un panel" />
+              </SelectTrigger>
+              <SelectContent>
+                {dashboards.map((dashboard) => (
+                  <SelectItem key={dashboard.id} value={dashboard.id}>
+                    <div className="flex items-center gap-2">
+                      {dashboard.is_default && (
+                        <span className="text-xs font-semibold text-primary">✓</span>
+                      )}
+                      <span>{dashboard.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+                <hr className="my-2" />
+                <SelectItem value="__new__">
+                  <div className="flex items-center gap-2 text-primary">
+                    <Plus className="w-4 h-4" />
+                    <span>Crear nuevo panel</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
       {/* Animated background blobs */}
       <div className="absolute inset-0 -z-10 overflow-hidden">
         <div className="absolute top-1/4 -left-32 w-96 h-96 bg-gradient-to-br from-primary/20 to-transparent rounded-full blur-3xl animate-pulse" />

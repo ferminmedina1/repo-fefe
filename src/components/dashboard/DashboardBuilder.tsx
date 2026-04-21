@@ -44,6 +44,7 @@ import { RefreshButton } from "./RefreshButton";
 import { CSVUploader } from "./CSVUploader";
 import { MetricBuilderModal } from "./MetricBuilderModal";
 import { DashboardSelector } from "./DashboardSelector";
+import { CreateNewDashboardDialog } from "./CreateNewDashboardDialog";
 import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, RefreshCw, Upload, Zap, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -63,6 +64,7 @@ export function DashboardBuilder() {
   const [showCSVUploader, setShowCSVUploader] = useState(false);
   const [showMetricBuilder, setShowMetricBuilder] = useState(false);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [showCreateNewDashboard, setShowCreateNewDashboard] = useState(false);
   const [showFilters, setShowFilters] = useState(false); // ✅ NEW: Collapsible filters state
   const [isDragging, setIsDragging] = useState(false);
 
@@ -346,6 +348,11 @@ export function DashboardBuilder() {
             // Open widget picker or add first widget
             handleAddWidget("kpi-monthly-sales" as WidgetType);
           }}
+          dashboards={dashboards}
+          selectedDashboardId={selectedDashboardId}
+          onDashboardChange={handleDashboardChange}
+          onCreateNewDashboard={() => setShowCreateNewDashboard(true)}
+          isLoadingDashboards={dashboardsLoading}
         />
         {showTemplateGallery && (
           <TemplateGallery
@@ -626,6 +633,16 @@ export function DashboardBuilder() {
       {/* Metric Builder Modal */}
       {showMetricBuilder && (
         <MetricBuilderModal onClose={() => setShowMetricBuilder(false)} />
+      )}
+
+      {/* Create New Dashboard Dialog */}
+      {showCreateNewDashboard && (
+        <CreateNewDashboardDialog
+          isOpen={showCreateNewDashboard}
+          onClose={() => setShowCreateNewDashboard(false)}
+          onCreateDashboard={handleCreateNewDashboard}
+          isCreating={createDashboardMutation.isPending}
+        />
       )}
       </div>
     </WidgetProvider>
