@@ -41,7 +41,7 @@ interface SortableWidgetProps {
 }
 
 /**
- * Enterprise Sortable Widget with enhanced feedback
+ * Enterprise Sortable Widget with enhanced feedback (like draw.io)
  */
 function EnterpriseSortableWidget({
   id,
@@ -63,8 +63,8 @@ function EnterpriseSortableWidget({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: transition || "transform 200ms cubic-bezier(0.2, 0, 0, 1)",
-    opacity: isDragging ? 0.4 : isDraggingAny && !isOver ? 0.6 : 1,
+    transition: transition || "transform 200ms cubic-bezier(0.4, 0.0, 0.2, 1)",
+    opacity: isDragging ? 0.5 : isDraggingAny && !isOver ? 0.5 : 1,
     zIndex: isDragging ? 1000 : isSorting ? 100 : 0,
   };
 
@@ -73,22 +73,24 @@ function EnterpriseSortableWidget({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "relative transition-all duration-200",
-        isDragging && "ring-2 ring-primary ring-offset-2 shadow-2xl",
-        isOver && "ring-2 ring-primary/50 bg-primary/5",
-        isSorting && "opacity-75"
+        "relative transition-all duration-200 rounded-lg",
+        // Draw.io style: Strong shadow and scale when dragging
+        isDragging && "ring-2 ring-primary ring-offset-4 shadow-2xl scale-[1.02]",
+        isOver && "ring-2 ring-primary/60 bg-primary/10 shadow-lg",
+        isSorting && "opacity-75",
+        // Smooth hover effect
+        !isDragging && !isDraggingAny && "hover:shadow-md"
       )}
       data-drag-id={id}
       role="button"
       aria-pressed={isDragging}
       aria-label={`Widget ${id}, drag to reorder`}
     >
-      {/* Grip Handle */}
+      {/* Grip Handle - Always visible for draw.io style */}
       <div
         className={cn(
-          "absolute left-0 top-0 bottom-0 w-1.5 bg-transparent hover:bg-primary/40 transition-colors duration-200 cursor-grab active:cursor-grabbing flex items-center justify-center group z-10",
-          isDragging && "bg-primary/60 w-1",
-          isDraggingAny && "visible"
+          "absolute left-0 top-0 bottom-0 w-1 bg-transparent hover:bg-primary/50 transition-all duration-200 cursor-grab active:cursor-grabbing flex items-center justify-center group z-10",
+          isDragging && "bg-primary w-1.5 shadow-lg"
         )}
         {...attributes}
         {...listeners}
@@ -103,19 +105,19 @@ function EnterpriseSortableWidget({
         <GripVertical
           className={cn(
             "h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-primary",
-            isDragging && "opacity-100"
+            isDragging && "opacity-100 text-white"
           )}
           aria-hidden="true"
         />
       </div>
 
-      {/* Indicator de drop zone */}
-      {isOver && (
-        <div className="absolute inset-0 rounded-lg border-2 border-primary border-dashed pointer-events-none animate-pulse" />
+      {/* Draw.io style drop zone indicator */}
+      {isOver && !isDragging && (
+        <div className="absolute inset-0 rounded-lg border-2 border-primary border-solid pointer-events-none animate-pulse bg-primary/5" />
       )}
 
-      {/* Content */}
-      <div className="pl-2">{children}</div>
+      {/* Content - subtle padding adjustment while dragging */}
+      <div className={cn("pl-2", isDragging && "pl-3")}>{children}</div>
     </div>
   );
 }

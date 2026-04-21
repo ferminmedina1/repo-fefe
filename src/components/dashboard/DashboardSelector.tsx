@@ -190,7 +190,7 @@ export function DashboardSelector({
   const currentDashboard = dashboards.find((d) => d.id === currentDashboardId);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 relative">
       {/* Dashboard Selector */}
       <Select
         value={currentDashboardId || ""}
@@ -405,9 +405,9 @@ export function DashboardSelector({
         </DialogContent>
       </Dialog>
 
-      {/* Loading indicator at the end - doesn't interfere with button positioning */}
+      {/* Loading indicator - positioned absolute so it doesn't move layout */}
       {isLoading && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="absolute right-0 flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap">
           <div className="h-4 w-4 border-2 border-muted-foreground border-t-foreground rounded-full animate-spin" />
           <span>Cargando...</span>
         </div>
