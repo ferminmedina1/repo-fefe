@@ -419,7 +419,7 @@ export function DashboardBuilder() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+      <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center relative">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Panel de Control Personalizado</h1>
           <p className="text-muted-foreground">
@@ -427,15 +427,18 @@ export function DashboardBuilder() {
             {widgets.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          {isSaving && (
-            <div className="text-xs text-muted-foreground flex items-center gap-2">
-              <div className="animate-spin">
-                <RefreshCw className="h-3 w-3" />
-              </div>
-              Guardando...
+        
+        {/* ✅ Saving indicator - positioned absolute so it doesn't cause layout shifts */}
+        {isSaving && (
+          <div className="absolute right-0 top-0 text-xs text-muted-foreground flex items-center gap-2 whitespace-nowrap">
+            <div className="animate-spin">
+              <RefreshCw className="h-3 w-3" />
             </div>
-          )}
+            Guardando...
+          </div>
+        )}
+        
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {widgets.length > 0 && (
             <>
               {/* ✅ NEW: Toggle Filters Button - Opens modal dialog */}

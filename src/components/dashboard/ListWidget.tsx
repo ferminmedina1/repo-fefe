@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { WidgetWrapper } from "./WidgetWrapper";
+import { WidgetConfigModal, WidgetConfig } from "./WidgetConfigModal";
 import { useWidgetContext } from "@/contexts/WidgetContext";
 import { WidgetDefinition } from "@/lib/dashboard/widgets";
 import { CheckCircle2 } from "lucide-react";
@@ -17,6 +19,15 @@ interface ListWidgetProps {
 export function ListWidget({
   definition,
 }: ListWidgetProps) {
+  const [showConfig, setShowConfig] = useState(false);
+  const [widgetConfig, setWidgetConfig] = useState<WidgetConfig>({
+    refreshInterval: 30,
+    showTitle: true,
+    showDescription: true,
+    maxItems: 10,
+    enableCache: true,
+  });
+  
   // ✅ NEW: Get data from context instead of props
   const context = useWidgetContext();
   const widgetData = context.dataMap[definition.id];
@@ -80,14 +91,28 @@ export function ListWidget({
   };
 
   return (
-    <WidgetWrapper
-      title={definition.name}
-      description={definition.description}
-      icon={<definition.icon className="h-5 w-5" />}
-      accentColor={definition.color}
-      isDragging={isDragging}
-    >
-      {renderContent()}
-    </WidgetWrapper>
+    <>
+      <WidgetConfigModal
+        isOpen={showConfig}
+        widgetName={definition.name}
+        widgetId={definition.id}
+        config={widgetConfig}
+        onClose={() => setShowConfig(false)}
+        onSave={(config) => {
+          setWidgetConfig(config);
+          // TODO: Persist config to database if needed
+        }}
+      />
+      <WidgetWrapper
+        title={definition.name}
+        description={definition.description}
+        icon={<definition.icon className="h-5 w-5" />}
+        accentColor={definition.color}
+        onConfigure={() => setShowConfig(true)}
+        isDragging={isDragging}
+      >
+        {renderContent()}
+      </WidgetWrapper>
+    </>
   );
 }

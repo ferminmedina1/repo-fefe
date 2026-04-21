@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { X, Settings } from "lucide-react";
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,7 @@ interface WidgetWrapperProps {
   icon?: ReactNode;
   accentColor: string;
   onRemove?: () => void;
+  onConfigure?: () => void;
   isDragging?: boolean;
   children: ReactNode;
   className?: string;
@@ -21,6 +22,7 @@ export function WidgetWrapper({
   icon,
   accentColor,
   onRemove,
+  onConfigure,
   isDragging,
   children,
   className,
@@ -72,16 +74,30 @@ export function WidgetWrapper({
           </div>
         </div>
 
-        {onRemove && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onRemove}
-            className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        )}
+        <div className="flex gap-1">
+          {onConfigure && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onConfigure}
+              className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+              title="Configurar widget"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
+          {onRemove && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRemove}
+              className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+              title="Eliminar widget"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-2">{children}</CardContent>
