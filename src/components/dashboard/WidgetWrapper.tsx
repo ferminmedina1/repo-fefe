@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { X, Settings } from "lucide-react";
+import { X, Settings, GripVertical } from "lucide-react";
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -49,41 +49,48 @@ export function WidgetWrapper({
   return (
     <Card
       className={cn(
-        "shadow-soft border-l-4 overflow-hidden transition-all",
+        "shadow-sm border-l-2 overflow-hidden transition-all duration-200 relative group",
         colorMap[accentColor] || colorMap.blue,
-        isDragging && "opacity-50 scale-95",
+        isDragging && "opacity-50 scale-95 ring-2 ring-primary/50 shadow-lg",
         className
       )}
     >
+      {/* Drag hint - visible on hover */}
+      <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-60 transition-opacity duration-150 pointer-events-none">
+        <span className="text-[10px] text-muted-foreground bg-background/80 px-1.5 py-0.5 rounded whitespace-nowrap">
+          Arrastra para mover
+        </span>
+      </div>
+
       {/* Accent gradient bar */}
       <div
         className={cn(
-          "h-1 bg-gradient-to-r",
+          "h-0.5 bg-gradient-to-r",
           accentGradientMap[accentColor] || accentGradientMap.blue
         )}
       />
 
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="flex items-center gap-2 flex-1">
-          {icon && <div className="text-muted-foreground">{icon}</div>}
-          <div className="flex-1">
-            <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 pt-2">
+        <div className="flex items-center gap-1.5 flex-1">
+          {icon && <div className="text-muted-foreground text-[16px]">{icon}</div>}
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-xs font-semibold truncate">{title}</CardTitle>
             {description && (
-              <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+              <p className="text-[11px] text-muted-foreground mt-0">{description}</p>
             )}
           </div>
         </div>
 
-        <div className="flex gap-1">
+        <div className="flex gap-0.5">
           {onConfigure && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onConfigure}
-              className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+              className="h-6 w-6 p-0 hover:bg-primary/10 hover:text-primary"
               title="Configurar widget"
             >
-              <Settings className="h-4 w-4" />
+              <Settings className="h-3.5 w-3.5" />
             </Button>
           )}
           {onRemove && (
@@ -91,16 +98,16 @@ export function WidgetWrapper({
               variant="ghost"
               size="sm"
               onClick={onRemove}
-              className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+              className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive"
               title="Eliminar widget"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </Button>
           )}
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-2">{children}</CardContent>
+      <CardContent className="space-y-1 px-3 pb-2 pt-0">{children}</CardContent>
     </Card>
   );
 }

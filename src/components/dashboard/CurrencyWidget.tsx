@@ -54,12 +54,12 @@ export function CurrencyWidget({
 
   const renderContent = () => {
     if (isLoading) {
-      return <div className="h-80 bg-muted animate-pulse rounded" />;
+      return <div className="h-48 bg-muted animate-pulse rounded" />;
     }
 
     if (!data || data.length === 0) {
       return (
-        <div className="h-80 flex items-center justify-center">
+        <div className="h-48 flex items-center justify-center">
           <p className="text-sm text-muted-foreground">Sin datos disponibles</p>
         </div>
       );
@@ -68,7 +68,7 @@ export function CurrencyWidget({
     switch (definition.id) {
       case "currency-rates":
         return (
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={200}>
             <LineChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="date" className="text-xs" />
@@ -101,25 +101,25 @@ export function CurrencyWidget({
 
       case "currency-summary":
         return (
-          <div className="space-y-3">
+          <div className="space-y-1.5">
             {data.map((item, idx) => (
               <div
                 key={idx}
-                className="p-3 rounded-lg border border-border bg-card/50 hover:bg-card transition-colors"
+                className="p-2 rounded-lg border border-border bg-card/50 hover:bg-card transition-colors"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <Badge variant="outline">{item.currency}</Badge>
-                  <span className="text-sm font-semibold text-foreground">
+                <div className="flex items-center justify-between mb-1">
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">{item.currency}</Badge>
+                  <span className="text-xs font-semibold text-foreground">
                     ${item.valueInARS?.toFixed(0) || 0}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-2 gap-1 text-[10px]">
                   <div>
-                    <p className="text-muted-foreground">Valor</p>
+                    <p className="text-muted-foreground text-[9px]">Valor</p>
                     <p className="font-medium">${item.totalValue?.toFixed(0) || 0}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Productos</p>
+                    <p className="text-muted-foreground text-[9px]">Productos</p>
                     <p className="font-medium">{item.productCount || 0}</p>
                   </div>
                 </div>

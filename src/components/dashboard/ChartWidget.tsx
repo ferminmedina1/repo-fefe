@@ -63,13 +63,13 @@ export function ChartWidget({
 
       if (isLoading) {
         return (
-          <div className="h-80 bg-muted animate-pulse rounded" />
+          <div className="h-48 bg-muted animate-pulse rounded" />
         );
       }
 
       if (!data || data.length === 0) {
         return (
-          <div className="h-80 flex items-center justify-center">
+          <div className="h-48 flex items-center justify-center">
             <p className="text-sm text-muted-foreground">Sin datos disponibles</p>
           </div>
         );
@@ -79,7 +79,7 @@ export function ChartWidget({
         case "chart-top-products":
         case "chart-top-customers":
           return (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={200}>
               <BarChart
                 data={data}
                 layout="vertical"
@@ -112,7 +112,7 @@ export function ChartWidget({
 
         case "chart-sales-7days":
           return (
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={200}>
               <LineChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="date" className="text-xs" />

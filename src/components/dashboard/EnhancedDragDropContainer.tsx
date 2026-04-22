@@ -64,7 +64,7 @@ function EnterpriseSortableWidget({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition: transition || "transform 200ms cubic-bezier(0.4, 0.0, 0.2, 1)",
-    opacity: isDragging ? 0.5 : isDraggingAny && !isOver ? 0.5 : 1,
+    opacity: isDragging ? 1 : isDraggingAny && !isOver ? 0.35 : 1,
     zIndex: isDragging ? 1000 : isSorting ? 100 : 0,
   };
 
@@ -75,11 +75,11 @@ function EnterpriseSortableWidget({
       className={cn(
         "relative transition-all duration-200 rounded-lg",
         // Draw.io style: Strong shadow and scale when dragging
-        isDragging && "ring-2 ring-primary ring-offset-4 shadow-2xl scale-[1.02]",
-        isOver && "ring-2 ring-primary/60 bg-primary/10 shadow-lg",
-        isSorting && "opacity-75",
+        isDragging && "ring-2 ring-primary ring-offset-2 shadow-2xl scale-105",
+        isOver && "ring-2 ring-primary/70 bg-primary/20 shadow-lg",
+        isSorting && "opacity-60",
         // Smooth hover effect
-        !isDragging && !isDraggingAny && "hover:shadow-md"
+        !isDragging && !isDraggingAny && "hover:shadow-md hover:border-primary/30"
       )}
       data-drag-id={id}
       role="button"
@@ -89,7 +89,7 @@ function EnterpriseSortableWidget({
       {/* Grip Handle - Always visible for draw.io style */}
       <div
         className={cn(
-          "absolute left-0 top-0 bottom-0 w-1 bg-transparent hover:bg-primary/50 transition-all duration-200 cursor-grab active:cursor-grabbing flex items-center justify-center group z-10",
+          "absolute left-0 top-0 bottom-0 w-1.5 bg-primary/20 hover:bg-primary/70 transition-all duration-150 cursor-grab active:cursor-grabbing flex items-center justify-center group z-10",
           isDragging && "bg-primary w-1.5 shadow-lg"
         )}
         {...attributes}
@@ -104,7 +104,7 @@ function EnterpriseSortableWidget({
       >
         <GripVertical
           className={cn(
-            "h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-primary",
+            "h-4 w-4 opacity-40 group-hover:opacity-100 transition-opacity duration-150 text-primary",
             isDragging && "opacity-100 text-white"
           )}
           aria-hidden="true"
@@ -113,11 +113,11 @@ function EnterpriseSortableWidget({
 
       {/* Draw.io style drop zone indicator */}
       {isOver && !isDragging && (
-        <div className="absolute inset-0 rounded-lg border-2 border-primary border-solid pointer-events-none animate-pulse bg-primary/5" />
+        <div className="absolute inset-0 rounded-lg border-2 border-dashed border-primary pointer-events-none bg-primary/15 shadow-inner" />
       )}
 
       {/* Content - subtle padding adjustment while dragging */}
-      <div className={cn("pl-2", isDragging && "pl-3")}>{children}</div>
+      <div className={cn("pl-2 transition-all duration-200", isDragging && "pl-3")}>{children}</div>
     </div>
   );
 }

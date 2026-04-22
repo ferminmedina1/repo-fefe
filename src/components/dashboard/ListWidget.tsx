@@ -39,9 +39,9 @@ export function ListWidget({
   const renderContent = () => {
     if (isLoading) {
       return (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-muted animate-pulse rounded" />
+            <div key={i} className="h-8 bg-muted animate-pulse rounded" />
           ))}
         </div>
       );
@@ -49,9 +49,9 @@ export function ListWidget({
 
     if (!data || data.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center py-8 gap-2">
-          <CheckCircle2 className="h-8 w-8 text-green-600" />
-          <p className="text-sm text-muted-foreground text-center">
+        <div className="flex flex-col items-center justify-center py-4 gap-2">
+          <CheckCircle2 className="h-6 w-6 text-green-600" />
+          <p className="text-xs text-muted-foreground text-center">
             {definition.id === "list-critical-stock"
               ? "Sin productos con stock crítico"
               : "Sin elementos"}
@@ -64,24 +64,24 @@ export function ListWidget({
     // Note: Virtual scrolling optimization disabled due to react-window build issues
     // Can be re-enabled in future when react-window export issue is resolved
     return (
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         {data.map((item, idx) => (
           <div
             key={idx}
-            className="flex items-center justify-between p-3 rounded-lg bg-warning/5 border border-warning/20"
+            className="flex items-center justify-between p-2 rounded-lg bg-warning/5 border border-warning/20"
           >
-            <div className="flex-1">
-              <p className="font-medium text-sm text-foreground">{item.name}</p>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-xs text-foreground truncate">{item.name}</p>
               {item.min_stock && (
-                <p className="text-xs text-muted-foreground">
-                  Stock mínimo: {item.min_stock}
+                <p className="text-[10px] text-muted-foreground">
+                  Min: {item.min_stock}
                 </p>
               )}
             </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold text-warning">{item.stock}</p>
-              <p className="text-xs text-muted-foreground">
-                {definition.id === "list-critical-stock" ? "unidades" : ""}
+            <div className="text-right ml-2">
+              <p className="text-base font-bold text-warning">{item.stock}</p>
+              <p className="text-[9px] text-muted-foreground">
+                {definition.id === "list-critical-stock" ? "un." : ""}
               </p>
             </div>
           </div>

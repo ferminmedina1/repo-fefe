@@ -530,7 +530,7 @@ export function DashboardBuilder() {
         enableLogging={true}
         maxReordersPerMinute={60}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-min">
           {widgets.map((widget) => {
             const definition = WIDGET_CATALOG[widget.type as WidgetType];
 
@@ -585,7 +585,7 @@ export function DashboardBuilder() {
               <EnterpriseSortableWidget key={widget.id} id={widget.id}>
                 <div
                   className={cn(
-                    "rounded-lg border bg-card p-6 shadow-sm relative group",
+                    "rounded-lg border bg-card p-3 shadow-sm relative group",
                     widget.size === "half" ? "col-span-1" : "col-span-1 md:col-span-2 lg:col-span-3"
                   )}
                 >
