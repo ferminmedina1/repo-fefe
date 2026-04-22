@@ -154,21 +154,38 @@ export function EnterpriseDragDropContainer({
   const [reorderCount, setReorderCount] = useState(0);
   const [lastReorderTime, setLastReorderTime] = useState<Date | null>(null);
 
-  // Rate limiting check
+  // Rate limiting check - improved logic
   const checkRateLimit = useCallback(() => {
-    if (!lastReorderTime) return true;
-
     const now = new Date();
-    const timeDiffMs = now.getTime() - lastReorderTime.getTime();
-    const timeDiffMin = timeDiffMs / 1000 / 60;
 
-    if (timeDiffMin >= 1) {
-      // Reset counter after 1 minute
-      setReorderCount(0);
+    // First time - initialize
+    if (!lastReorderTime) {
+      setLastReorderTime(now);
+      setReorderCount(1);
       return true;
     }
 
+    const timeDiffMs = now.getTime() - lastReorderTime.getTime();
+    const timeDiffSec = timeDiffMs / 1000;
+    const timeDiffMin = timeDiffSec / 60;
+
+    // Reset counter if more than 1 minute has passed
+    if (timeDiffMin >= 1) {
+      setReorderCount(0);
+      setLastReorderTime(now);
+      return true;
+    }
+
+    // Check if limit exceeded
     if (reorderCount >= maxReordersPerMinute) {
+      if (enableLogging) {
+        console.warn('[DragDrop] Rate limit exceeded:', {
+          reorderCount,
+          maxPerMinute: maxReordersPerMinute,
+          timePassedSec: timeDiffSec.toFixed(2),
+        });
+      }
+
       const alert: SecurityAlert = {
         type: "rate_limit",
         message: `Rate limit exceeded: ${maxReordersPerMinute} reorders per minute`,
@@ -179,7 +196,7 @@ export function EnterpriseDragDropContainer({
     }
 
     return true;
-  }, [lastReorderTime, reorderCount, maxReordersPerMinute, onSecurityAlert]);
+  }, [lastReorderTime, reorderCount, maxReordersPerMinute, onSecurityAlert, enableLogging]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

@@ -58,7 +58,7 @@ export function KpiWidget({
         return (
           <div className="space-y-1">
             <div className="flex items-baseline gap-1.5">
-              <div className="text-2xl font-bold">${currentMonth.toFixed(0)}</div>
+              <div className="text-2xl font-bold">${(currentMonth ?? 0).toFixed(0)}</div>
               {monthlyData && (
                 <Badge
                   variant="outline"
@@ -92,7 +92,7 @@ export function KpiWidget({
         return (
           <div className="space-y-1">
             <div className="flex items-baseline gap-1.5">
-              <div className="text-2xl font-bold">${grossMargin.toFixed(0)}</div>
+              <div className="text-2xl font-bold">${(grossMargin ?? 0).toFixed(0)}</div>
               <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30 text-[10px] px-1.5 py-0.5">
                 {marginPercentage.toFixed(1)}%
               </Badge>
@@ -112,7 +112,7 @@ export function KpiWidget({
         return (
           <div className="space-y-1">
             <div className="flex items-baseline gap-1.5">
-              <div className="text-2xl font-bold">${total.toFixed(0)}</div>
+              <div className="text-2xl font-bold">${(total ?? 0).toFixed(0)}</div>
               {overduePercentage > 0 && (
                 <Badge variant="outline" className="bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30 text-[10px] px-1.5 py-0.5">
                   {overduePercentage.toFixed(0)}% venc.

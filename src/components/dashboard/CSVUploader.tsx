@@ -44,9 +44,22 @@ export const CSVUploader = ({ onSuccess, onClose }: CSVUploaderProps) => {
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const droppedFile = e.dataTransfer.files[0];
-      if (droppedFile.type === 'text/csv' || droppedFile.name.endsWith('.csv')) {
-        handleFile(droppedFile);
+      
+      // Validate file type
+      const isValidType = droppedFile.type === 'text/csv' || droppedFile.name.endsWith('.csv');
+      if (!isValidType) {
+        alert('Por favor selecciona un archivo CSV válido');
+        return;
       }
+      
+      // Validate file size (max 10MB) 
+      const maxFileSize = 10 * 1024 * 1024;
+      if (droppedFile.size > maxFileSize) {
+        alert(`Archivo demasiado grande (${(droppedFile.size / 1024 / 1024).toFixed(1)}MB). Máximo: 10MB`);
+        return;
+      }
+      
+      handleFile(droppedFile);
     }
   };
 

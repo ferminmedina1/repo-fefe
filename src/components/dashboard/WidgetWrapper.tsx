@@ -46,11 +46,35 @@ export function WidgetWrapper({
     cyan: "from-cyan-500 to-cyan-600",
   };
 
+  // Validate color with fallback (prevent invalid colors from breaking UI)
+  const getColorClass = (color: string): string => {
+    if (!color) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[WidgetWrapper] Missing accentColor prop, using default');
+      }
+      return colorMap.blue;
+    }
+    if (colorMap[color]) {
+      return colorMap[color];
+    }
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`[WidgetWrapper] Unknown accentColor: ${color}, using default`);
+    }
+    return colorMap.blue;
+  };
+
+  const getGradientClass = (color: string): string => {
+    if (!color || !accentGradientMap[color]) {
+      return accentGradientMap.blue;
+    }
+    return accentGradientMap[color];
+  };
+
   return (
     <Card
       className={cn(
         "shadow-sm border-l-2 overflow-hidden transition-all duration-200 relative group",
-        colorMap[accentColor] || colorMap.blue,
+        getColorClass(accentColor),
         isDragging && "opacity-50 scale-95 ring-2 ring-primary/50 shadow-lg",
         className
       )}
@@ -66,7 +90,7 @@ export function WidgetWrapper({
       <div
         className={cn(
           "h-0.5 bg-gradient-to-r",
-          accentGradientMap[accentColor] || accentGradientMap.blue
+          getGradientClass(accentColor)
         )}
       />
 
