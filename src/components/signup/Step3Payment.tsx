@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -16,8 +16,11 @@ import { MercadoPagoCardFields } from "./MercadoPagoCardFields";
 interface Step3PaymentProps {
   formData: SignupFormData;
   updateFormData: (data: Partial<SignupFormData>) => void;
-  nextStep: () => void;
-  prevStep: () => void;
+  nextStep?: () => void;
+  prevStep?: () => void;
+  showHeader?: boolean;
+  showBackButton?: boolean;
+  onPaymentSaved?: () => void | Promise<void>;
 }
 
 const COUNTRIES = [
@@ -34,7 +37,15 @@ const COUNTRIES = [
   { code: "OTHER", name: "Otro" },
 ];
 
-export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: Step3PaymentProps) {
+export function Step3Payment({
+  formData,
+  updateFormData,
+  nextStep,
+  prevStep,
+  showHeader = true,
+  showBackButton = true,
+  onPaymentSaved,
+}: Step3PaymentProps) {
   const [billingCountry, setBillingCountry] = useState<string>(formData.billing_country || "AR");
   const [stripePromise] = useState(() => {
     const key = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
@@ -45,7 +56,7 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
   const isArgentina = billingCountry === "AR";
   const provider = isArgentina ? "mercadopago" : "stripe";
 
-  const handlePaymentSuccess = async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => {
+  const handlePaymentSuccess = useCallback(async (paymentMethodRef: string, metadata: { brand: string; last4: string; exp_month: number; exp_year: number }) => {
     try {
       setLoading(true);
       const { data, error } = await supabase.functions.invoke("signup-save-payment-method", {
@@ -73,20 +84,32 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
       });
 
       toast.success("Tarjeta guardada exitosamente");
-      nextStep();
+      if (onPaymentSaved) {
+        await onPaymentSaved();
+        return;
+      }
+
+      if (nextStep) {
+        nextStep();
+        return;
+      }
+
+      setLoading(false);
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message ?? "Error al guardar el método de pago");
       setLoading(false);
     }
-  };
+  }, [billingCountry, formData.email, formData.full_name, nextStep, provider, updateFormData]);
 
   return (
     <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-2xl font-bold">Método de pago</h2>
-        <p className="text-muted-foreground">Agrega tu tarjeta para comenzar después del período de prueba</p>
-      </div>
+      {showHeader && (
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-bold">Método de pago</h2>
+          <p className="text-muted-foreground">Agrega tu tarjeta para comenzar después del período de prueba</p>
+        </div>
+      )}
 
       {/* Country Selection Card */}
       <Card>
@@ -152,11 +175,13 @@ export function Step3Payment({ formData, updateFormData, nextStep, prevStep }: S
       </Card>
 
       {/* Navigation Buttons */}
-      <div className="flex justify-between pt-4">
-        <Button onClick={prevStep} variant="outline" size="lg" disabled={loading} className="text-black dark:text-black">
-          Atrás
-        </Button>
-      </div>
+      {showBackButton && prevStep && (
+        <div className="flex justify-between pt-4">
+          <Button onClick={prevStep} variant="outline" size="lg" disabled={loading} className="text-black dark:text-black">
+            Atrás
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

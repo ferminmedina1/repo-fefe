@@ -17,6 +17,7 @@ export default function SignupSuccess() {
 
   const [status, setStatus] = useState<"checking" | "checkout_created" | "paid_ready" | "timeout" | "error">("checking");
   const [attempts, setAttempts] = useState(0);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordLoaded, setPasswordLoaded] = useState(false);
 
@@ -28,6 +29,7 @@ export default function SignupSuccess() {
       try {
         const data = JSON.parse(savedData);
         console.log("[SignupSuccess] Parsed data:", { email: data.email, hasPassword: !!data.password });
+        setEmail(data.email ?? "");
         setPassword(data.password);
         setPasswordLoaded(true);
       } catch (e) {
@@ -108,8 +110,8 @@ export default function SignupSuccess() {
   }, [intentId, status, attempts, passwordLoaded]);
 
   const finalizeSignup = async () => {
-    if (!intentId || !password) {
-      console.error("[SignupSuccess] Missing data:", { intentId, hasPassword: !!password });
+    if (!intentId || !password || !email) {
+      console.error("[SignupSuccess] Missing data:", { intentId, hasEmail: !!email, hasPassword: !!password });
       toast.error("Faltan datos para finalizar el registro");
       setStatus("error");
       return;
@@ -128,6 +130,21 @@ export default function SignupSuccess() {
       if (error) throw error;
 
       console.log("[SignupSuccess] Signup finalized:", data);
+
+      // Try to sign the user in immediately after creation so they land authenticated.
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInErr) {
+        console.warn("[SignupSuccess] Auto sign-in failed, falling back to login:", signInErr);
+        toast.success("¡Cuenta creada exitosamente! Redirigiendo al login...");
+        localStorage.removeItem("signup_wizard_data");
+        localStorage.removeItem("signup_intent_id");
+        window.location.href = "/auth";
+        return;
+      }
 
       // Clear localStorage
       localStorage.removeItem("signup_wizard_data");
@@ -159,7 +176,7 @@ export default function SignupSuccess() {
         console.warn("[SignupSuccess] Could not verify company:", e);
       }
 
-      window.location.href = "/";
+      window.location.href = signInData.session ? "/app" : "/auth";
     } catch (error) {
       console.error("[SignupSuccess] Error finalizing:", error);
       toast.error(`Error al finalizar registro: ${error}`);

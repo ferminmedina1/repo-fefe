@@ -63,6 +63,7 @@ Deno.serve(async (req: Request) => {
       reason: `Suscripción ${sub.subscription_plans?.name}`,
       payer_email: sub.signup_intents?.email,
       back_url: `${url}/functions/v1/mercadopago-webhook`,
+      notification_url: `${url}/functions/v1/mercadopago-webhook`,
       auto_recurring: autoRecurring,
     };
 

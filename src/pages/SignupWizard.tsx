@@ -2,8 +2,7 @@ import { useSignupWizard } from "@/hooks/useSignupWizard";
 import { SignupStepper } from "@/components/signup/SignupStepper";
 import { Step1Account } from "@/components/signup/Step1Account";
 import { Step2Plan } from "@/components/signup/Step2Plan";
-import { Step3Payment } from "@/components/signup/Step3Payment";
-import { Step4Confirmation } from "@/components/signup/Step4Confirmation";
+import { Step4Confirmation } from "../components/signup/Step4Confirmation";
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -22,8 +21,7 @@ export default function SignupWizard() {
   const stepLabels = [
     "Cuenta",
     "Plan",
-    "Pago",
-    "Confirmación",
+    "Paso final",
   ];
   const currentStepLabel = stepLabels[currentStep] || "Paso";
   const totalSteps = stepLabels.length;
@@ -93,9 +91,10 @@ export default function SignupWizard() {
 
       console.log("[SignupWizard] Checkout created:", checkoutData);
 
-      // If payment was captured inline, navigate to success directly
-      if (checkoutData?.is_paid_ready || (formData.payment_method_ref && formData.payment_provider)) {
-        console.log("[SignupWizard] Payment method ready, navigating to success");
+      // Only go directly to success if backend explicitly confirms payment is already ready.
+      // MercadoPago real flows must continue through checkout_url so the authorization webhook can fire.
+      if (checkoutData?.is_paid_ready) {
+        console.log("[SignupWizard] Payment already confirmed by backend, navigating to success");
         window.location.href = `/signup/success?intent_id=${data.intent_id}`;
         return;
       }
@@ -232,16 +231,9 @@ export default function SignupWizard() {
             />
           )}
           {currentStep === 2 && (
-            <Step3Payment
-              formData={formData}
-              updateFormData={updateFormData}
-              nextStep={nextStep}
-              prevStep={prevStep}
-            />
-          )}
-          {currentStep === 3 && (
             <Step4Confirmation
               formData={formData}
+              updateFormData={updateFormData}
               prevStep={prevStep}
               onCreateIntent={handleCreateIntent}
             />

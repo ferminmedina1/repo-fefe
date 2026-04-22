@@ -9,8 +9,7 @@ interface Step {
 const steps: Step[] = [
   { title: "Datos de cuenta", description: "Información básica" },
   { title: "Elegir plan", description: "Selecciona tu plan" },
-  { title: "Método de pago", description: "Añade una tarjeta" },
-  { title: "Confirmación", description: "Revisa y finaliza" },
+  { title: "Paso final", description: "Confirmar y Pagar" },
 ];
 
 interface SignupStepperProps {
@@ -59,7 +58,7 @@ export function SignupStepper({ currentStep }: SignupStepperProps) {
                   index < currentStep
                     ? "text-green-600" // Pasos completados: verde
                     : index === currentStep
-                    ? "text-foreground" // Paso actual: foreground
+                    ? "text-white" // Paso actual: blanco
                     : "text-muted-foreground" // Pasos no completados: muted
                 )}
               >
@@ -68,7 +67,11 @@ export function SignupStepper({ currentStep }: SignupStepperProps) {
               <p
                 className={cn(
                   "text-xs",
-                  index < currentStep ? "text-green-500" : "text-muted-foreground"
+                  index === currentStep
+                    ? "text-white"
+                    : index < currentStep
+                    ? "text-green-500"
+                    : "text-muted-foreground"
                 )}
               >
                 {step.description}
