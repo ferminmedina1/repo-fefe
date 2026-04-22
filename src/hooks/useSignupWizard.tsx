@@ -67,8 +67,8 @@ export function useSignupWizard() {
     setFormData((prev) => ({ ...prev, ...data }));
   };
 
-  const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, 4));
-  const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 3));
+  const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, 2));
+  const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 0));
   const goToStep = (step: number) => setCurrentStep(step);
 
   const saveIntent = (id: string) => {
