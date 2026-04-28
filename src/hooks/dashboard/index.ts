@@ -21,3 +21,4 @@ export { useTemplates, useTemplatesForCategory, useSaveTemplateFromLayout, type 
 export { useCreateShareLink, useGetShareLink, useDeleteShareLink, useRetrieveSharedDashboard, generateShareUrl, type DashboardShare } from "./useShareLink";
 export { useInvalidateDashboardQueries } from "./useInvalidateDashboard";
 export { useInitializeDashboardTables, safeQuery, getDashboardFallbacks } from "./useDashboardTableCheck";
+export { useDashboardAllData, type DashboardAllData, type UseDashboardAllDataResult } from "./useDashboardAllData";

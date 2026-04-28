@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { useMetricFormula } from "@/hooks/dashboard/useMetricFormula";
 import { useMetricHistory } from "@/hooks/dashboard/useMetricBuilder";
 import { CustomMetric } from "@/hooks/dashboard/useMetricBuilder";
+import { WidgetLoadingSkeleton, WidgetErrorState } from "@/hooks/useWidgetState";
 
 export interface CustomMetricWidgetProps {
   metric: CustomMetric;
@@ -11,26 +12,31 @@ export interface CustomMetricWidgetProps {
 export const CustomMetricWidget = ({ metric }: CustomMetricWidgetProps) => {
   const { evaluateFormula, isLoading } = useMetricFormula();
   const { data: history } = useMetricHistory(metric.id);
+  const [formulaError, setFormulaError] = useState<Error | null>(null);
 
   // Calculate current value - with error handling
   const currentValue = useMemo(() => {
     try {
+      setFormulaError(null);
       if (!metric.formula || typeof metric.formula !== 'string') {
-        console.warn('Invalid formula provided to CustomMetricWidget:', metric.formula);
+        const err = new Error('Fórmula inválida proporcionada');
+        setFormulaError(err);
         return null;
       }
       const result = evaluateFormula(metric.formula);
       // Validate result is a number
       if (typeof result !== 'number' && result !== null) {
-        console.warn('Formula did not return a valid number:', result);
+        const err = new Error(`La fórmula devolvió: ${typeof result}`);
+        setFormulaError(err);
         return null;
       }
       return result;
     } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      setFormulaError(err);
       console.error('Error evaluating formula:', {
         formula: metric.formula,
-        error: error instanceof Error ? error.message : String(error),
-        fullError: error
+        error: err.message,
       });
       return null;
     }
@@ -84,19 +90,9 @@ export const CustomMetricWidget = ({ metric }: CustomMetricWidgetProps) => {
       {/* Value Display */}
       <div className="flex-1 flex items-center justify-center py-4">
         {isLoading ? (
-          <div 
-            className="w-8 h-8 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin"
-            role="status"
-            aria-label="Cargando métrica"
-            aria-busy="true"
-          />
-        ) : currentValue === null ? (
-          <div className="text-center">
-            <p className="text-sm text-red-600">Error al calcular</p>
-            <code className="text-xs text-gray-600 mt-2 block break-words">
-              {metric.formula}
-            </code>
-          </div>
+          <WidgetLoadingSkeleton height="h-24" />
+        ) : formulaError || currentValue === null ? (
+          <WidgetErrorState error={formulaError || new Error('No se pudo calcular')} />
         ) : (
           <div className="text-center">
             <p className="text-3xl font-bold text-purple-600">

@@ -1,26 +1,29 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { X, Settings, GripVertical } from "lucide-react";
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { WidgetActionMenu } from "./WidgetActionMenu";
 
 interface WidgetWrapperProps {
+  id: string;
   title: string;
   description?: string;
   icon?: ReactNode;
   accentColor: string;
-  onRemove?: () => void;
+  onEditMetric?: () => void;
   onConfigure?: () => void;
+  onRemove?: () => void;
   isDragging?: boolean;
   children: ReactNode;
   className?: string;
 }
 
 export function WidgetWrapper({
+  id,
   title,
   description,
   icon,
   accentColor,
+  onEditMetric,
   onRemove,
   onConfigure,
   isDragging,
@@ -105,30 +108,14 @@ export function WidgetWrapper({
           </div>
         </div>
 
-        <div className="flex gap-0.5">
-          {onConfigure && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onConfigure}
-              className="h-6 w-6 p-0 hover:bg-primary/10 hover:text-primary"
-              title="Configurar widget"
-            >
-              <Settings className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          {onRemove && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onRemove}
-              className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive"
-              title="Eliminar widget"
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
+        {/* Widget Action Menu - arriba a la derecha, discreto */}
+        <WidgetActionMenu
+          widgetId={id}
+          widgetName={title}
+          onEditMetric={onEditMetric || (() => {})}
+          onConfigure={onConfigure || (() => {})}
+          onRemove={onRemove || (() => {})}
+        />
       </CardHeader>
 
       <CardContent className="space-y-1 px-3 pb-2 pt-0">{children}</CardContent>

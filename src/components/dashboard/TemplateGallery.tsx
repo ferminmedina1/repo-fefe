@@ -26,14 +26,14 @@ export function TemplateGallery({ onSelectTemplate, onClose }: TemplateGalleryPr
     try {
       await onSelectTemplate(widgets);
       toast({
-        title: "✓ Template aplicado",
+        title: "✓ Plantilla aplicada",
         description: `Cargados ${widgets.length} widgets`,
       });
       onClose();
     } catch (error) {
       console.error('[TemplateGallery] Error:', error);
       toast({
-        title: "Error al aplicar template",
+        title: "Error al aplicar plantilla",
         description: error instanceof Error ? error.message : "Error desconocido",
         variant: "destructive",
       });
@@ -101,15 +101,15 @@ export function TemplateGallery({ onSelectTemplate, onClose }: TemplateGalleryPr
             <div className="py-12 text-center">
               <div className="mb-4 text-4xl">📋</div>
               <p className="text-base font-medium text-foreground mb-2">
-                No hay templates disponibles
+                No hay plantillas disponibles
               </p>
               {templatesError && (
                 <p className="text-sm text-destructive font-medium mt-2">
-                  Error: {templatesError.message || 'No se pudieron cargar los templates'}
+                  Error: {templatesError.message || 'No se pudieron cargar las plantillas'}
                 </p>
               )}
               <p className="text-sm text-muted-foreground mt-3">
-                Los templates aparecerán aquí una vez que se configure la base de datos.
+                Las plantillas aparecerán aquí una vez que se configure la base de datos.
               </p>
             </div>
           )}

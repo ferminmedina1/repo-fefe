@@ -216,14 +216,14 @@ export function EnterpriseDragDropContainer({
   const handleDragStart = (event: DragStartEvent) => {
     setIsDraggingAny(true);
     if (enableLogging) {
-      console.log("[Dashboard] Drag started:", event.active.id);
+      // Debug: Drag started
     }
   };
 
   const handleDragCancel = (event: DragCancelEvent) => {
     setIsDraggingAny(false);
     if (enableLogging) {
-      console.log("[Dashboard] Drag cancelled:", event.active.id);
+      // Debug: Drag cancelled
     }
   };
 

@@ -1,8 +1,9 @@
 import { WidgetWrapper } from "./WidgetWrapper";
 import { WidgetConfigModal, WidgetConfig } from "./WidgetConfigModal";
-import { useWidgetContext } from "@/contexts/WidgetContext";
+import { MetricEditorModal } from "./MetricEditorModal";
+import { useWidgetState, WidgetLoadingSkeleton, WidgetEmptyState, WidgetErrorState } from "@/hooks/useWidgetState";
 import { WidgetDefinition } from "@/lib/dashboard/widgets";
-import { useState, Suspense, useEffect } from "react";
+import { useState } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -14,7 +15,6 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { LoadingSkeleton } from "@/lib/dashboard/lazyLoading";
 
 interface ChartData {
   producto?: string;
@@ -28,53 +28,60 @@ interface ChartData {
 }
 
 interface ChartWidgetProps {
+  id: string;
   definition: WidgetDefinition;
+  metricConfig?: {
+    metricId?: string;
+    customFormula?: string;
+    customFormat?: 'currency' | 'number' | 'percentage' | 'decimal';
+    customUnit?: string;
+  };
+  onUpdateMetricConfig?: (config: {
+    metricId?: string;
+    customFormula?: string;
+    customFormat?: 'currency' | 'number' | 'percentage' | 'decimal';
+    customUnit?: string;
+  }) => void;
   // ✅ Removed: data, isLoading, onRemove, isDragging (now come from context)
 }
 
 export function ChartWidget({
+  id,
   definition,
+  metricConfig,
+  onUpdateMetricConfig,
 }: ChartWidgetProps) {
-  const [showConfig, setShowConfig] = useState(false);
-  const [widgetConfig, setWidgetConfig] = useState<WidgetConfig>({
-    refreshInterval: 30,
-    showTitle: true,
-    showDescription: true,
-    enableCache: true,
-  });
-  
-  // ✅ NEW: Get data from context instead of props
-  const context = useWidgetContext();
-  const widgetData = context.dataMap[definition.id];
-  const data = widgetData?.data;
-  const isLoading = widgetData?.isLoading ?? false;
-  const onRemove = () => context.onWidgetRemove(definition.id);
-  const isDragging = context.isDragging;
+  const [showMetricEditor, setShowMetricEditor] = useState(false);
+  // ✅ CONSOLIDATED: Single hook replaces 8 lines of state management
+  const {
+    showConfig,
+    setShowConfig,
+    widgetConfig,
+    setWidgetConfig,
+    data,
+    isLoading,
+    error,
+    onRemove,
+    isDragging,
+  } = useWidgetState(definition);
 
-  const [chartError, setChartError] = useState<string | null>(null);
+  const renderContent = () => {
+    // ✅ CONSOLIDATED: Use centralized loading state
+    if (isLoading) {
+      return <WidgetLoadingSkeleton height="h-48" />;
+    }
 
-  // ✅ FIXED: Move error clearing to useEffect instead of during render
-  useEffect(() => {
-    setChartError(null);
-  }, [data, isLoading]);
+    // ✅ CONSOLIDATED: Use centralized empty state
+    if (!data || data.length === 0) {
+      return <WidgetEmptyState message="Sin datos disponibles" />;
+    }
 
-  const renderChart = () => {
+    // ✅ CONSOLIDATED: Use centralized error state
+    if (error) {
+      return <WidgetErrorState error={error} />;
+    }
+
     try {
-
-      if (isLoading) {
-        return (
-          <div className="h-48 bg-muted animate-pulse rounded" />
-        );
-      }
-
-      if (!data || data.length === 0) {
-        return (
-          <div className="h-48 flex items-center justify-center">
-            <p className="text-sm text-muted-foreground">Sin datos disponibles</p>
-          </div>
-        );
-      }
-
       switch (definition.id) {
         case "chart-top-products":
         case "chart-top-customers":
@@ -146,21 +153,25 @@ export function ChartWidget({
             </div>
           );
       }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Error al renderizar el gráfico';
-      console.error('ChartWidget render error:', error);
-      // ✅ FIXED: Don't call setState during render - log error instead
-      return (
-        <div className="h-80 flex flex-col items-center justify-center gap-2">
-          <p className="text-sm text-red-600 font-medium">Error al renderizar gráfico</p>
-          <p className="text-xs text-muted-foreground">{errorMsg}</p>
-        </div>
-      );
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      return <WidgetErrorState error={error} />;
     }
   };
 
   return (
     <>
+      <MetricEditorModal
+        open={showMetricEditor}
+        onOpenChange={setShowMetricEditor}
+        currentConfig={metricConfig || {}}
+        onSave={(config) => {
+          if (onUpdateMetricConfig) {
+            onUpdateMetricConfig(config);
+          }
+          setShowMetricEditor(false);
+        }}
+      />
       <WidgetConfigModal
         isOpen={showConfig}
         widgetName={definition.name}
@@ -173,17 +184,16 @@ export function ChartWidget({
         }}
       />
       <WidgetWrapper
+        id={id}
         title={definition.name}
         description={definition.description}
         icon={<definition.icon className="h-5 w-5" />}
         accentColor={definition.color}
+        onEditMetric={() => setShowMetricEditor(true)}
         onConfigure={() => setShowConfig(true)}
         isDragging={isDragging}
       >
-        {/* ✅ NEW: Wrap chart rendering with Suspense for lazy loading */}
-        <Suspense fallback={<LoadingSkeleton />}>
-          {renderChart()}
-        </Suspense>
+        {renderContent()}
       </WidgetWrapper>
     </>
   );

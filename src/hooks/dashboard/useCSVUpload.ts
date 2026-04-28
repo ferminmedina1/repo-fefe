@@ -1,6 +1,12 @@
 import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import Papa from 'papaparse';
+import { 
+  sanitizeCSVRow, 
+  validateCSVDataset, 
+  validateCSVFile,
+  containsDangerousPatterns 
+} from '@/lib/dashboard/csvValidator';
 
 export interface CSVUploadResult {
   success: boolean;
@@ -99,10 +105,29 @@ export const useCSVUpload = () => {
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
 
+        // ✅ SECURITY: Sanitize entire row
+        const expectedSchema: Record<string, any> = {
+          product_name: 'string',
+          quantity: 'number',
+          unit_price: 'number',
+          customer_name: 'string',
+          cost: 'number',
+          category: 'string',
+          date: 'date',
+        };
+
+        const sanitized = sanitizeCSVRow(row, expectedSchema);
+        if (sanitized.errors.length > 0) {
+          warnings.push(`Row ${i + 2}: ${sanitized.errors.join('; ')}`);
+          continue;
+        }
+
+        const sanitizedRow = sanitized.data;
+
         // Extract required fields
-        const productName = row.product_name?.toString().trim();
-        const quantity = parseFloat(row.quantity?.toString() || '0');
-        const unitPrice = parseFloat(row.unit_price?.toString() || '0');
+        const productName = sanitizedRow.product_name?.toString().trim();
+        const quantity = sanitizedRow.quantity ?? parseFloat(row.quantity?.toString() || '0');
+        const unitPrice = sanitizedRow.unit_price ?? parseFloat(row.unit_price?.toString() || '0');
 
         // Validate required fields
         if (!productName) {
@@ -111,26 +136,35 @@ export const useCSVUpload = () => {
         }
 
         if (isNaN(quantity) || quantity <= 0) {
-          warnings.push(`Row ${i + 2}: Invalid quantity "${row.quantity}"`);
+          warnings.push(`Row ${i + 2}: Invalid quantity (must be > 0)`);
           continue;
         }
 
         if (isNaN(unitPrice) || unitPrice < 0) {
-          warnings.push(`Row ${i + 2}: Invalid unit_price "${row.unit_price}"`);
+          warnings.push(`Row ${i + 2}: Invalid unit_price (must be >= 0)`);
           continue;
         }
 
-        // Extract optional fields
-        const cost = row.cost ? parseFloat(row.cost.toString()) : unitPrice * 0.6; // Default 60% cost
-        const customerName = row.customer_name?.toString().trim() || 'Sin cliente';
-        const category = row.category?.toString().trim() || 'General';
-        const dateStr = row.date?.toString().trim() || new Date().toISOString().split('T')[0];
-
-        // Validate date
-        const saleDate = new Date(dateStr);
-        if (isNaN(saleDate.getTime())) {
-          warnings.push(`Row ${i + 2}: Invalid date "${row.date}"`);
+        // ✅ SECURITY: Check for dangerous patterns in string fields
+        if (containsDangerousPatterns(productName)) {
+          errors.push(`Row ${i + 2}: Contenido sospechoso en product_name`);
           continue;
+        }
+
+        // Extract optional fields (with sanitization)
+        const cost = sanitizedRow.cost ?? (unitPrice * 0.6); // Default 60% cost
+        const customerName = (sanitizedRow.customer_name || 'Sin cliente').toString().trim();
+        const category = (sanitizedRow.category || 'General').toString().trim();
+        
+        // Validate date
+        let saleDate = sanitizedRow.date;
+        if (!saleDate) {
+          const dateStr = row.date?.toString().trim() || new Date().toISOString().split('T')[0];
+          saleDate = new Date(dateStr);
+          if (isNaN(saleDate.getTime())) {
+            warnings.push(`Row ${i + 2}: Invalid date format`);
+            saleDate = new Date();
+          }
         }
 
         const subtotal = quantity * unitPrice;

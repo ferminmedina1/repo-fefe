@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Upload, AlertCircle, CheckCircle, X, Download } from 'lucide-react';
 import { useCSVUpload } from '@/hooks/dashboard/useCSVUpload';
 import { useCompany } from '@/contexts/CompanyContext';
+import { validateCSVFile } from '@/lib/dashboard/csvValidator';
 
 export interface CSVUploaderProps {
   onSuccess?: (inserted: number) => void;
@@ -45,17 +46,10 @@ export const CSVUploader = ({ onSuccess, onClose }: CSVUploaderProps) => {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const droppedFile = e.dataTransfer.files[0];
       
-      // Validate file type
-      const isValidType = droppedFile.type === 'text/csv' || droppedFile.name.endsWith('.csv');
-      if (!isValidType) {
-        alert('Por favor selecciona un archivo CSV válido');
-        return;
-      }
-      
-      // Validate file size (max 10MB) 
-      const maxFileSize = 10 * 1024 * 1024;
-      if (droppedFile.size > maxFileSize) {
-        alert(`Archivo demasiado grande (${(droppedFile.size / 1024 / 1024).toFixed(1)}MB). Máximo: 10MB`);
+      // ✅ SECURITY: Use centralized validation
+      const validation = validateCSVFile(droppedFile);
+      if (!validation.valid) {
+        alert(validation.error);
         return;
       }
       
@@ -70,16 +64,10 @@ export const CSVUploader = ({ onSuccess, onClose }: CSVUploaderProps) => {
   };
 
   const handleFile = async (selectedFile: File) => {
-    // Validate file size (max 10MB)
-    const maxFileSize = 10 * 1024 * 1024; // 10MB
-    if (selectedFile.size > maxFileSize) {
-      alert('Archivo demasiado grande (máximo 10 MB)');
-      return;
-    }
-
-    // Validate file type
-    if (selectedFile.type !== 'text/csv' && !selectedFile.name.endsWith('.csv')) {
-      alert('Por favor selecciona un archivo CSV válido');
+    // ✅ SECURITY: Use centralized validation
+    const validation = validateCSVFile(selectedFile);
+    if (!validation.valid) {
+      alert(validation.error);
       return;
     }
 

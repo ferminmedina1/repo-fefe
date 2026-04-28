@@ -109,7 +109,7 @@ export function DashboardEmptyState({
               Construí tu Panel de Control
             </h1>
             <p className={`${DASHBOARD_DESIGN.typography.caption} text-lg max-w-xl mx-auto`}>
-              Empieza con un template prearmado o diseña desde cero. Sin límites de creatividad.
+              Empieza con una plantilla prearmada o diseña desde cero. Sin límites de creatividad.
             </p>
           </div>
         </div>
@@ -145,7 +145,7 @@ export function DashboardEmptyState({
               {/* Content */}
               <div className="space-y-2">
                 <h3 className={`${DASHBOARD_DESIGN.typography.subheading} text-foreground`}>
-                  Usar un template
+                  Usar una plantilla
                 </h3>
                 <p className={`${DASHBOARD_DESIGN.typography.caption} line-clamp-2`}>
                   Empieza con dashboards preconstruidos para SaaS, ecommerce, inventario y más
@@ -163,7 +163,7 @@ export function DashboardEmptyState({
                   group-hover:translate-x-0.5
                 `}
               >
-                Explorar templates
+                Explorar plantillas
                 <Zap className="w-4 h-4 ml-2" />
               </Button>
             </div>
@@ -232,7 +232,7 @@ export function DashboardEmptyState({
           <p className={`${DASHBOARD_DESIGN.typography.caption} text-sm`}>
             💡{' '}
             <span className="font-medium text-foreground">
-              Podés cambiar de template cuando quieras o combinar elementos de varios
+              Podés cambiar de plantilla cuando quieras o combinar elementos de varios
             </span>
           </p>
         </div>

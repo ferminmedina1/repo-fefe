@@ -1,50 +1,66 @@
-import { useState } from "react";
 import { WidgetWrapper } from "./WidgetWrapper";
 import { WidgetConfigModal, WidgetConfig } from "./WidgetConfigModal";
-import { useWidgetContext } from "@/contexts/WidgetContext";
-import { Skeleton } from "@/components/ui/skeleton";
+import { MetricEditorModal } from "./MetricEditorModal";
+import { useWidgetState, WidgetLoadingSkeleton, WidgetEmptyState, WidgetErrorState } from "@/hooks/useWidgetState";
 import { Badge } from "@/components/ui/badge";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { WidgetDefinition } from "@/lib/dashboard/widgets";
 import { MonthlyComparisonData } from "@/hooks/dashboard/useMonthlyComparison";
 import { ReceivablesData } from "@/hooks/dashboard/useReceivables";
+import { useState } from "react";
 
 interface KpiWidgetProps {
+  id: string;
   definition: WidgetDefinition;
+  metricConfig?: {
+    metricId?: string;
+    customFormula?: string;
+    customFormat?: 'currency' | 'number' | 'percentage' | 'decimal';
+    customUnit?: string;
+  };
+  onUpdateMetricConfig?: (config: {
+    metricId?: string;
+    customFormula?: string;
+    customFormat?: 'currency' | 'number' | 'percentage' | 'decimal';
+    customUnit?: string;
+  }) => void;
   // ✅ Removed: data, isLoading, onRemove, isDragging (now come from context)
 }
 
 export function KpiWidget({
+  id,
   definition,
+  metricConfig,
+  onUpdateMetricConfig,
 }: KpiWidgetProps) {
-  const [showConfig, setShowConfig] = useState(false);
-  const [widgetConfig, setWidgetConfig] = useState<WidgetConfig>({
-    refreshInterval: 30,
-    showTitle: true,
-    showDescription: true,
-    enableCache: true,
-  });
-  
-  // ✅ NEW: Get data from context instead of props
-  const context = useWidgetContext();
-  const widgetData = context.dataMap[definition.id];
-  const data = widgetData?.data;
-  const isLoading = widgetData?.isLoading ?? false;
-  const onRemove = () => context.onWidgetRemove(definition.id);
-  const isDragging = context.isDragging;
+  const [showMetricEditor, setShowMetricEditor] = useState(false);
+  // ✅ CONSOLIDATED: Single hook replaces 8 lines of state management
+  const {
+    showConfig,
+    setShowConfig,
+    widgetConfig,
+    setWidgetConfig,
+    data,
+    isLoading,
+    error,
+    onRemove,
+    isDragging,
+  } = useWidgetState(definition);
 
   const renderContent = () => {
+    // ✅ CONSOLIDATED: Use centralized loading state
     if (isLoading) {
-      return (
-        <div className="space-y-1">
-          <Skeleton className="h-8 w-24" />
-          <Skeleton className="h-3 w-32" />
-        </div>
-      );
+      return <WidgetLoadingSkeleton height="h-16" />;
     }
 
+    // ✅ CONSOLIDATED: Use centralized empty state
     if (!data) {
-      return <p className="text-[11px] text-muted-foreground">Sin datos disponibles</p>;
+      return <WidgetEmptyState message="Sin datos disponibles" />;
+    }
+
+    // ✅ CONSOLIDATED: Use centralized error state
+    if (error) {
+      return <WidgetErrorState error={error} />;
     }
 
     switch (definition.id) {
@@ -146,6 +162,17 @@ export function KpiWidget({
 
   return (
     <>
+      <MetricEditorModal
+        open={showMetricEditor}
+        onOpenChange={setShowMetricEditor}
+        currentConfig={metricConfig || {}}
+        onSave={(config) => {
+          if (onUpdateMetricConfig) {
+            onUpdateMetricConfig(config);
+          }
+          setShowMetricEditor(false);
+        }}
+      />
       <WidgetConfigModal
         isOpen={showConfig}
         widgetName={definition.name}
@@ -158,10 +185,12 @@ export function KpiWidget({
         }}
       />
       <WidgetWrapper
+        id={id}
         title={definition.name}
         description={definition.description}
         icon={<definition.icon className="h-5 w-5" />}
         accentColor={definition.color}
+        onEditMetric={() => setShowMetricEditor(true)}
         onConfigure={() => setShowConfig(true)}
         isDragging={isDragging}
       >

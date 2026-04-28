@@ -21,11 +21,19 @@ const normalizeLayoutWidgets = (widgets: DashboardWidget[]): DashboardWidget[] =
   }));
 };
 
+export interface WidgetMetricConfig {
+  metricId?: string;
+  customFormula?: string;
+  customFormat?: 'currency' | 'number' | 'percentage' | 'decimal';
+  customUnit?: string;
+}
+
 export interface DashboardWidget {
   id: string;
   type: string;
   size?: "full" | "half" | "quarter";
   order: number;
+  metricConfig?: WidgetMetricConfig;
 }
 
 export interface DashboardLayoutData {
@@ -200,6 +208,17 @@ export function useDashboardLayout(
     }
   };
 
+  // ✅ NEW: Update metric config for a widget
+  const updateWidgetMetricConfig = (widgetId: string, metricConfig: WidgetMetricConfig) => {
+    setLocalWidgets((prev) =>
+      prev.map((w) =>
+        w.id === widgetId
+          ? { ...w, metricConfig }
+          : w
+      )
+    );
+  };
+
   // Manually save
   const save = async () => {
     await saveLayoutMutation.mutateAsync(localWidgets);
@@ -216,6 +235,7 @@ export function useDashboardLayout(
     removeWidget,
     reorderWidgets,
     resetLayout,
+    updateWidgetMetricConfig,
     save,
     layoutId: layoutData?.id,
   };
