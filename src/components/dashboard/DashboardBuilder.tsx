@@ -126,6 +126,7 @@ export function DashboardBuilder() {
     layoutId,
     updateWidget,
     updateWidgetMetricConfig,
+    updateWidgetConfig,
     undo,
     redo,
     canUndo,
@@ -634,6 +635,17 @@ export function DashboardBuilder() {
               updateWidgetMetricConfig(widget.id, metricConfig);
             };
 
+            const handleUpdateWidgetConfig = (widgetConfig: {
+              refreshInterval?: number;
+              showTitle?: boolean;
+              showDescription?: boolean;
+              maxItems?: number;
+              enableCache?: boolean;
+              [key: string]: any;
+            }) => {
+              updateWidgetConfig(widget.id, widgetConfig);
+            };
+
             switch (definition.category) {
               case "kpi":
                 return (
@@ -641,7 +653,9 @@ export function DashboardBuilder() {
                     id={widget.id}
                     definition={definition}
                     metricConfig={widget.metricConfig}
+                    widgetConfig={widget.widgetConfig}
                     onUpdateMetricConfig={handleUpdateMetricConfig}
+                    onUpdateWidgetConfig={handleUpdateWidgetConfig}
                   />
                 );
               case "chart":
@@ -650,7 +664,9 @@ export function DashboardBuilder() {
                     id={widget.id}
                     definition={definition}
                     metricConfig={widget.metricConfig}
+                    widgetConfig={widget.widgetConfig}
                     onUpdateMetricConfig={handleUpdateMetricConfig}
+                    onUpdateWidgetConfig={handleUpdateWidgetConfig}
                   />
                 );
               case "list":
@@ -659,7 +675,9 @@ export function DashboardBuilder() {
                     id={widget.id}
                     definition={definition}
                     metricConfig={widget.metricConfig}
+                    widgetConfig={widget.widgetConfig}
                     onUpdateMetricConfig={handleUpdateMetricConfig}
+                    onUpdateWidgetConfig={handleUpdateWidgetConfig}
                   />
                 );
               case "currency":
@@ -668,7 +686,9 @@ export function DashboardBuilder() {
                     id={widget.id}
                     definition={definition}
                     metricConfig={widget.metricConfig}
+                    widgetConfig={widget.widgetConfig}
                     onUpdateMetricConfig={handleUpdateMetricConfig}
+                    onUpdateWidgetConfig={handleUpdateWidgetConfig}
                   />
                 );
               default:

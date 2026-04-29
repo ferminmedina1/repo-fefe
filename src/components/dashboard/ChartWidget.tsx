@@ -52,12 +52,10 @@ export function ChartWidget({
   onUpdateMetricConfig,
 }: ChartWidgetProps) {
   const [showMetricEditor, setShowMetricEditor] = useState(false);
-  // ✅ CONSOLIDATED: Single hook replaces 8 lines of state management
+  // ✅ CONSOLIDATED: Single hook replaces loading, error, and drag state
   const {
     showConfig,
     setShowConfig,
-    widgetConfig,
-    setWidgetConfig,
     data,
     isLoading,
     error,
@@ -179,8 +177,10 @@ export function ChartWidget({
         config={widgetConfig}
         onClose={() => setShowConfig(false)}
         onSave={(config) => {
-          setWidgetConfig(config);
-          // TODO: Persist config to database if needed
+          if (onUpdateWidgetConfig) {
+            onUpdateWidgetConfig(config);
+          }
+          setShowConfig(false);
         }}
       />
       <WidgetWrapper

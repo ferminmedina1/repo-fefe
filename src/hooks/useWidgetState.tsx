@@ -55,13 +55,7 @@ export function useWidgetState(definition: WidgetDefinition, widgetId: string): 
   // ✅ State: Config modal visibility
   const [showConfig, setShowConfig] = useState(false);
 
-  // ✅ State: Widget configuration
-  const [widgetConfig, setWidgetConfig] = useState<WidgetConfig>({
-    refreshInterval: 30,
-    showTitle: true,
-    showDescription: true,
-    enableCache: true,
-  });
+  // ✅ NOTE: Widget config now comes as prop (widgetConfig) and persists via onUpdateWidgetConfig callback
 
   // ✅ Get context
   const context = useWidgetContext();
@@ -79,11 +73,7 @@ export function useWidgetState(definition: WidgetDefinition, widgetId: string): 
   // ✅ Action: Remove this widget
   const onRemove = () => context.onWidgetRemove(widgetId);
 
-  // ✅ Action: Update widget config
-  const onUpdateConfig = (newConfig: WidgetConfig) => {
-    setWidgetConfig(newConfig);
-    context.onWidgetUpdate(widgetId, newConfig);
-  };
+
 
   // ✅ UI state: Is dragging
   const isDragging = context.isDragging;
@@ -92,8 +82,6 @@ export function useWidgetState(definition: WidgetDefinition, widgetId: string): 
     // Config state
     showConfig,
     setShowConfig,
-    widgetConfig,
-    setWidgetConfig,
     
     // Data
     data,
@@ -102,7 +90,6 @@ export function useWidgetState(definition: WidgetDefinition, widgetId: string): 
     
     // Actions
     onRemove,
-    onUpdateConfig,
     
     // UI
     isDragging,

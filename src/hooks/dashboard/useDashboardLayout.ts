@@ -28,6 +28,16 @@ export interface WidgetMetricConfig {
   customUnit?: string;
 }
 
+// ✅ Widget configuration (from WidgetConfigModal) - per-instance settings
+export interface WidgetConfig {
+  refreshInterval?: number;
+  showTitle?: boolean;
+  showDescription?: boolean;
+  maxItems?: number;
+  enableCache?: boolean;
+  [key: string]: any;
+}
+
 export interface WidgetPosition {
   x: number;
   y: number;
@@ -42,6 +52,7 @@ export interface DashboardWidget {
   order: number;
   position?: WidgetPosition;
   metricConfig?: WidgetMetricConfig;
+  widgetConfig?: WidgetConfig; // ✅ NEW: Per-instance widget configuration
 }
 
 export interface DashboardLayoutData {
@@ -322,6 +333,25 @@ export function useDashboardLayout(
     }, 1000);
   };
 
+  // ✅ NEW: Update widget config for a widget (WidgetConfigModal settings)
+  const updateWidgetConfig = (widgetId: string, widgetConfig: WidgetConfig) => {
+    setLocalWidgets((prev) =>
+      prev.map((w) =>
+        w.id === widgetId
+          ? { ...w, widgetConfig }
+          : w
+      )
+    );
+    // Persist widget config changes promptly (not position-only)
+    if (positionSaveTimeoutRef.current) {
+      clearTimeout(positionSaveTimeoutRef.current);
+      positionSaveTimeoutRef.current = null;
+    }
+    autoSaveTimeout.debounce(() => {
+      saveLayoutMutation.mutate(localWidgetsRef.current);
+    }, 1000);
+  };
+
   // Manually save
   const save = async () => {
     await saveLayoutMutation.mutateAsync(localWidgets);
@@ -340,6 +370,7 @@ export function useDashboardLayout(
     resetLayout,
     updateWidget,
     updateWidgetMetricConfig,
+    updateWidgetConfig,
     save,
     layoutId: layoutData?.id,
     undo,

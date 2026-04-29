@@ -18,11 +18,27 @@ interface KpiWidgetProps {
     customFormat?: 'currency' | 'number' | 'percentage' | 'decimal';
     customUnit?: string;
   };
+  widgetConfig?: {
+    refreshInterval?: number;
+    showTitle?: boolean;
+    showDescription?: boolean;
+    maxItems?: number;
+    enableCache?: boolean;
+    [key: string]: any;
+  };
   onUpdateMetricConfig?: (config: {
     metricId?: string;
     customFormula?: string;
     customFormat?: 'currency' | 'number' | 'percentage' | 'decimal';
     customUnit?: string;
+  }) => void;
+  onUpdateWidgetConfig?: (config: {
+    refreshInterval?: number;
+    showTitle?: boolean;
+    showDescription?: boolean;
+    maxItems?: number;
+    enableCache?: boolean;
+    [key: string]: any;
   }) => void;
   // ✅ Removed: data, isLoading, onRemove, isDragging (now come from context)
 }
@@ -31,15 +47,15 @@ export function KpiWidget({
   id,
   definition,
   metricConfig,
+  widgetConfig,
   onUpdateMetricConfig,
+  onUpdateWidgetConfig,
 }: KpiWidgetProps) {
   const [showMetricEditor, setShowMetricEditor] = useState(false);
-  // ✅ CONSOLIDATED: Single hook replaces 8 lines of state management
+  // ✅ CONSOLIDATED: Single hook replaces loading, error, and drag state
   const {
     showConfig,
     setShowConfig,
-    widgetConfig,
-    setWidgetConfig,
     data,
     isLoading,
     error,
@@ -180,8 +196,10 @@ export function KpiWidget({
         config={widgetConfig}
         onClose={() => setShowConfig(false)}
         onSave={(config) => {
-          setWidgetConfig(config);
-          // TODO: Persist config to database if needed
+          if (onUpdateWidgetConfig) {
+            onUpdateWidgetConfig(config);
+          }
+          setShowConfig(false);
         }}
       />
       <WidgetWrapper
