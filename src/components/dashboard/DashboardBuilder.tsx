@@ -412,16 +412,8 @@ export function DashboardBuilder() {
             </div>
           )}
 
-          {/* Center: Title and Description */}
-          <div className="flex-1 min-w-0">
-            <h1 className="text-3xl font-bold text-foreground">Panel de Control</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              {widgets.length === 0 
-                ? "Comienza agregando tu primer widget para personalizar tu panel"
-                : `${widgets.length} widget${widgets.length !== 1 ? "s" : ""} agregado${widgets.length !== 1 ? "s" : ""}`
-              }
-            </p>
-          </div>
+          {/* Center: Spacer (title removed) */}
+          <div className="flex-1 min-w-0" />
 
           {/* Right: Add Widget + Actions Menu */}
           <div className="flex items-center gap-2 min-w-fit">
@@ -537,7 +529,7 @@ export function DashboardBuilder() {
         enableLogging={true}
         maxReordersPerMinute={60}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-min">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-max">
           {widgets.map((widget) => {
             const definition = WIDGET_CATALOG[widget.type as WidgetType];
 

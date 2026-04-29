@@ -204,7 +204,7 @@ export function DashboardSelector({
           }
         }}
       >
-        <SelectTrigger className="w-64">
+        <SelectTrigger className="w-64 border border-border hover:border-primary/50 transition-colors">
           <SelectValue 
             placeholder="Selecciona un panel"
           />
