@@ -339,11 +339,7 @@ export function DashboardBuilder() {
   if (widgets.length === 0) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Panel de Control</h1>
-            <p className="text-muted-foreground">Crea tu Panel de Control agregando widgets</p>
-          </div>
+        <div className="flex items-center justify-end">
           <WidgetPicker
             addedWidgetIds={widgets.map((w) => w.type)}
             onAddWidget={handleAddWidget}
@@ -554,19 +550,19 @@ export function DashboardBuilder() {
           const widgetContent = (() => {
             if (!definition) {
               return (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-6 shadow-sm h-full flex flex-col justify-center">
+                <div className="rounded-lg border border-border/60 bg-background/80 p-5 shadow-sm h-full flex flex-col justify-center">
                   <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <AlertTriangle className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="font-semibold text-red-900">Widget no encontrado</h4>
-                      <p className="text-sm text-red-700 mt-1">
-                        Tipo desconocido: <code className="bg-red-100 px-2 py-1 rounded text-xs">{widget.type}</code>
+                      <h4 className="font-semibold text-foreground">Bloque no disponible</h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Este widget no pudo cargarse. Tipo: <code className="bg-muted px-2 py-1 rounded text-xs">{widget.type}</code>
                       </p>
                       <button
                         onClick={() => removeWidget(widget.id)}
-                        className="text-xs text-red-600 hover:text-red-700 hover:underline mt-2"
+                        className="text-xs text-primary hover:underline mt-2"
                       >
-                        Eliminar →
+                        Quitar bloque →
                       </button>
                     </div>
                   </div>

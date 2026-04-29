@@ -39,8 +39,8 @@ export function DashboardEmptyState({
       {/* Dashboard Selector - Top Bar with futuristic styling */}
       {dashboards && dashboards.length > 0 && (
         <div className="absolute top-6 right-6 flex items-center gap-3 animate-in fade-in slide-in-from-right-4 duration-500">
-          <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 backdrop-blur-sm shadow-[0_0_20px_rgba(168,85,247,0.2)]">
-            <label className="text-sm font-semibold text-foreground">Panel de Control:</label>
+          <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-slate-950/70 border border-cyan-400/20 backdrop-blur-sm shadow-[0_0_18px_rgba(34,211,238,0.12)]">
+            <label className="text-sm font-semibold text-slate-200">Panel activo:</label>
             <Select
               value={selectedDashboardId || ''}
               onValueChange={(value) => {
@@ -54,28 +54,26 @@ export function DashboardEmptyState({
             >
               <SelectTrigger className={cn(
                 "w-48 transition-all duration-300",
-                "bg-gradient-to-r from-background/40 to-background/20",
-                "border border-purple-500/30 hover:border-purple-500/70",
-                "shadow-[0_0_15px_rgba(168,85,247,0.15)]",
-                "hover:shadow-[0_0_25px_rgba(168,85,247,0.3)]",
-                "text-foreground"
+                "bg-slate-950/80 border border-cyan-400/25 hover:border-cyan-300/50",
+                "shadow-[0_0_15px_rgba(34,211,238,0.12)] hover:shadow-[0_0_20px_rgba(34,211,238,0.18)]",
+                "text-slate-100 cursor-pointer"
               )}>
                 <SelectValue placeholder="Selecciona un panel" />
               </SelectTrigger>
-              <SelectContent className="bg-background/80 backdrop-blur-xl border-border/50 shadow-[0_8_32px_rgba(0,0,0,0.4)]">
+              <SelectContent className="bg-slate-950/95 backdrop-blur-xl border-cyan-400/20 shadow-[0_8px_32px_rgba(0,0,0,0.45)]">
                 {dashboards.map((dashboard) => (
                   <SelectItem key={dashboard.id} value={dashboard.id} className="cursor-pointer">
                     <div className="flex items-center gap-2">
                       {dashboard.is_default && (
-                        <span className="text-xs font-bold text-emerald-400">✓</span>
+                        <span className="text-xs font-bold text-cyan-300">✓</span>
                       )}
-                      <span className="text-sm">{dashboard.name}</span>
+                      <span className="text-sm text-slate-100">{dashboard.name}</span>
                     </div>
                   </SelectItem>
                 ))}
-                <hr className="my-2 border-border/30" />
+                <hr className="my-2 border-cyan-400/15" />
                 <SelectItem value="__new__" className="cursor-pointer">
-                  <div className="flex items-center gap-2 text-purple-400 font-medium">
+                  <div className="flex items-center gap-2 text-cyan-300 font-medium">
                     <Plus className="w-4 h-4" />
                     <span>Crear nuevo panel</span>
                   </div>
@@ -132,14 +130,14 @@ export function DashboardEmptyState({
               "bg-gradient-to-r from-cyan-300 via-purple-300 to-pink-300 bg-clip-text text-transparent",
               "animate-in fade-in slide-in-from-bottom-4 duration-700"
             )}>
-              Construí tu Panel de Control Futurista
+              Tu panel, más claro y más rápido
             </h1>
             <p className={cn(
               DASHBOARD_DESIGN.typography.caption,
               "text-lg max-w-2xl mx-auto text-muted-foreground",
               "animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100"
             )}>
-              Empieza con una plantilla prearmada o diseña desde cero. Animaciones suaves, efectos modernos y máxima personalización.
+              Elegí un panel, agregá solo lo que suma y evitá ruido visual. La vista está pensada para leer datos, no para administrar demasiadas cosas a la vez.
             </p>
           </div>
         </div>
@@ -193,7 +191,7 @@ export function DashboardEmptyState({
                     DASHBOARD_DESIGN.typography.subheading,
                     "text-foreground"
                   )}>
-                    Usar una Plantilla
+                    Usar una plantilla
                   </h3>
                   <Zap className="w-4 h-4 text-yellow-400" />
                 </div>
@@ -201,7 +199,7 @@ export function DashboardEmptyState({
                   DASHBOARD_DESIGN.typography.caption,
                   "line-clamp-3 text-muted-foreground"
                 )}>
-                  Empieza con dashboards preconstruidos para SaaS, ecommerce, inventario y más. Personalizables al 100%.
+                    Empezá con una base útil para luego ajustar lo mínimo necesario.
                 </p>
               </div>
 
@@ -223,7 +221,7 @@ export function DashboardEmptyState({
                 )}
               >
                 <span className="relative z-10 flex items-center justify-center gap-2">
-                  Explorar Plantillas
+                  Explorar plantillas
                   <Zap className="w-4 h-4 group-hover/btn:animate-pulse" />
                 </span>
               </Button>
@@ -277,7 +275,7 @@ export function DashboardEmptyState({
                     DASHBOARD_DESIGN.typography.subheading,
                     "text-foreground"
                   )}>
-                    Constructor Libre
+                    Constructor libre
                   </h3>
                   <Sparkles className="w-4 h-4 text-pink-400" />
                 </div>
@@ -285,7 +283,7 @@ export function DashboardEmptyState({
                   DASHBOARD_DESIGN.typography.caption,
                   "line-clamp-3 text-muted-foreground"
                 )}>
-                  Diseña tu dashboard desde cero con un editor visual potente. Arrastra, configura y personaliza cada widget.
+                    Diseñá tu tablero desde cero con controles directos y menos fricción.
                 </p>
               </div>
 
@@ -307,7 +305,7 @@ export function DashboardEmptyState({
                 )}
               >
                 <span className="relative z-10 flex items-center justify-center gap-2">
-                  Empezar Vacío
+                  Empezar vacío
                   <Plus className="w-4 h-4 group-hover/btn:rotate-90 transition-transform" />
                 </span>
               </Button>
@@ -328,8 +326,8 @@ export function DashboardEmptyState({
             "text-sm text-foreground text-center flex items-center justify-center gap-2"
           )}>
             <Sparkles className="w-5 h-5 text-emerald-400 animate-pulse" />
-            <span className="font-medium">
-              Podés cambiar de plantilla cuando quieras o combinar elementos de varios. Sin límites de edición.
+              <span className="font-medium">
+              Podés cambiar de panel cuando quieras o combinar elementos de varios. Sin límites de edición.
             </span>
           </p>
         </div>
