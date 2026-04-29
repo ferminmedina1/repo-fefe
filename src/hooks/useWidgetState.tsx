@@ -51,7 +51,7 @@ export interface UseWidgetStateResult {
  * @param definition - Widget definition from catalog
  * @returns All state needed for widget rendering
  */
-export function useWidgetState(definition: WidgetDefinition): UseWidgetStateResult {
+export function useWidgetState(definition: WidgetDefinition, widgetId: string): UseWidgetStateResult {
   // ✅ State: Config modal visibility
   const [showConfig, setShowConfig] = useState(false);
 
@@ -77,12 +77,12 @@ export function useWidgetState(definition: WidgetDefinition): UseWidgetStateResu
   const error = (widgetData?.error ?? null) as Error | null;
 
   // ✅ Action: Remove this widget
-  const onRemove = () => context.onWidgetRemove(definition.id);
+  const onRemove = () => context.onWidgetRemove(widgetId);
 
   // ✅ Action: Update widget config
   const onUpdateConfig = (newConfig: WidgetConfig) => {
     setWidgetConfig(newConfig);
-    context.onWidgetUpdate(definition.id, newConfig);
+    context.onWidgetUpdate(widgetId, newConfig);
   };
 
   // ✅ UI state: Is dragging

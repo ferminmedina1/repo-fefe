@@ -68,7 +68,7 @@ export function ImportButton({ onImport }: ImportButtonProps) {
       await onImport(importData.widgets);
       toast({
         title: "✓ Dashboard imported",
-        description: `Loaded ${importData.widgets.length} widget(s)`,
+        description: `Se cargaron ${importData.widgets.length} Tarjeta(s)`,
       });
       setImportData(null);
     } catch (error) {
@@ -106,7 +106,7 @@ export function ImportButton({ onImport }: ImportButtonProps) {
           <AlertDialogTitle>Import Dashboard?</AlertDialogTitle>
           <AlertDialogDescription className="space-y-3">
             <p>
-              This will import <strong>{importData?.widgets.length || 0} widgets</strong> from your file.
+              Esto importará <strong>{importData?.widgets.length || 0} Tarjeta(s)</strong> desde tu archivo.
             </p>
             {importData?.warnings.length ? (
               <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm text-yellow-800 space-y-1">
@@ -118,7 +118,7 @@ export function ImportButton({ onImport }: ImportButtonProps) {
                 ))}
               </div>
             ) : null}
-            <p className="text-xs text-gray-500">Existing widgets will be replaced.</p>
+            <p className="text-xs text-gray-500">Las Tarjetas existentes serán reemplazadas.</p>
           </AlertDialogDescription>
           <div className="flex gap-2 justify-end pt-4">
             <AlertDialogCancel>Cancel</AlertDialogCancel>

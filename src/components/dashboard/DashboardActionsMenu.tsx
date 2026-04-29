@@ -100,13 +100,13 @@ export function DashboardActionsMenu({
       <DropdownMenuContent align="end" className="w-56">
         {/* Widget Management */}
         <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Gestión de Widgets
+          Gestión de Tarjetas
         </DropdownMenuLabel>
 
         {onAddWidget && (
           <DropdownMenuItem onClick={() => handleAction(onAddWidget)} disabled={isSaving}>
             <Zap className="h-4 w-4 mr-2" />
-            <span>Agregar Widget</span>
+            <span>Agregar Tarjeta</span>
           </DropdownMenuItem>
         )}
 

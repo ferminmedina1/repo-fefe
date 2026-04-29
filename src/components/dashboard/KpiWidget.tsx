@@ -45,7 +45,7 @@ export function KpiWidget({
     error,
     onRemove,
     isDragging,
-  } = useWidgetState(definition);
+  } = useWidgetState(definition, id);
 
   const renderContent = () => {
     // ✅ CONSOLIDATED: Use centralized loading state

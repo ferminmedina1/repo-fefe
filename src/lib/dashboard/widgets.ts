@@ -154,6 +154,9 @@ const LEGACY_WIDGET_ID_MAP: Record<string, WidgetType> = {
   "gross-margin": "kpi-gross-margin",
   "receivables": "kpi-receivables",
   "sales-today": "kpi-sales-today",
+  // Backward compatibility for previously generated custom types
+  "custom-kpi": "kpi-monthly-sales",
+  "custom-chart": "chart-sales-7days",
   "top-products": "chart-top-products",
   "top-customers": "chart-top-customers",
   "sales-7days": "chart-sales-7days",

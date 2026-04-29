@@ -82,14 +82,14 @@ export function WidgetPicker({ addedWidgetIds, onAddWidget, onCreateWidgetWithMe
           className="gap-2"
         >
           <Plus className="h-4 w-4" />
-          Agregar Widget
+          Agregar Tarjeta
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="flex flex-col w-full sm:max-w-2xl">
         <SheetHeader>
-          <SheetTitle>Agregar Widget al Panel de Control</SheetTitle>
+          <SheetTitle>Agregar Tarjeta al Panel de Control</SheetTitle>
           <SheetDescription>
-            Selecciona widgets pre-hechos o crea uno personalizado
+            Selecciona Tarjetas pre-hechas o crea una personalizada
           </SheetDescription>
         </SheetHeader>
 
@@ -108,7 +108,7 @@ export function WidgetPicker({ addedWidgetIds, onAddWidget, onCreateWidgetWithMe
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar widgets..."
+                placeholder="Buscar Tarjetas..."
                 className="pl-8"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -167,8 +167,8 @@ export function WidgetPicker({ addedWidgetIds, onAddWidget, onCreateWidgetWithMe
               <div className="flex flex-col items-center justify-center py-8">
                 <p className="text-sm text-muted-foreground text-center">
                   {isAllWidgetsAdded
-                    ? "Ya has agregado todos los widgets disponibles"
-                    : "No se encontraron widgets que coincidan"}
+                    ? "Ya has agregado todas las Tarjetas disponibles"
+                    : "No se encontraron Tarjetas que coincidan"}
                 </p>
               </div>
             ) : (
@@ -217,7 +217,7 @@ export function WidgetPicker({ addedWidgetIds, onAddWidget, onCreateWidgetWithMe
               </div>
               <div className="text-center space-y-2">
                 <h3 className="font-semibold text-lg text-slate-900">
-                  Crear Widget Personalizado
+                  Crear Tarjeta Personalizada
                 </h3>
                 <p className="text-sm text-slate-600 max-w-sm">
                   Abre el creador de widgets para:

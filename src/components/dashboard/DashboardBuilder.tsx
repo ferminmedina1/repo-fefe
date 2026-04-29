@@ -341,7 +341,8 @@ export function DashboardBuilder() {
 
     addWidget({
       id: widgetId,
-      type: widget.type === 'chart' ? 'custom-chart' : 'custom-kpi',
+      // Use supported catalog types to avoid unavailable blocks.
+      type: widget.type === 'chart' ? 'chart-sales-7days' : 'kpi-monthly-sales',
       size: widget.size,
       position: {
         x: offsetX,
@@ -423,6 +424,21 @@ export function DashboardBuilder() {
 
   const addedWidgetTypes = widgets.map((w) => w.type);
   const availableWidgets = getAvailableWidgets(addedWidgetTypes);
+
+  const resolveWidgetDefinition = (widgetType: string) => {
+    const directDefinition = WIDGET_CATALOG[widgetType as WidgetType];
+    if (directDefinition) return directDefinition;
+
+    // Backward compatibility for older saved custom types.
+    if (widgetType === 'custom-kpi') {
+      return WIDGET_CATALOG['kpi-monthly-sales'];
+    }
+    if (widgetType === 'custom-chart') {
+      return WIDGET_CATALOG['chart-sales-7days'];
+    }
+
+    return undefined;
+  };
 
   return (
     <WidgetProvider
@@ -531,7 +547,7 @@ export function DashboardBuilder() {
                 Comienza en segundos
               </h3>
               <p className="text-sm text-muted-foreground">
-                Elige uno de nuestros widgets populares para comenzar, o crea uno personalizado
+                Elige una de nuestras Tarjetas populares para comenzar, o crea una personalizada
               </p>
             </div>
 
@@ -574,7 +590,7 @@ export function DashboardBuilder() {
         {/* Widget management actions when widgets exist */}
         {widgets.length > 0 && availableWidgets.length > 0 && (
           <div className="text-xs text-muted-foreground text-center py-2">
-            {availableWidgets.length} widget(s) adicionales disponibles
+            {availableWidgets.length} Tarjeta(s) adicionales disponibles
           </div>
         )}
       </div>
@@ -582,7 +598,7 @@ export function DashboardBuilder() {
       {/* Infinite Canvas - Freeform Drag & Drop */}
       <InfiniteCanvas
         items={widgets.map((widget) => {
-          const definition = WIDGET_CATALOG[widget.type as WidgetType];
+          const definition = resolveWidgetDefinition(widget.type);
           const position: CanvasPosition = widget.position || { x: 0, y: 0, width: 400, height: 300 };
 
           // ✅ Widget rendering content
@@ -595,7 +611,7 @@ export function DashboardBuilder() {
                     <div>
                       <h4 className="font-semibold text-foreground">Bloque no disponible</h4>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Este widget no pudo cargarse. Tipo: <code className="bg-muted px-2 py-1 rounded text-xs">{widget.type}</code>
+                        Esta tarjeta no pudo cargarse. Tipo: <code className="bg-muted px-2 py-1 rounded text-xs">{widget.type}</code>
                       </p>
                       <button
                         onClick={() => removeWidget(widget.id)}
@@ -676,7 +692,7 @@ export function DashboardBuilder() {
                   <button
                     onClick={() => removeWidget(widget.id)}
                     className="absolute top-2 right-2 z-20 p-1 hover:bg-destructive/10 rounded transition-colors"
-                    aria-label="Eliminar widget"
+                    aria-label="Eliminar tarjeta"
                   >
                     <X className="h-4 w-4 text-destructive" />
                   </button>
@@ -701,9 +717,9 @@ export function DashboardBuilder() {
       {/* Footer info */}
       <div className="text-xs text-muted-foreground text-center py-4">
         {availableWidgets.length > 0 ? (
-          <p>{availableWidgets.length} widget(s) disponibles para agregar</p>
+          <p>{availableWidgets.length} Tarjeta(s) disponibles para agregar</p>
         ) : (
-          <p>Todos los widgets están agregados</p>
+          <p>Todas las Tarjetas están agregadas</p>
         )}
       </div>
 
@@ -762,7 +778,7 @@ export function DashboardBuilder() {
               
               toast({
                 title: "Plantilla aplicada",
-                description: `${template.name} se ha aplicado al dashboard con ${template.widgets.length} widget(s)`,
+                description: `${template.name} se ha aplicado al dashboard con ${template.widgets.length} Tarjeta(s)`,
               });
             }
             setShowWidgetTemplatesGallery(false);

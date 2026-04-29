@@ -98,7 +98,7 @@ export function InfiniteCanvas({
       ref={containerRef}
       className={cn(
         'dashboard-infinite-canvas relative overflow-auto rounded-lg select-none',
-        'border border-cyan-400/20 bg-slate-950 text-slate-50',
+        'border border-slate-200 bg-white text-slate-900',
         className
       )}
       style={{
@@ -113,10 +113,10 @@ export function InfiniteCanvas({
         className="absolute inset-0 pointer-events-none dashboard-infinite-canvas__bg"
         style={{
           backgroundImage: [
-            'radial-gradient(circle at 20% 20%, rgba(34,211,238,0.12) 0, rgba(34,211,238,0) 34%)',
-            'radial-gradient(circle at 80% 10%, rgba(59,130,246,0.14) 0, rgba(59,130,246,0) 30%)',
-            'radial-gradient(circle at 50% 80%, rgba(14,165,233,0.10) 0, rgba(14,165,233,0) 36%)',
-            'radial-gradient(circle, rgba(148,163,184,0.14) 1px, transparent 1px)'
+            'radial-gradient(circle at 20% 20%, rgba(59,130,246,0.08) 0, rgba(59,130,246,0) 32%)',
+            'radial-gradient(circle at 80% 10%, rgba(15,23,42,0.04) 0, rgba(15,23,42,0) 28%)',
+            'radial-gradient(circle at 50% 85%, rgba(14,165,233,0.06) 0, rgba(14,165,233,0) 32%)',
+            'radial-gradient(circle, rgba(148,163,184,0.18) 1px, transparent 1px)'
           ].join(', '),
           backgroundSize: '100% 100%, 100% 100%, 100% 100%, 40px 40px',
           backgroundPosition: '0 0',

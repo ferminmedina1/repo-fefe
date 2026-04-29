@@ -63,7 +63,7 @@ export function ChartWidget({
     error,
     onRemove,
     isDragging,
-  } = useWidgetState(definition);
+  } = useWidgetState(definition, id);
 
   const renderContent = () => {
     // ✅ CONSOLIDATED: Use centralized loading state
