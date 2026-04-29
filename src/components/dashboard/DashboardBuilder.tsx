@@ -502,10 +502,9 @@ export function DashboardBuilder() {
             {/* Additional Actions */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-primary/10">
               <Button
-                variant="outline"
                 onClick={() => setShowTemplateGallery(true)}
                 disabled={isSaving}
-                className="gap-2"
+                className="gap-2 bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/50 text-primary hover:border-primary hover:bg-gradient-to-r hover:from-primary/20 hover:to-primary/10 hover:shadow-lg hover:shadow-primary/50 transition-all duration-300"
               >
                 <Zap className="h-4 w-4" />
                 Ver más plantillas
