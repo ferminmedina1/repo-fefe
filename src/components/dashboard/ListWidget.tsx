@@ -1,11 +1,9 @@
 import { WidgetWrapper } from "./WidgetWrapper";
 import { WidgetConfigModal, WidgetConfig } from "./WidgetConfigModal";
-import { MetricEditorModal } from "./MetricEditorModal";
 import { useWidgetState, WidgetLoadingSkeleton, WidgetEmptyState, WidgetErrorState } from "@/hooks/useWidgetState";
 import { WidgetDefinition } from "@/lib/dashboard/widgets";
 import { VirtualList } from "./VirtualList";
 import { CheckCircle2 } from "lucide-react";
-import { useState } from "react";
 
 interface ListItem {
   name: string;
@@ -37,7 +35,6 @@ export function ListWidget({
   metricConfig,
   onUpdateMetricConfig,
 }: ListWidgetProps) {
-  const [showMetricEditor, setShowMetricEditor] = useState(false);
   // ✅ CONSOLIDATED: Single hook replaces 8 lines of state management
   const {
     showConfig,
@@ -152,11 +149,13 @@ export function ListWidget({
         }}
       />
       <WidgetWrapper
+        id={id}
         title={definition.name}
         description={definition.description}
         icon={<definition.icon className="h-5 w-5" />}
         accentColor={definition.color}
         onConfigure={() => setShowConfig(true)}
+        onRemove={onRemove}
         isDragging={isDragging}
       >
         {renderContent()}

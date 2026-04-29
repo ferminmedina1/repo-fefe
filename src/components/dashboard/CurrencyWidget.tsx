@@ -164,11 +164,14 @@ export function CurrencyWidget({
         }}
       />
       <WidgetWrapper
+        id={id}
         title={definition.name}
         description={definition.description}
         icon={<definition.icon className="h-5 w-5" />}
         accentColor={definition.color}
+        onEditMetric={() => setShowMetricEditor(true)}
         onConfigure={() => setShowConfig(true)}
+        onRemove={onRemove}
         isDragging={isDragging}
       >
         {renderContent()}

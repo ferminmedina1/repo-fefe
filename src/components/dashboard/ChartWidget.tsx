@@ -191,6 +191,7 @@ export function ChartWidget({
         accentColor={definition.color}
         onEditMetric={() => setShowMetricEditor(true)}
         onConfigure={() => setShowConfig(true)}
+        onRemove={onRemove}
         isDragging={isDragging}
       >
         {renderContent()}
