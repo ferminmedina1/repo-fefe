@@ -393,72 +393,83 @@ export function DashboardBuilder() {
         </DialogContent>
       </Dialog>
 
-      {/* ✅ NEW: Dashboard Selector - Always visible at top */}
-      {dashboards.length > 0 && (
-        <div className="flex items-center justify-between gap-4 p-3 bg-muted/30 rounded-lg border border-border">
-          <span className="text-sm font-medium text-muted-foreground">Panel de Control:</span>
-          <DashboardSelector
-            currentDashboardId={selectedDashboardId || dashboardId}
-            dashboards={dashboards}
-            isLoading={dashboardsLoading}
-            onDashboardChange={handleDashboardChange}
-            onCreateNew={handleCreateNewDashboard}
-            onDeleteDashboard={handleDeleteDashboard}
-            onDuplicateDashboard={handleDuplicateDashboard}
-          />
-        </div>
-      )}
-
-      {/* ✅ IMPROVED: Header with Discrete Actions Menu */}
+      {/* ✅ IMPROVED: Header with Dashboard Selector Left, Buttons Right */}
       <div className="flex flex-col items-start justify-between gap-4 relative">
-        <div className="flex-1">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Panel de Control</h1>
-              <p className="text-muted-foreground mt-1">
-                {widgets.length === 0 
-                  ? "Comienza agregando tu primer widget para personalizar tu panel"
-                  : `${widgets.length} widget${widgets.length !== 1 ? "s" : ""} agregado${widgets.length !== 1 ? "s" : ""}`
-                }
-              </p>
-            </div>
-
-            {/* ✅ Discrete Actions Menu - Top Right Corner */}
-            <div className="flex items-center gap-2">
-              {isSaving && (
-                <div className="text-xs text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
-                  <div className="animate-spin">
-                    <RefreshCw className="h-3 w-3" />
-                  </div>
-                  <span className="hidden sm:inline">Guardando...</span>
-                </div>
-              )}
-              <DashboardActionsMenu
-                hasWidgets={widgets.length > 0}
-                isSaving={isSaving}
-                onFilters={() => setShowFilters(true)}
-                onRefresh={() => {
-                  // Refresh functionality would go here
-                }}
-                onExport={() => {
-                  // Export functionality would go here
-                }}
-                onImport={() => {
-                  // Import functionality would go here
-                }}
-                onTemplateGallery={() => setShowWidgetTemplatesGallery(true)}
-                onCSVUpload={() => setShowCSVUploader(true)}
-                onMetricBuilder={() => setShowMetricBuilder(true)}
-                onDashboardCustomize={() => setShowWidgetCustomizer(true)}
-                onShare={() => {
-                  // Share functionality would go here
-                }}
-                onReset={resetLayout}
-                onAddWidget={() => {
-                  // This will be handled by the WidgetPicker
-                }}
+        <div className="w-full flex items-center justify-between gap-4">
+          {/* Left: Dashboard Selector */}
+          {dashboards.length > 0 && (
+            <div className="flex items-center gap-2 min-w-fit">
+              <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Panel:</span>
+              <DashboardSelector
+                currentDashboardId={selectedDashboardId || dashboardId}
+                dashboards={dashboards}
+                isLoading={dashboardsLoading}
+                onDashboardChange={handleDashboardChange}
+                onCreateNew={handleCreateNewDashboard}
+                onDeleteDashboard={handleDeleteDashboard}
+                onDuplicateDashboard={handleDuplicateDashboard}
               />
             </div>
+          )}
+
+          {/* Center: Title and Description */}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-3xl font-bold text-foreground">Panel de Control</h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {widgets.length === 0 
+                ? "Comienza agregando tu primer widget para personalizar tu panel"
+                : `${widgets.length} widget${widgets.length !== 1 ? "s" : ""} agregado${widgets.length !== 1 ? "s" : ""}`
+              }
+            </p>
+          </div>
+
+          {/* Right: Add Widget + Actions Menu */}
+          <div className="flex items-center gap-2 min-w-fit">
+            {isSaving && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5 whitespace-nowrap">
+                <div className="animate-spin">
+                  <RefreshCw className="h-3 w-3" />
+                </div>
+                <span className="hidden sm:inline">Guardando...</span>
+              </div>
+            )}
+            
+            {/* Add Widget Button - Next to menu */}
+            {availableWidgets.length > 0 && widgets.length > 0 && (
+              <WidgetPicker
+                addedWidgetIds={addedWidgetTypes}
+                onAddWidget={handleAddWidget}
+                onCreateWidgetWithMetric={handleCreateWidgetWithMetric}
+                disabled={isSaving}
+              />
+            )}
+
+            {/* Actions Menu */}
+            <DashboardActionsMenu
+              hasWidgets={widgets.length > 0}
+              isSaving={isSaving}
+              onFilters={() => setShowFilters(true)}
+              onRefresh={() => {
+                // Refresh functionality would go here
+              }}
+              onExport={() => {
+                // Export functionality would go here
+              }}
+              onImport={() => {
+                // Import functionality would go here
+              }}
+              onTemplateGallery={() => setShowWidgetTemplatesGallery(true)}
+              onCSVUpload={() => setShowCSVUploader(true)}
+              onMetricBuilder={() => setShowMetricBuilder(true)}
+              onDashboardCustomize={() => setShowWidgetCustomizer(true)}
+              onShare={() => {
+                // Share functionality would go here
+              }}
+              onReset={resetLayout}
+              onAddWidget={() => {
+                // This will be handled by the WidgetPicker
+              }}
+            />
           </div>
         </div>
 
@@ -513,13 +524,8 @@ export function DashboardBuilder() {
 
         {/* Widget management actions when widgets exist */}
         {widgets.length > 0 && availableWidgets.length > 0 && (
-          <div className="flex gap-2">
-            <WidgetPicker
-              addedWidgetIds={addedWidgetTypes}
-              onAddWidget={handleAddWidget}
-              onCreateWidgetWithMetric={handleCreateWidgetWithMetric}
-              disabled={isSaving}
-            />
+          <div className="text-xs text-muted-foreground text-center py-2">
+            {availableWidgets.length} widget(s) adicionales disponibles
           </div>
         )}
       </div>
