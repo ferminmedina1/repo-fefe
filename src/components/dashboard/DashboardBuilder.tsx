@@ -99,41 +99,6 @@ export function DashboardBuilder() {
     };
   }, []);
 
-  // ✅ NEW: Keyboard shortcut listener for undo/redo (Ctrl+Z / Cmd+Z)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Check for Ctrl+Z (Windows/Linux) or Cmd+Z (Mac)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        e.preventDefault();
-        
-        // Ctrl+Shift+Z or Cmd+Shift+Z = Redo
-        if (e.shiftKey) {
-          if (canRedo) {
-            redo();
-            toast({
-              title: "Rehacer",
-              description: "Cambios rehechos",
-              duration: 2000,
-            });
-          }
-        } else {
-          // Ctrl+Z or Cmd+Z = Undo
-          if (canUndo) {
-            undo();
-            toast({
-              title: "Deshacer",
-              description: "Último cambio deshecho",
-              duration: 2000,
-            });
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canUndo, canRedo, undo, redo, toast]);
-
   // ✅ NEW: Fetch all dashboards for the user
   const { 
     data: dashboards = [], 
@@ -166,6 +131,41 @@ export function DashboardBuilder() {
     canUndo,
     canRedo,
   } = useDashboardLayout(currentCompany?.id, userId, selectedDashboardId);
+
+  // ✅ NEW: Keyboard shortcut listener for undo/redo (Ctrl+Z / Cmd+Z)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Ctrl+Z (Windows/Linux) or Cmd+Z (Mac)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+
+        // Ctrl+Shift+Z or Cmd+Shift+Z = Redo
+        if (e.shiftKey) {
+          if (canRedo) {
+            redo();
+            toast({
+              title: "Rehacer",
+              description: "Cambios rehechos",
+              duration: 2000,
+            });
+          }
+        } else {
+          // Ctrl+Z or Cmd+Z = Undo
+          if (canUndo) {
+            undo();
+            toast({
+              title: "Deshacer",
+              description: "Último cambio deshecho",
+              duration: 2000,
+            });
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canUndo, canRedo, undo, redo, toast]);
 
   // ✅ NEW: Handle dashboard changes
   const handleDashboardChange = (newDashboardId: string) => {
