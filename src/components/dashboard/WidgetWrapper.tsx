@@ -30,27 +30,51 @@ export function WidgetWrapper({
   children,
   className,
 }: WidgetWrapperProps) {
-  // Map color names to Tailwind classes
-  const colorMap: Record<string, string> = {
-    blue: "border-blue-500/30 bg-blue-500/5",
-    green: "border-green-500/30 bg-green-500/5",
-    orange: "border-orange-500/30 bg-orange-500/5",
-    purple: "border-purple-500/30 bg-purple-500/5",
-    red: "border-red-500/30 bg-red-500/5",
-    cyan: "border-cyan-500/30 bg-cyan-500/5",
+  // Map color names to Tailwind classes - improved with gradient effects
+  const colorMap: Record<string, { border: string; bg: string; glow: string }> = {
+    blue: {
+      border: "border-blue-500/40 hover:border-blue-500/70",
+      bg: "bg-gradient-to-br from-blue-500/8 to-cyan-500/8 hover:from-blue-500/12 hover:to-cyan-500/12",
+      glow: "shadow-[0_0_30px_rgba(59,130,246,0.2)] hover:shadow-[0_0_40px_rgba(59,130,246,0.3)]"
+    },
+    green: {
+      border: "border-green-500/40 hover:border-green-500/70",
+      bg: "bg-gradient-to-br from-green-500/8 to-emerald-500/8 hover:from-green-500/12 hover:to-emerald-500/12",
+      glow: "shadow-[0_0_30px_rgba(34,197,94,0.2)] hover:shadow-[0_0_40px_rgba(34,197,94,0.3)]"
+    },
+    orange: {
+      border: "border-orange-500/40 hover:border-orange-500/70",
+      bg: "bg-gradient-to-br from-orange-500/8 to-amber-500/8 hover:from-orange-500/12 hover:to-amber-500/12",
+      glow: "shadow-[0_0_30px_rgba(249,115,22,0.2)] hover:shadow-[0_0_40px_rgba(249,115,22,0.3)]"
+    },
+    purple: {
+      border: "border-purple-500/40 hover:border-purple-500/70",
+      bg: "bg-gradient-to-br from-purple-500/8 to-pink-500/8 hover:from-purple-500/12 hover:to-pink-500/12",
+      glow: "shadow-[0_0_30px_rgba(168,85,247,0.2)] hover:shadow-[0_0_40px_rgba(168,85,247,0.3)]"
+    },
+    red: {
+      border: "border-red-500/40 hover:border-red-500/70",
+      bg: "bg-gradient-to-br from-red-500/8 to-rose-500/8 hover:from-red-500/12 hover:to-rose-500/12",
+      glow: "shadow-[0_0_30px_rgba(239,68,68,0.2)] hover:shadow-[0_0_40px_rgba(239,68,68,0.3)]"
+    },
+    cyan: {
+      border: "border-cyan-500/40 hover:border-cyan-500/70",
+      bg: "bg-gradient-to-br from-cyan-500/8 to-blue-500/8 hover:from-cyan-500/12 hover:to-blue-500/12",
+      glow: "shadow-[0_0_30px_rgba(34,211,238,0.2)] hover:shadow-[0_0_40px_rgba(34,211,238,0.3)]"
+    },
   };
 
   const accentGradientMap: Record<string, string> = {
-    blue: "from-blue-500 to-blue-600",
-    green: "from-green-500 to-green-600",
-    orange: "from-orange-500 to-orange-600",
-    purple: "from-purple-500 to-purple-600",
-    red: "from-red-500 to-red-600",
-    cyan: "from-cyan-500 to-cyan-600",
+    blue: "from-blue-500 to-cyan-600",
+    green: "from-green-500 to-emerald-600",
+    orange: "from-orange-500 to-amber-600",
+    purple: "from-purple-500 to-pink-600",
+    red: "from-red-500 to-rose-600",
+    cyan: "from-cyan-500 to-blue-600",
   };
 
-  // Validate color with fallback (prevent invalid colors from breaking UI)
-  const getColorClass = (color: string): string => {
+  // Validate color with fallback
+  const getColorClasses = (color: string): { border: string; bg: string; glow: string } => {
     if (!color) {
       if (process.env.NODE_ENV === 'development') {
         console.warn('[WidgetWrapper] Missing accentColor prop, using default');
@@ -73,52 +97,73 @@ export function WidgetWrapper({
     return accentGradientMap[color];
   };
 
+  const colorClasses = getColorClasses(accentColor);
+
   return (
     <Card
       className={cn(
-        "shadow-sm border-l-2 overflow-hidden transition-all duration-200 relative group",
-        getColorClass(accentColor),
-        isDragging && "opacity-50 scale-95 ring-2 ring-primary/50 shadow-lg",
+        // Base structure
+        "overflow-hidden transition-all duration-300 relative group",
+        // Border and background with gradients
+        "border",
+        colorClasses.border,
+        colorClasses.bg,
+        // Glow effect
+        colorClasses.glow,
+        // Drag state
+        isDragging && "opacity-50 scale-95 ring-2 ring-primary/50 shadow-xl",
         className
       )}
     >
-      {/* Drag hint - visible on hover */}
-      <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-60 transition-opacity duration-150 pointer-events-none">
-        <span className="text-[10px] text-muted-foreground bg-background/80 px-1.5 py-0.5 rounded whitespace-nowrap">
-          Arrastra para mover
-        </span>
+      {/* Background shimmer on hover */}
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 rounded-lg" />
       </div>
 
-      {/* Accent gradient bar */}
+      {/* Top accent gradient bar - animated */}
       <div
         className={cn(
-          "h-0.5 bg-gradient-to-r",
+          "h-1 bg-gradient-to-r transition-all duration-300 group-hover:h-1.5",
           getGradientClass(accentColor)
         )}
       />
 
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-3 pt-2">
-        <div className="flex items-center gap-1.5 flex-1">
-          {icon && <div className="text-muted-foreground text-[16px]">{icon}</div>}
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-3">
+        <div className="flex items-center gap-2.5 flex-1">
+          {/* Icon with animated glow */}
+          {icon && (
+            <div className={cn(
+              "p-1.5 rounded-lg transition-all duration-300",
+              "bg-gradient-to-br from-current/10 to-current/5",
+              "group-hover:from-current/20 group-hover:to-current/10",
+              "text-muted-foreground group-hover:text-foreground",
+              "text-[16px]"
+            )}>
+              {icon}
+            </div>
+          )}
+          
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-xs font-semibold truncate">{title}</CardTitle>
+            <CardTitle className="text-sm font-bold truncate text-foreground">{title}</CardTitle>
             {description && (
-              <p className="text-[11px] text-muted-foreground mt-0">{description}</p>
+              <p className="text-[11px] text-muted-foreground/70 mt-0.5">{description}</p>
             )}
           </div>
         </div>
 
-        {/* Widget Action Menu - arriba a la derecha, discreto */}
-        <WidgetActionMenu
-          widgetId={id}
-          widgetName={title}
-          onEditMetric={onEditMetric || (() => {})}
-          onConfigure={onConfigure || (() => {})}
-          onRemove={onRemove || (() => {})}
-        />
+        {/* Widget Action Menu - right side, with better spacing */}
+        <div className="ml-2 flex-shrink-0">
+          <WidgetActionMenu
+            widgetId={id}
+            widgetName={title}
+            onEditMetric={onEditMetric || (() => {})}
+            onConfigure={onConfigure || (() => {})}
+            onRemove={onRemove || (() => {})}
+          />
+        </div>
       </CardHeader>
 
-      <CardContent className="space-y-1 px-3 pb-2 pt-0">{children}</CardContent>
+      <CardContent className="space-y-2 px-4 pb-3 pt-1">{children}</CardContent>
     </Card>
   );
 }
