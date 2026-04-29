@@ -32,6 +32,7 @@ export function InfiniteCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isHovered, setIsHovered] = useState(false);
 
   // Handle dragging
   const handleMouseDown = useCallback((e: React.MouseEvent, itemId: string) => {
@@ -96,21 +97,28 @@ export function InfiniteCanvas({
     <div
       ref={containerRef}
       className={cn(
-        'relative overflow-auto bg-background border border-border/50',
-        'rounded-lg select-none',
+        'dashboard-infinite-canvas relative overflow-auto rounded-lg select-none',
+        'border border-cyan-400/20 bg-slate-950 text-slate-50',
         className
       )}
       style={{
         height: '100vh',
-        cursor: isDragging ? 'grabbing' : 'grab',
+        cursor: isDragging ? 'grabbing' : isHovered ? 'grab' : 'default',
       }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Canvas background */}
       <div
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none dashboard-infinite-canvas__bg"
         style={{
-          backgroundImage: 'radial-gradient(circle, var(--color-border) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
+          backgroundImage: [
+            'radial-gradient(circle at 20% 20%, rgba(34,211,238,0.12) 0, rgba(34,211,238,0) 34%)',
+            'radial-gradient(circle at 80% 10%, rgba(59,130,246,0.14) 0, rgba(59,130,246,0) 30%)',
+            'radial-gradient(circle at 50% 80%, rgba(14,165,233,0.10) 0, rgba(14,165,233,0) 36%)',
+            'radial-gradient(circle, rgba(148,163,184,0.14) 1px, transparent 1px)'
+          ].join(', '),
+          backgroundSize: '100% 100%, 100% 100%, 100% 100%, 40px 40px',
           backgroundPosition: '0 0',
         }}
       />

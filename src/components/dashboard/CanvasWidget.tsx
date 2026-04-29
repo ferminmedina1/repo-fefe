@@ -116,8 +116,8 @@ export function CanvasWidget({
     <div
       ref={widgetRef}
       className={cn(
-        'relative bg-background border border-border/50 rounded-lg overflow-hidden',
-        'transition-shadow duration-200',
+        'group relative bg-slate-950/70 border border-cyan-400/15 rounded-lg overflow-hidden',
+        'transition-shadow duration-200 cursor-default',
         isDragging && 'shadow-lg ring-2 ring-primary/50',
         isResizing && 'ring-2 ring-primary',
         className
@@ -126,20 +126,20 @@ export function CanvasWidget({
       {/* Draggable header handle */}
       <div
         data-draggable-handle
-        className="cursor-grab active:cursor-grabbing absolute top-0 left-0 right-0 h-10 z-10"
+        className="absolute top-0 left-0 right-0 h-10 z-10 cursor-grab active:cursor-grabbing"
       />
 
       {/* Widget content */}
       <div className="h-full w-full overflow-auto">{children}</div>
 
       {/* Resize handles - only show on hover */}
-      <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity pointer-events-none group">
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
         {RESIZE_HANDLES.map((handle) => (
           <div
             key={handle}
             className={cn(
-              'absolute w-4 h-4 bg-primary rounded-full transition-colors',
-              'hover:bg-primary/80 pointer-events-auto'
+              'absolute w-3 h-3 bg-cyan-400/80 rounded-full transition-colors pointer-events-auto',
+              'hover:bg-cyan-300'
             )}
             style={getResizeHandlePosition(handle)}
             onMouseDown={(e) => handleResizeStart(handle, e)}
