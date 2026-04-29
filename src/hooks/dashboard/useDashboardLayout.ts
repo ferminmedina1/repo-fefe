@@ -68,10 +68,12 @@ export function useDashboardLayout(
 ) {
   const queryClient = useQueryClient();
   const [localWidgets, setLocalWidgets] = useState<DashboardWidget[]>([]);
+  const localWidgetsRef = useRef<DashboardWidget[]>([]);
   const [dashboardName, setDashboardName] = useState("Mi Panel de Control");
   const [history, setHistory] = useState<DashboardWidget[][]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const autoSaveTimeout = useAutoSaveTimeout();
+  const positionSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // ✅ NEW: Fetch a specific dashboard or the default one
   const { data: layoutData, isLoading } = useQuery<DashboardLayoutData | null>({
@@ -121,7 +123,14 @@ export function useDashboardLayout(
       setLocalWidgets(normalizedWidgets);
       setDashboardName(layoutData.name);
     }
+    // keep ref in sync for timeouts
+    localWidgetsRef.current = layoutData?.widgets ? normalizeLayoutWidgets(layoutData.widgets) : [];
   }, [layoutData?.widgets, layoutData?.name]);
+
+  // keep ref updated whenever localWidgets change
+  useEffect(() => {
+    localWidgetsRef.current = localWidgets;
+  }, [localWidgets]);
 
   // Mutation: Save layout to Supabase
   const saveLayoutMutation = useMutation({
@@ -173,8 +182,11 @@ export function useDashboardLayout(
   useEffect(() => {
     if (!layoutData?.id && localWidgets.length === 0) return;
 
+    // If we're currently batching position saves, skip the generic autosave
+    if (positionSaveTimeoutRef.current) return;
+
     autoSaveTimeout.debounce(() => {
-      saveLayoutMutation.mutate(localWidgets);
+      saveLayoutMutation.mutate(localWidgetsRef.current);
     }, 1000);
 
     return () => autoSaveTimeout.clear();
@@ -189,6 +201,11 @@ export function useDashboardLayout(
         order: prev.length,
       },
     ]);
+    // Adding a widget is a structural change — cancel any pending position-only save
+    if (positionSaveTimeoutRef.current) {
+      clearTimeout(positionSaveTimeoutRef.current);
+      positionSaveTimeoutRef.current = null;
+    }
   };
 
   // Remove widget
@@ -198,6 +215,10 @@ export function useDashboardLayout(
         .filter((w) => w.id !== widgetId)
         .map((w, idx) => ({ ...w, order: idx }))
     );
+    if (positionSaveTimeoutRef.current) {
+      clearTimeout(positionSaveTimeoutRef.current);
+      positionSaveTimeoutRef.current = null;
+    }
   };
 
   // Reorder widgets (for drag & drop)
@@ -213,6 +234,11 @@ export function useDashboardLayout(
   // Reset layout to empty
   const resetLayout = async () => {
     setLocalWidgets([]);
+    // Clear any pending position save and persist empty layout
+    if (positionSaveTimeoutRef.current) {
+      clearTimeout(positionSaveTimeoutRef.current);
+      positionSaveTimeoutRef.current = null;
+    }
     if (layoutData?.id) {
       await saveLayoutMutation.mutateAsync([]);
     }
@@ -220,6 +246,8 @@ export function useDashboardLayout(
 
   // ✅ NEW: Update widget position or other properties (with history)
   const updateWidget = (widgetId: string, updates: Partial<DashboardWidget>) => {
+    const isPositionOnly = Object.keys(updates).length === 1 && 'position' in updates;
+
     setLocalWidgets((prev) => {
       // Save current state to history before making changes
       const newHistory = history.slice(0, historyIndex + 1);
@@ -228,12 +256,29 @@ export function useDashboardLayout(
       setHistoryIndex(newHistory.length - 1);
 
       // Now apply the update
-      return prev.map((w) =>
-        w.id === widgetId
-          ? { ...w, ...updates }
-          : w
-      );
+      const next = prev.map((w) => (w.id === widgetId ? { ...w, ...updates } : w));
+      return next;
     });
+
+    // If this is a high-frequency position update (drag), batch saves and write only after idle
+    if (isPositionOnly) {
+      if (positionSaveTimeoutRef.current) {
+        clearTimeout(positionSaveTimeoutRef.current);
+      }
+      positionSaveTimeoutRef.current = setTimeout(() => {
+        saveLayoutMutation.mutate(localWidgetsRef.current);
+        positionSaveTimeoutRef.current = null;
+      }, 1500);
+    } else {
+      // Non-position changes should cancel any pending position save and schedule a normal autosave
+      if (positionSaveTimeoutRef.current) {
+        clearTimeout(positionSaveTimeoutRef.current);
+        positionSaveTimeoutRef.current = null;
+      }
+      autoSaveTimeout.debounce(() => {
+        saveLayoutMutation.mutate(localWidgetsRef.current);
+      }, 1000);
+    }
   };
 
   // ✅ NEW: Undo function
@@ -267,6 +312,14 @@ export function useDashboardLayout(
           : w
       )
     );
+    // Persist metric config changes promptly (not position-only)
+    if (positionSaveTimeoutRef.current) {
+      clearTimeout(positionSaveTimeoutRef.current);
+      positionSaveTimeoutRef.current = null;
+    }
+    autoSaveTimeout.debounce(() => {
+      saveLayoutMutation.mutate(localWidgetsRef.current);
+    }, 1000);
   };
 
   // Manually save
