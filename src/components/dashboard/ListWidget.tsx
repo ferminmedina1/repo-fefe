@@ -143,7 +143,7 @@ export function ListWidget({
       <WidgetConfigModal
         isOpen={showConfig}
         widgetName={definition.name}
-        widgetId={definition.id}
+        widgetId={id}
         config={widgetConfig}
         onClose={() => setShowConfig(false)}
         onSave={(config) => {
