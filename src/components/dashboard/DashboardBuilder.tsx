@@ -24,7 +24,8 @@ import { WIDGET_CATALOG, WidgetType, getAvailableWidgets } from "@/lib/dashboard
 import { getWidgetContainerClassesForType, type WidgetSize } from "@/lib/dashboard/widgetDimensions";
 import { WidgetPicker } from "./WidgetPicker";
 import { DashboardEmptyState } from "./DashboardEmptyState";
-import { EnterpriseDragDropContainer, EnterpriseSortableWidget } from "./EnhancedDragDropContainer";
+import { InfiniteCanvas, CanvasPosition } from "./InfiniteCanvas";
+import { CanvasWidget } from "./CanvasWidget";
 import { KpiWidget } from "./KpiWidget";
 import { ChartWidget } from "./ChartWidget";
 import { ListWidget } from "./ListWidget";
@@ -123,6 +124,7 @@ export function DashboardBuilder() {
     resetLayout,
     hasLayout,
     layoutId,
+    updateWidget,
     updateWidgetMetricConfig,
   } = useDashboardLayout(currentCompany?.id, userId, selectedDashboardId);
 
@@ -266,10 +268,21 @@ export function DashboardBuilder() {
 
   // Wrapper for addWidget to match WidgetPicker's interface
   const handleAddWidget = (widgetType: WidgetType, size?: 'full' | 'half' | 'quarter') => {
+    // Auto-position widgets: offset them to avoid stacking
+    const positionIndex = widgets.length;
+    const offsetX = (positionIndex % 4) * 420;
+    const offsetY = Math.floor(positionIndex / 4) * 320;
+
     addWidget({
-      id: `${widgetType}-${Date.now()}`, // Generate unique ID
+      id: `${widgetType}-${Date.now()}`,
       type: widgetType,
       size: size || 'full',
+      position: {
+        x: offsetX,
+        y: offsetY,
+        width: 400,
+        height: 300,
+      },
     });
   };
 
@@ -283,10 +296,20 @@ export function DashboardBuilder() {
     size: 'quarter' | 'half' | 'full';
   }) => {
     const widgetId = `metric-widget-${Date.now()}`;
+    const positionIndex = widgets.length;
+    const offsetX = (positionIndex % 4) * 420;
+    const offsetY = Math.floor(positionIndex / 4) * 320;
+
     addWidget({
       id: widgetId,
       type: widget.type === 'chart' ? 'custom-chart' : 'custom-kpi',
       size: widget.size,
+      position: {
+        x: offsetX,
+        y: offsetY,
+        width: 400,
+        height: 300,
+      },
       metricConfig: {
         metricId: widget.metricId,
         customFormula: widget.customFormula,
@@ -377,8 +400,7 @@ export function DashboardBuilder() {
       isDragging={isDragging}
       setIsDragging={setIsDragging}
     >
-      <div className="space-y-6">
-      {/* ✅ IMPROVED: Filters Modal Dialog - Opens with button */}
+      <div className="space-y-4">
       <Dialog open={showFilters} onOpenChange={setShowFilters}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -394,8 +416,8 @@ export function DashboardBuilder() {
       </Dialog>
 
       {/* ✅ IMPROVED: Header with Dashboard Selector Left, Buttons Right */}
-      <div className="flex flex-col items-start justify-between gap-4 relative">
-        <div className="w-full flex items-center justify-between gap-4">
+      <div className="flex flex-col items-start justify-between gap-2 relative">
+        <div className="w-full flex items-center justify-between gap-2">
           {/* Left: Dashboard Selector */}
           {dashboards.length > 0 && (
             <div className="flex items-center gap-2 min-w-fit">
@@ -522,129 +544,124 @@ export function DashboardBuilder() {
         )}
       </div>
 
-      {/* Widgets Grid */}
-      <EnterpriseDragDropContainer
-        widgets={widgets}
-        onReorder={reorderWidgets}
-        enableLogging={true}
-        maxReordersPerMinute={60}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 auto-rows-max">
-          {widgets.map((widget) => {
-            const definition = WIDGET_CATALOG[widget.type as WidgetType];
+      {/* Infinite Canvas - Freeform Drag & Drop */}
+      <InfiniteCanvas
+        items={widgets.map((widget) => {
+          const definition = WIDGET_CATALOG[widget.type as WidgetType];
+          const position: CanvasPosition = widget.position || { x: 0, y: 0, width: 400, height: 300 };
 
-            // ✅ FIXED: Show error instead of silently failing if widget type not found
+          // ✅ Widget rendering content
+          const widgetContent = (() => {
             if (!definition) {
               return (
-                <EnterpriseSortableWidget key={widget.id} id={widget.id}>
-                  <div className="rounded-lg border border-red-200 bg-red-50 p-6 shadow-sm relative group">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <h4 className="font-semibold text-red-900">Widget no encontrado</h4>
-                        <p className="text-sm text-red-700 mt-1">
-                          Tipo de widget desconocido: <code className="bg-red-100 px-2 py-1 rounded text-xs">{widget.type}</code>
-                        </p>
-                        <button
-                          onClick={() => removeWidget(widget.id)}
-                          className="text-xs text-red-600 hover:text-red-700 hover:underline mt-2"
-                        >
-                          Eliminar widget →
-                        </button>
-                      </div>
+                <div className="rounded-lg border border-red-200 bg-red-50 p-6 shadow-sm h-full flex flex-col justify-center">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-semibold text-red-900">Widget no encontrado</h4>
+                      <p className="text-sm text-red-700 mt-1">
+                        Tipo desconocido: <code className="bg-red-100 px-2 py-1 rounded text-xs">{widget.type}</code>
+                      </p>
+                      <button
+                        onClick={() => removeWidget(widget.id)}
+                        className="text-xs text-red-600 hover:text-red-700 hover:underline mt-2"
+                      >
+                        Eliminar →
+                      </button>
                     </div>
                   </div>
-                </EnterpriseSortableWidget>
+                </div>
               );
             }
 
-            // ✅ All widgets now get data from context - no more prop drilling!
-            const widgetContent = (() => {
-              const handleUpdateMetricConfig = (metricConfig: {
-                metricId?: string;
-                customFormula?: string;
-                customFormat?: 'currency' | 'number' | 'percentage' | 'decimal';
-                customUnit?: string;
-              }) => {
-                updateWidgetMetricConfig(widget.id, metricConfig);
-              };
+            const handleUpdateMetricConfig = (metricConfig: {
+              metricId?: string;
+              customFormula?: string;
+              customFormat?: 'currency' | 'number' | 'percentage' | 'decimal';
+              customUnit?: string;
+            }) => {
+              updateWidgetMetricConfig(widget.id, metricConfig);
+            };
 
-              switch (definition.category) {
-                case "kpi":
-                  return (
-                    <KpiWidget 
-                      id={widget.id}
-                      definition={definition}
-                      metricConfig={widget.metricConfig}
-                      onUpdateMetricConfig={handleUpdateMetricConfig}
-                    />
-                  );
+            switch (definition.category) {
+              case "kpi":
+                return (
+                  <KpiWidget 
+                    id={widget.id}
+                    definition={definition}
+                    metricConfig={widget.metricConfig}
+                    onUpdateMetricConfig={handleUpdateMetricConfig}
+                  />
+                );
+              case "chart":
+                return (
+                  <ChartWidget 
+                    id={widget.id}
+                    definition={definition}
+                    metricConfig={widget.metricConfig}
+                    onUpdateMetricConfig={handleUpdateMetricConfig}
+                  />
+                );
+              case "list":
+                return (
+                  <ListWidget 
+                    id={widget.id}
+                    definition={definition}
+                    metricConfig={widget.metricConfig}
+                    onUpdateMetricConfig={handleUpdateMetricConfig}
+                  />
+                );
+              case "currency":
+                return (
+                  <CurrencyWidget 
+                    id={widget.id}
+                    definition={definition}
+                    metricConfig={widget.metricConfig}
+                    onUpdateMetricConfig={handleUpdateMetricConfig}
+                  />
+                );
+              default:
+                return null;
+            }
+          })();
 
-                case "chart":
-                  return (
-                    <ChartWidget 
-                      id={widget.id}
-                      definition={definition}
-                      metricConfig={widget.metricConfig}
-                      onUpdateMetricConfig={handleUpdateMetricConfig}
-                    />
-                  );
-
-                case "list":
-                  return (
-                    <ListWidget 
-                      id={widget.id}
-                      definition={definition}
-                      metricConfig={widget.metricConfig}
-                      onUpdateMetricConfig={handleUpdateMetricConfig}
-                    />
-                  );
-
-                case "currency":
-                  return (
-                    <CurrencyWidget 
-                      id={widget.id}
-                      definition={definition}
-                      metricConfig={widget.metricConfig}
-                      onUpdateMetricConfig={handleUpdateMetricConfig}
-                    />
-                  );
-
-                default:
-                  return null;
-              }
-            })();
-
-            if (!widgetContent) return null;
-
-            return (
-              <EnterpriseSortableWidget key={widget.id} id={widget.id}>
-                <div
-                  className={cn(
-                    "rounded-lg border bg-card shadow-sm relative group",
-                    // ✅ CENTRALIZED: Dimensions now come from config, not hardcoded
-                    getWidgetContainerClassesForType(widget.size as WidgetSize, widget.type)
-                  )}
-                >
-                  {/* ✅ Delete Button - Appears on hover */}
+          return {
+            id: widget.id,
+            position,
+            children: (
+              <CanvasWidget
+                id={widget.id}
+                position={position}
+                onPositionChange={(newPosition) => {
+                  updateWidget(widget.id, { position: newPosition });
+                }}
+              >
+                <div className="relative w-full h-full">
+                  {/* Delete button */}
                   <button
                     onClick={() => removeWidget(widget.id)}
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-destructive/10 rounded"
-                    aria-label={`Eliminar widget: ${definition.name}`}
+                    className="absolute top-2 right-2 z-20 p-1 hover:bg-destructive/10 rounded transition-colors"
+                    aria-label="Eliminar widget"
                   >
-                    <X className="h-4 w-4 text-destructive" aria-hidden="true" />
+                    <X className="h-4 w-4 text-destructive" />
                   </button>
 
-                  {/* ✅ Wrap widget with error boundary to prevent cascade failures */}
-                  <WidgetErrorBoundary widgetName={definition.name}>
-                    {widgetContent}
+                  {/* Widget content */}
+                  <WidgetErrorBoundary widgetName={definition?.name || 'Unknown'}>
+                    <div className="h-full pt-8">
+                      {widgetContent}
+                    </div>
                   </WidgetErrorBoundary>
                 </div>
-              </EnterpriseSortableWidget>
-            );
-          })}
-        </div>
-      </EnterpriseDragDropContainer>
+              </CanvasWidget>
+            ),
+          };
+        })}
+        onItemPositionChange={(itemId, position) => {
+          updateWidget(itemId, { position });
+        }}
+        className="flex-1 min-h-[calc(100vh-200px)]"
+      />
 
       {/* Footer info */}
       <div className="text-xs text-muted-foreground text-center py-4">

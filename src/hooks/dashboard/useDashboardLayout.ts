@@ -28,11 +28,19 @@ export interface WidgetMetricConfig {
   customUnit?: string;
 }
 
+export interface WidgetPosition {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface DashboardWidget {
   id: string;
   type: string;
   size?: "full" | "half" | "quarter";
   order: number;
+  position?: WidgetPosition;
   metricConfig?: WidgetMetricConfig;
 }
 
@@ -208,6 +216,17 @@ export function useDashboardLayout(
     }
   };
 
+  // ✅ NEW: Update widget position or other properties
+  const updateWidget = (widgetId: string, updates: Partial<DashboardWidget>) => {
+    setLocalWidgets((prev) =>
+      prev.map((w) =>
+        w.id === widgetId
+          ? { ...w, ...updates }
+          : w
+      )
+    );
+  };
+
   // ✅ NEW: Update metric config for a widget
   const updateWidgetMetricConfig = (widgetId: string, metricConfig: WidgetMetricConfig) => {
     setLocalWidgets((prev) =>
@@ -235,6 +254,7 @@ export function useDashboardLayout(
     removeWidget,
     reorderWidgets,
     resetLayout,
+    updateWidget,
     updateWidgetMetricConfig,
     save,
     layoutId: layoutData?.id,

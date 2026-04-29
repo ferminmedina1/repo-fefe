@@ -204,7 +204,7 @@ export function DashboardSelector({
           }
         }}
       >
-        <SelectTrigger className="w-64 border border-border hover:border-primary/50 transition-colors">
+        <SelectTrigger className="w-64 border border-border hover:border-primary/50 transition-colors cursor-pointer">
           <SelectValue 
             placeholder="Selecciona un panel"
           />
@@ -212,62 +212,20 @@ export function DashboardSelector({
         <SelectContent>
           {/* Existing Dashboards */}
           {dashboards.map((dashboard) => (
-            <div
+            <SelectItem 
               key={dashboard.id}
-              className="flex items-center justify-between px-2 py-2 text-sm hover:bg-accent rounded cursor-pointer group"
-              onClick={() => {
-                navigate(`/app?dashboard=${dashboard.id}`);
-                onDashboardChange(dashboard.id);
-              }}
+              value={dashboard.id}
+              className="cursor-pointer"
             >
-              <SelectItem value={dashboard.id} className="flex-1 p-0">
-                <div className="flex items-center gap-2">
-                  {dashboard.is_default && (
-                    <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded">
-                      Por defecto
-                    </span>
-                  )}
-                  <span>{dashboard.name}</span>
-                </div>
-              </SelectItem>
-
-              {/* Action Buttons - Visible on hover */}
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openEditModal(dashboard.id, dashboard.name);
-                  }}
-                  className="p-1 hover:bg-primary/10 hover:text-primary rounded transition-colors"
-                  title="Editar configuración"
-                >
-                  <Settings className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDuplicateDashboard(dashboard.id);
-                  }}
-                  disabled={isDuplicating}
-                  className="p-1 hover:bg-muted rounded transition-colors"
-                  title="Duplicar panel"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-                {dashboards.length > 1 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteConfirm(dashboard.id);
-                    }}
-                    className="p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-colors"
-                    title="Eliminar panel"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+              <div className="flex items-center gap-2">
+                {dashboard.is_default && (
+                  <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded whitespace-nowrap">
+                    Por defecto
+                  </span>
                 )}
+                <span className="truncate">{dashboard.name}</span>
               </div>
-            </div>
+            </SelectItem>
           ))}
 
           {/* Divider */}
