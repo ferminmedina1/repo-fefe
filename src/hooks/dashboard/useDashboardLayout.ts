@@ -69,6 +69,8 @@ export function useDashboardLayout(
   const queryClient = useQueryClient();
   const [localWidgets, setLocalWidgets] = useState<DashboardWidget[]>([]);
   const [dashboardName, setDashboardName] = useState("Mi Panel de Control");
+  const [history, setHistory] = useState<DashboardWidget[][]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
   const autoSaveTimeout = useAutoSaveTimeout();
 
   // ✅ NEW: Fetch a specific dashboard or the default one
@@ -216,16 +218,45 @@ export function useDashboardLayout(
     }
   };
 
-  // ✅ NEW: Update widget position or other properties
+  // ✅ NEW: Update widget position or other properties (with history)
   const updateWidget = (widgetId: string, updates: Partial<DashboardWidget>) => {
-    setLocalWidgets((prev) =>
-      prev.map((w) =>
+    setLocalWidgets((prev) => {
+      // Save current state to history before making changes
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push(prev);
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+
+      // Now apply the update
+      return prev.map((w) =>
         w.id === widgetId
           ? { ...w, ...updates }
           : w
-      )
-    );
+      );
+    });
   };
+
+  // ✅ NEW: Undo function
+  const undo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setLocalWidgets(history[newIndex]);
+    }
+  };
+
+  // ✅ NEW: Redo function
+  const redo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setLocalWidgets(history[newIndex]);
+    }
+  };
+
+  // ✅ NEW: Check if undo/redo are available
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
 
   // ✅ NEW: Update metric config for a widget
   const updateWidgetMetricConfig = (widgetId: string, metricConfig: WidgetMetricConfig) => {
@@ -258,6 +289,10 @@ export function useDashboardLayout(
     updateWidgetMetricConfig,
     save,
     layoutId: layoutData?.id,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   };
 }
 
